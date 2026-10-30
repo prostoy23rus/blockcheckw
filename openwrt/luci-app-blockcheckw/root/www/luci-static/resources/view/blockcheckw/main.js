@@ -27,7 +27,16 @@ var PRESET_DEFS = {
 		domainsText: '33 хоста, 17 провайдеров (Rutracker, Pornhub, TorProject, BBC и др.)',
 		test_url: 'https://rutracker.org',
 		key: 'builtin',
-		port: '80,443'
+		port: '80,443',
+		hint: {
+			title: 'Встроенные хосты (33 сайта, 17 провайдеров)',
+			summary: 'Комплексный профиль для обхода блокировок Рунета по широкому спектру популярных заблокированных ресурсов.',
+			details: [
+				{ title: '🎯 Что тестируется', text: '33 домена заблокированных ресурсов (Rutracker, Pornhub, TorProject, BBC, Meduza, LinkedIn, Soundcloud и др.) на портах 80 (HTTP) и 443 (HTTPS).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_General (список list_hosts_general). Защищает весь общий заблокированный веб-трафик домашней сети.' },
+				{ title: '💡 Универсальность', text: 'Подобранная стратегия находит «золотую середину» против алгоритмов ТСПУ вашего интернет-провайдера, открывая сразу сотни сайтов.' }
+			]
+		}
 	},
 	'preset_youtube': {
 		name: 'Предустановленный список YouTube (3)',
@@ -37,7 +46,17 @@ var PRESET_DEFS = {
 		domainsText: 'googlevideo.com (видеопотоки), i.ytimg.com (превью), youtube.com',
 		test_url: 'https://www.youtube.com',
 		key: 'preset_youtube',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'YouTube (видеопотоки, превью, веб-плеер)',
+			summary: 'Специализированный режим для полного обхода троттлинга (замедления) и блокировки YouTube на смартфонах, Smart TV и ПК.',
+			details: [
+				{ title: '🎯 Что тестируется', text: 'googlevideo.com (CDN видеопотоков 1080p-4K), i.ytimg.com (обложки и аватары), youtube.com (веб-интерфейс и API).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Создает или дополняет секцию zapret2.MyTube (список list_hosts_youtube). При нахождении новой стратегии создается отдельная версия (MyTube_v...) без затирания старой.' },
+				{ title: '📱 Смартфоны и Smart TV', text: 'Приложения YouTube на смартфонах и ТВ по умолчанию используют протокол QUIC (UDP 443). Роутер автоматически блокирует QUIC (правило Reject-QUIC), принуждая плеер переключиться на TCP TLS, где стратегия Zapret2 успешно расщепляет пакеты.' },
+				{ title: '⚙️ Рекомендация', text: 'Используйте связку «Турбо» + «Circular авто-ротация». Circular объединит fake-split и disorder для надежной работы без буферизации.' }
+			]
+		}
 	},
 	'preset_discord': {
 		name: 'Предустановленный список Discord (3)',
@@ -47,7 +66,16 @@ var PRESET_DEFS = {
 		domainsText: 'gateway.discord.gg (голос), discord.com, cdn.discordapp.com',
 		test_url: 'https://gateway.discord.gg',
 		key: 'preset_discord',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'Discord (голосовые каналы, шлюзы, текст и медиа)',
+			summary: 'Профиль для восстановления работы Discord: устранение бесконечного подключения RTC («Подключение к голосовому каналу...») и загрузки картинок.',
+			details: [
+				{ title: '🎯 Что тестируется', text: 'gateway.discord.gg (сигнальный сервер голоса и вебсокетов), discord.com (авторизация/API), cdn.discordapp.com (медиафайлы, аватарки, вложения).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_Discord (список list_hosts_discord). Использует L7 фильтрацию пакетов tls discord.' },
+				{ title: '💡 Особенность работы', text: 'DPI провайдеров глушит первый TLS ClientHello при установлении голосового RTC соединения. Стратегия расщепляет SNI gateway.discord.gg.' }
+			]
+		}
 	},
 	'preset_twitch': {
 		name: 'Предустановленный список Twitch (3)',
@@ -57,7 +85,16 @@ var PRESET_DEFS = {
 		domainsText: 'twitch.tv, static-cdn.jtvnw.net, usher.ttvnw.net (стримы)',
 		test_url: 'https://twitch.tv',
 		key: 'preset_twitch',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'Twitch (прямые трансляции, стримы 1080p60 и чат)',
+			summary: 'Оптимизирован для обхода замедления прямых эфиров Twitch, предотвращения постоянной буферизации и зависания плеера.',
+			details: [
+				{ title: '🎯 Что тестируется', text: 'twitch.tv (портал), static-cdn.jtvnw.net (стили, скрипты, смайлы), usher.ttvnw.net (видео-плейлисты HLS и сегменты трансляций).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_Twitch (список list_hosts_twitch).' },
+				{ title: '⚡ Рекомендация', text: 'Для стабильного стриминга без фризов рекомендуется использовать Circular авто-ротацию со сплитом в начале SNI (pos=1 или pos=midsld).' }
+			]
+		}
 	},
 	'preset_x': {
 		name: 'Предустановленный список X (3)',
@@ -67,7 +104,16 @@ var PRESET_DEFS = {
 		domainsText: 'x.com, api.x.com, pbs.twimg.com (медиа)',
 		test_url: 'https://x.com',
 		key: 'preset_x',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'X / Twitter (лента твитов, медиа и авторизация)',
+			summary: 'Профиль для восстановления доступа к X (бывший Twitter) в браузере и официальном мобильном приложении на смартфонах.',
+			details: [
+				{ title: '🎯 Что тестируется', text: 'x.com (веб-версия), api.x.com (API синхронизации ленты и авторизации), pbs.twimg.com (хостинг фото и видео).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_X (список list_hosts_x).' },
+				{ title: '💡 Особенность', text: 'Серверы X строго проверяют целостность TLS ClientHello — наилучшие результаты показывают стратегии fake-split и multisplit.' }
+			]
+		}
 	},
 	'preset_instagram': {
 		name: 'Предустановленный список Instagram (2)',
@@ -77,7 +123,16 @@ var PRESET_DEFS = {
 		domainsText: 'gateway.instagram.com, static.cdninstagram.com',
 		test_url: 'https://gateway.instagram.com',
 		key: 'preset_instagram',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'Instagram (лента, Stories, Reels и Direct)',
+			summary: 'Разблокировка Instagram: быстрая загрузка контента в ленте, публикация и просмотр историй и личных сообщений.',
+			details: [
+				{ title: '🎯 Что тестируется', text: 'gateway.instagram.com (мобильные API-шлюзы Meta), static.cdninstagram.com (CDN медиа-файлов).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_Instagram (список list_hosts_instagram).' },
+				{ title: '📱 Совет по смартфонам', text: 'Для работы приложения убедитесь, что в телефоне в настройках сети выключен «Частный DNS-сервер» провайдера (должен стоять «Автоматически» или IP роутера).' }
+			]
+		}
 	},
 	'tcp16': {
 		name: 'Кандидаты TCP 16-20 KB (110)',
@@ -87,7 +142,16 @@ var PRESET_DEFS = {
 		domainsText: '110 хостов из suite.json (Miele, Roxio, GetScope и др.)',
 		test_url: 'https://media.miele.com',
 		key: 'tcp16',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'Кандидаты TCP 16-20 KB (110 хостов)',
+			summary: 'Стресс-тестирование DPI провайдера на обработку длинных TLS-пакетов, больших окон TCP и тяжелых цепочек сертификатов.',
+			details: [
+				{ title: '🎯 Что тестируется', text: '110 международных хостов из набора suite.json (media.miele.com, Roxio, GetScope и др.) с размером TLS-рукопожатия более 16 КБ.' },
+				{ title: '🛡️ Секция Zapret2', text: 'Запись zapret2.BlockcheckW_TCP16.' },
+				{ title: '🔬 Когда полезно', text: 'Используйте, если некоторые тяжелые зарубежные сайты или платежные шлюзы с длинными сертификатами зависают при загрузке.' }
+			]
+		}
 	},
 	'domains': {
 		name: 'Свои домены',
@@ -97,7 +161,16 @@ var PRESET_DEFS = {
 		domainsText: 'Пользовательский список доменов для поиска обхода',
 		test_url: 'https://rutracker.org',
 		key: 'domains',
-		port: '80,443'
+		port: '80,443',
+		hint: {
+			title: 'Свои домены (Пользовательский список)',
+			summary: 'Индивидуальный подбор стратегии обхода для любых конкретных сайтов, указанных вами вручную.',
+			details: [
+				{ title: '📝 Как использовать', text: 'Введите один или несколько доменов через пробел в поле ввода выше (например: notion.so rutracker.org canva.com).' },
+				{ title: '🛡️ Секция Zapret2', text: 'Создает персональную стратегию zapret2.BlockcheckW_Custom. Правила Zapret2 будут применены точечно только к введенным адресам.' },
+				{ title: '💡 Формат ввода', text: 'Указывайте только чистые имена доменов без протокола https://, портов или слэшей страниц.' }
+			]
+		}
 	},
 	'test_strategy': {
 		name: 'Тест стратегии',
@@ -107,7 +180,16 @@ var PRESET_DEFS = {
 		domainsText: 'Проверка работы существующей стратегии Zapret2 на ресурсе',
 		test_url: 'https://rutracker.org',
 		key: 'test_strategy',
-		port: '443'
+		port: '443',
+		hint: {
+			title: 'Тест стратегии (Проверка без сканирования)',
+			summary: 'Экспресс-диагностика: проверка доступности любого ресурса через уже сохраненную на роутере конфигурацию Zapret2.',
+			details: [
+				{ title: '⚡ Как работает', text: 'Роутер отправляет реальный HTTP/HTTPS запрос (curl) с эмуляцией TLS ClientHello браузера и выводит точный код ответа (200 OK, 302 Redirect) и время отклика.' },
+				{ title: '🔍 Выбор адреса', text: 'Адрес автоматически подставляется под выбранную стратегию (для YouTube — googlevideo.com, для Discord — gateway.discord.gg), либо вы можете указать любой свой URL.' },
+				{ title: '🚀 Кнопки управления', text: 'Нажмите [ 🌐 Проверить доступность (curl) ] для моментальной проверки. Кнопку [ ▶ Запустить поиск стратегий ] нажимайте только если хотите заново подобрать стратегию с нуля.' }
+			]
+		}
 	}
 };
 
@@ -223,6 +305,15 @@ return view.extend({
 			'.bcw-chip-btn:hover { color: #fff; border-color: #3273dc; background: #323742; }\n' +
 			'.bcw-chip-btn.active { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; font-weight: bold; }\n' +
 			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }\n' +
+			'\n' +
+			'/* Mode Hints Box */\n' +
+			'.bcw-hint-box { margin-top: 14px; padding: 14px 16px; border-radius: 6px; background: rgba(97, 175, 239, 0.06); border: 1px solid rgba(97, 175, 239, 0.22); border-left: 4px solid #61afef; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }\n' +
+			'.bcw-hint-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: bold; color: #61afef; font-size: 14px; }\n' +
+			'.bcw-hint-summary { color: #e5e9f0; font-size: 13px; font-weight: 500; }\n' +
+			'.bcw-hint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }\n' +
+			'.bcw-hint-item { display: flex; flex-direction: column; gap: 3px; background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); }\n' +
+			'.bcw-hint-item-title { font-weight: bold; font-size: 12px; color: #98c379; display: flex; align-items: center; gap: 6px; }\n' +
+			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; }\n' +
 			'\n' +
 			'/* Control & Parameters Bar */\n' +
 			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; }\n' +
@@ -348,7 +439,9 @@ return view.extend({
 			{ id: 'preset_x', icon: '🐦', name: 'X / Twitter' },
 			{ id: 'preset_instagram', icon: '📸', name: 'Instagram' },
 			{ id: 'builtin', icon: '🌐', name: 'Встроенные хосты (33)' },
-			{ id: 'tcp16', icon: '⚡', name: 'TCP 16-20 KB' }
+			{ id: 'tcp16', icon: '⚡', name: 'TCP 16-20 KB' },
+			{ id: 'domains', icon: '🎯', name: 'Свои домены' },
+			{ id: 'test_strategy', icon: '🧪', name: 'Тест стратегии' }
 		];
 
 		var chipsRowEl = E('div', { class: 'bcw-chips-row' }, [
@@ -477,6 +570,19 @@ return view.extend({
 			summaryStatusBadgeEl
 		]);
 
+		// Mode Hint Box
+		var modeHintTitleEl = E('span', { class: 'bcw-hint-header' }, '💡 Справка по режиму');
+		var modeHintSummaryEl = E('div', { class: 'bcw-hint-summary' }, '');
+		var modeHintGridEl = E('div', { class: 'bcw-hint-grid' }, []);
+
+		var modeHintBox = E('div', { class: 'bcw-hint-box' }, [
+			E('div', { style: 'display: flex; justify-content: space-between; align-items: center;' }, [
+				modeHintTitleEl
+			]),
+			modeHintSummaryEl,
+			modeHintGridEl
+		]);
+
 		var targetSectionCard = E('div', { class: 'bcw-card' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, '1. Цель обхода (Пресеты Zapret Finder)')
@@ -488,7 +594,8 @@ return view.extend({
 			chipsRowEl,
 			customDomainRow,
 			testStrategyRow,
-			targetSummaryBox
+			targetSummaryBox,
+			modeHintBox
 		]);
 		mainLayout.appendChild(targetSectionCard);
 
@@ -513,11 +620,34 @@ return view.extend({
 			click: function() { switchApplyMode(false); }
 		}, '✋ Вручную (По кнопке)');
 
+		var paramSpeedHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+			currentMode === 'turbo'
+				? '⚡ Турбо: молниеносный перебор проверенных топ-стратегий 2026 года (multisplit, fake, disorder). Рекомендуется в 95% случаев.'
+				: '🔬 Глубокий скан: полный перебор комбинаций параметров Zapret (ack/ts смещения, fool/disorder, fake payloads). Для жестких блокировок.'
+		);
+
+		var paramApplyHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+			autoApply
+				? '⚡ Авто: лучшая найденная связка сразу записывается в конфиг Zapret2 и перезапускает службу.'
+				: '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.'
+		);
+
+		var paramCircularHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+			doCircular
+				? '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.'
+				: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.'
+		);
+
 		var chkCircular = E('input', {
 			type: 'checkbox',
 			checked: doCircular,
 			style: 'margin-right: 8px; cursor: pointer;',
-			change: function(e) { doCircular = e.target.checked; }
+			change: function(e) {
+				doCircular = e.target.checked;
+				paramCircularHintEl.textContent = doCircular
+					? '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.'
+					: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
+			}
 		});
 
 		var btnStartScan = E('button', {
@@ -555,13 +685,13 @@ return view.extend({
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Скорость подбора:'),
 					E('div', { class: 'bcw-segmented' }, [ btnModeTurbo, btnModeFull ]),
-					E('div', { style: 'font-size: 11px; opacity: 0.7;' }, 'Турбо тестирует топ-пресеты 2026 года.')
+					paramSpeedHintEl
 				]),
 				// Box 2: Auto-apply
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Режим применения:'),
 					E('div', { class: 'bcw-segmented' }, [ btnApplyAuto, btnApplyManual ]),
-					E('div', { style: 'font-size: 11px; opacity: 0.7;' }, 'Авто сразу внедряет лучшую связку в Zapret2.')
+					paramApplyHintEl
 				]),
 				// Box 3: Circular
 				E('div', { class: 'bcw-param-box' }, [
@@ -570,7 +700,7 @@ return view.extend({
 						chkCircular,
 						E('span', { style: 'color: #3273dc;' }, '🔄 Circular авто-ротация')
 					]),
-					E('div', { style: 'font-size: 11px; opacity: 0.7;' }, 'Ротация между разными техниками обхода.')
+					paramCircularHintEl
 				])
 			]),
 			E('div', { class: 'bcw-action-bar' }, [
@@ -965,6 +1095,36 @@ return view.extend({
 			});
 		}
 
+		function updateModeHint() {
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var h = pDef.hint;
+			if (!h) {
+				modeHintBox.style.display = 'none';
+				return;
+			}
+			modeHintBox.style.display = 'flex';
+
+			modeHintTitleEl.textContent = '💡 ' + (h.title || pDef.name);
+			modeHintSummaryEl.textContent = h.summary || '';
+
+			while (modeHintGridEl.firstChild) {
+				modeHintGridEl.removeChild(modeHintGridEl.firstChild);
+			}
+
+			if (h.details && h.details.length) {
+				h.details.forEach(function(item) {
+					var itemEl = E('div', { class: 'bcw-hint-item' }, [
+						E('div', { class: 'bcw-hint-item-title' }, item.title),
+						E('div', { class: 'bcw-hint-item-text' }, item.text)
+					]);
+					modeHintGridEl.appendChild(itemEl);
+				});
+				modeHintGridEl.style.display = 'grid';
+			} else {
+				modeHintGridEl.style.display = 'none';
+			}
+		}
+
 		function updateSummaryBox() {
 			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
 			summaryTitleEl.textContent = pDef.icon + ' ' + pDef.name;
@@ -982,17 +1142,18 @@ return view.extend({
 					summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
 					summaryStatusBadgeEl.textContent = 'Выберите стратегию выше';
 				}
-				return;
+			} else {
+				var sData = zapretServicesData[pDef.key || currentTarget];
+				if (sData && sData.enabled) {
+					summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
+					summaryStatusBadgeEl.textContent = sData.is_circular ? '🔄 Активна Circular-связка (' + sData.section + ')' : '✓ Активна стратегия (' + sData.section + ')';
+				} else {
+					summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
+					summaryStatusBadgeEl.textContent = 'Не настроено в Zapret2';
+				}
 			}
 
-			var sData = zapretServicesData[pDef.key || currentTarget];
-			if (sData && sData.enabled) {
-				summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
-				summaryStatusBadgeEl.textContent = sData.is_circular ? '🔄 Активна Circular-связка (' + sData.section + ')' : '✓ Активна стратегия (' + sData.section + ')';
-			} else {
-				summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
-				summaryStatusBadgeEl.textContent = 'Не настроено в Zapret2';
-			}
+			updateModeHint();
 		}
 
 		function selectTarget(targetId) {
@@ -1031,9 +1192,11 @@ return view.extend({
 			if (mode === 'turbo') {
 				btnModeTurbo.classList.add('active');
 				btnModeFull.classList.remove('active');
+				paramSpeedHintEl.textContent = '⚡ Турбо: молниеносный перебор проверенных топ-стратегий 2026 года (multisplit, fake, disorder). Рекомендуется в 95% случаев.';
 			} else {
 				btnModeFull.classList.add('active');
 				btnModeTurbo.classList.remove('active');
+				paramSpeedHintEl.textContent = '🔬 Глубокий скан: полный перебор комбинаций параметров Zapret (ack/ts смещения, fool/disorder, fake payloads). Для жестких блокировок.';
 			}
 		}
 
@@ -1042,9 +1205,11 @@ return view.extend({
 			if (isAuto) {
 				btnApplyAuto.classList.add('active', 'teal');
 				btnApplyManual.classList.remove('active');
+				paramApplyHintEl.textContent = '⚡ Авто: лучшая найденная связка сразу записывается в конфиг Zapret2 и перезапускает службу.';
 			} else {
 				btnApplyManual.classList.add('active');
 				btnApplyAuto.classList.remove('active', 'teal');
+				paramApplyHintEl.textContent = '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.';
 			}
 		}
 

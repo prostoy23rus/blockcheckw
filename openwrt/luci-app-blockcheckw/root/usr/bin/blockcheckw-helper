@@ -35,13 +35,41 @@ write_status() {
         circular_esc=$(sed 's/"/\\"/g' "$OUTPUT_CIRCULAR" | awk '{printf "%s\\n", $0}')
     fi
 
+    local isp=""
+    local block_type=""
+    if [ -f "$LOG_FILE" ]; then
+        isp=$(grep -i "ISP:" "$LOG_FILE" 2>/dev/null | head -n 1 | sed 's/.*ISP:[[:space:]]*//' | sed 's/"/\\"/g' | tr -d '\r\n')
+    fi
+    if [ -f "$OUTPUT_SCAN" ]; then
+        block_type=$(lua -e '
+            local json = require("luci.jsonc")
+            local f = io.open("'"$OUTPUT_SCAN"'", "r")
+            if f then
+                local d = json.parse(f:read("*a"))
+                f:close()
+                if d and d.block_type then print(d.block_type) end
+            end
+        ' 2>/dev/null | tr -d '\r\n')
+    fi
+    if [ -z "$block_type" ] && [ -f "$LOG_FILE" ]; then
+        if grep -qi "SNI blocked" "$LOG_FILE"; then
+            block_type="sni_blocked"
+        elif grep -qi "IP blocked" "$LOG_FILE"; then
+            block_type="ip_blocked"
+        elif grep -qi "BLOCKED" "$LOG_FILE"; then
+            block_type="sni_blocked"
+        fi
+    fi
+
     cat <<EOF > "$STATUS_FILE"
 {
   "status": "$status",
   "percent": $percent,
   "phase": "$phase",
   "log": "$log_tail",
-  "circular": "$circular_esc"
+  "circular": "$circular_esc",
+  "isp": "$isp",
+  "block_type": "$block_type"
   $extra
 }
 EOF
@@ -309,7 +337,64 @@ cmd_status() {
         fi
     fi
 
-    cat "$STATUS_FILE"
+    lua - "$STATUS_FILE" "$LOG_FILE" "$OUTPUT_SCAN" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local scan_file = arg[3]
+
+local st = {}
+local sf = io.open(status_file, "r")
+if sf then
+    st = json.parse(sf:read("*a")) or {}
+    sf:close()
+end
+
+-- Enrich with ISP from log if missing
+if not st.isp or st.isp == "" then
+    local lf = io.open(log_file, "r")
+    if lf then
+        for line in lf:lines() do
+            local isp_match = line:match("ISP:%s*(.+)")
+            if isp_match then
+                st.isp = isp_match:gsub("[\r\n]", ""):gsub("^%s+", "")
+                break
+            end
+        end
+        lf:close()
+    end
+end
+
+-- Enrich with block_type from scan or log if missing
+if not st.block_type or st.block_type == "" then
+    local scf = io.open(scan_file, "r")
+    if scf then
+        local sc = json.parse(scf:read("*a")) or {}
+        scf:close()
+        if sc.block_type then
+            st.block_type = sc.block_type
+        end
+    end
+end
+
+if not st.block_type or st.block_type == "" then
+    local lf = io.open(log_file, "r")
+    if lf then
+        local content = lf:read("*a") or ""
+        lf:close()
+        local bt = content:match('"block_type":%s*"([^"]+)"')
+        if bt then
+            st.block_type = bt
+        elseif content:find("SNI blocked") or content:find("BLOCKED") then
+            st.block_type = "sni_blocked"
+        elseif content:find("IP blocked") then
+            st.block_type = "ip_blocked"
+        end
+    end
+end
+
+print(json.stringify(st))
+EOF
 }
 
 cmd_stop() {

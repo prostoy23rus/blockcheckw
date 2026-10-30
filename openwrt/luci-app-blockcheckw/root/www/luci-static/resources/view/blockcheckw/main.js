@@ -163,6 +163,28 @@ function checkVersion() {
 	});
 }
 
+function formatBlockType(bType) {
+	if (!bType || bType.trim() === '') return 'Определение...';
+	switch (bType) {
+		case 'sni_blocked':
+			return '🛡️ SNI blocked (DPI блокировка по SNI — обходится Zapret2)';
+		case 'throttled':
+			return '⚠️ DPI Throttling (Искусственное замедление скорости до 16-20 KB)';
+		case 'not_blocked':
+			return '✅ Доступен без обхода (не блокируется на вашей линии)';
+		case 'ip_blocked':
+			return '❌ IP blocked (блокировка адреса / дроп SYN — требуется VPN)';
+		case 'syn_blocked':
+			return '❌ SYN blocked (пакеты глушатся у провайдера, но хост жив)';
+		case 'dns_failed':
+			return '⚠️ DNS Failed (ошибка разрешения имени / отравление DNS)';
+		case 'host_dead':
+			return '💀 Хост недоступен / выключен';
+		default:
+			return bType;
+	}
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
@@ -532,6 +554,29 @@ return view.extend({
 		var progressPercentEl = E('span', { style: 'font-weight: bold;' }, '0%');
 		var progressPhaseEl = E('h3', { class: 'bcw-card-title', style: 'color: #00d1b2;' }, 'Прогресс сканирования');
 
+		var ispValEl = E('span', { style: 'color: #61afef; font-weight: 600;' }, (statusData.isp || 'Определение...'));
+		var blockTypeValEl = E('span', { style: 'color: #e5c07b; font-weight: 600;' }, formatBlockType(statusData.block_type));
+
+		var lineParamsBoxEl = E('div', {
+			class: 'bcw-line-params-box',
+			style: 'margin-top: 14px; padding: 12px 16px; background: rgba(0, 0, 0, 0.25); border-radius: 6px; border: 1px solid #383e4a; font-size: 13px;'
+		}, [
+			E('div', { style: 'font-weight: bold; color: #00d1b2; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;' }, [
+				E('span', {}, '📡'),
+				'Исходные параметры линии и блокировки:'
+			]),
+			E('div', { style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;' }, [
+				E('div', {}, [
+					E('strong', { style: 'color: #abb2bf;' }, 'Провайдер: '),
+					ispValEl
+				]),
+				E('div', {}, [
+					E('strong', { style: 'color: #abb2bf;' }, 'Тип блокировки: '),
+					blockTypeValEl
+				])
+			])
+		]);
+
 		var monitorCard = E('div', { class: 'bcw-card', style: 'display: none; border-left: 4px solid #00d1b2;' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				progressPhaseEl
@@ -542,7 +587,8 @@ return view.extend({
 			E('div', { style: 'display: flex; justify-content: space-between; font-size: 13px; opacity: 0.9;' }, [
 				progressTextEl,
 				progressPercentEl
-			])
+			]),
+			lineParamsBoxEl
 		]);
 		mainLayout.appendChild(monitorCard);
 
@@ -781,6 +827,8 @@ return view.extend({
 			monitorCard.style.display = 'block';
 			circularCard.style.display = 'none';
 			resultsCard.style.display = 'none';
+			ispValEl.textContent = 'Определение...';
+			blockTypeValEl.textContent = 'Определение...';
 
 			var helperArgs = [
 				'start',
@@ -859,6 +907,13 @@ return view.extend({
 				progressPhaseEl.textContent = 'Ошибка сканирования';
 				progressPhaseEl.style.color = '#ff3860';
 				progressBarEl.style.background = '#ff3860';
+			}
+
+			if (st.isp && st.isp.trim() !== '') {
+				ispValEl.textContent = st.isp;
+			}
+			if (st.block_type && st.block_type.trim() !== '') {
+				blockTypeValEl.textContent = formatBlockType(st.block_type);
 			}
 
 			if (activeLogTab === 'scanner' && st.log) {
@@ -1108,13 +1163,16 @@ return view.extend({
 			}
 		}, 5000);
 
-		// Initial check if background scan is already running
+		// Initial check if background scan is already running or has previous diagnosis
 		if (statusData.status === 'running') {
 			monitorCard.style.display = 'block';
 			btnStartScan.style.display = 'none';
 			btnStopScan.style.display = 'inline-flex';
 			updateProgressUI(statusData);
 			startPolling();
+		} else if (statusData.status === 'done' && (statusData.isp || statusData.block_type)) {
+			monitorCard.style.display = 'block';
+			updateProgressUI(statusData);
 		}
 
 		return container;

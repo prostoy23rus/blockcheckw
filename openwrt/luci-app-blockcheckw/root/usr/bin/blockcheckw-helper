@@ -803,7 +803,7 @@ cmd_check_update() {
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
     rm -f "$tmp_ver"
-    curl -sSL -k --connect-timeout 5 "$REPO_RAW/openwrt/version.json?_=$(date +%s)" -o "$tmp_ver" 2>/dev/null
+    curl -sSL -k --connect-timeout 5 "$REPO_RAW/openwrt/version.json" -o "$tmp_ver" 2>/dev/null
 
     if [ ! -s "$tmp_ver" ]; then
         echo "{\"success\":false,\"current_version\":\"$cur_ver\",\"error\":\"Не удалось связаться с GitHub\"}"

@@ -296,12 +296,18 @@ return view.extend({
 			'.bcw-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); }\n' +
 			'.bcw-card-title { font-size: 15px; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; color: #e5e9f0; }\n' +
 			'\n' +
+			'/* Header Action Elements */\n' +
+			'.bcw-header-item { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; font-size: 12px; font-weight: 600; border-radius: 6px; box-sizing: border-box; line-height: 1; white-space: nowrap; transition: all 0.2s; border: 1px solid #485060; }\n' +
+			'.bcw-header-btn { background: #282c34; color: #abb2bf; cursor: pointer; text-decoration: none; }\n' +
+			'.bcw-header-btn:hover { background: #323742; color: #fff; border-color: #3273dc; }\n' +
+			'.bcw-header-badge { background: #282c34; color: #abb2bf; }\n' +
+			'\n' +
 			'/* Finder Mode Dropdown & Chips */\n' +
 			'.bcw-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }\n' +
-			'.bcw-select { box-sizing: border-box; min-width: 320px; max-width: 100%; padding: 8px 14px; font-size: 14px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
+			'.bcw-select { box-sizing: border-box; min-width: 320px; max-width: 100%; height: 38px; padding: 0 14px; font-size: 14px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
 			'.bcw-select:hover, .bcw-select:focus { border-color: #3273dc; box-shadow: 0 0 8px rgba(50, 115, 220, 0.3); }\n' +
 			'.bcw-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }\n' +
-			'.bcw-chip-btn { box-sizing: border-box; padding: 6px 14px; font-size: 12px; font-weight: 500; border-radius: 20px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }\n' +
+			'.bcw-chip-btn { box-sizing: border-box; height: 32px; padding: 0 14px; font-size: 12px; font-weight: 500; border-radius: 16px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; white-space: nowrap; }\n' +
 			'.bcw-chip-btn:hover { color: #fff; border-color: #3273dc; background: #323742; }\n' +
 			'.bcw-chip-btn.active { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; font-weight: bold; }\n' +
 			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }\n' +
@@ -310,34 +316,38 @@ return view.extend({
 			'.bcw-hint-box { margin-top: 14px; padding: 14px 16px; border-radius: 6px; background: rgba(97, 175, 239, 0.06); border: 1px solid rgba(97, 175, 239, 0.22); border-left: 4px solid #61afef; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }\n' +
 			'.bcw-hint-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: bold; color: #61afef; font-size: 14px; }\n' +
 			'.bcw-hint-summary { color: #e5e9f0; font-size: 13px; font-weight: 500; }\n' +
-			'.bcw-hint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }\n' +
-			'.bcw-hint-item { display: flex; flex-direction: column; gap: 3px; background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); }\n' +
+			'.bcw-hint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }\n' +
+			'.bcw-hint-item { display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); height: 100%; box-sizing: border-box; }\n' +
 			'.bcw-hint-item-title { font-weight: bold; font-size: 12px; color: #98c379; display: flex; align-items: center; gap: 6px; }\n' +
 			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; }\n' +
 			'\n' +
 			'/* Control & Parameters Bar */\n' +
 			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; }\n' +
-			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }\n' +
+			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; min-height: 125px; box-sizing: border-box; }\n' +
 			'.bcw-param-label { font-size: 13px; font-weight: bold; color: #abb2bf; }\n' +
-			'.bcw-segmented { display: flex; border-radius: 6px; overflow: hidden; border: 1px solid #485060; background: #1c1f24; }\n' +
-			'.bcw-seg-btn { flex: 1; padding: 8px 10px; font-size: 12px; font-weight: 600; text-align: center; cursor: pointer; background: transparent; border: none; color: #828997; transition: all 0.2s; }\n' +
+			'.bcw-segmented { display: flex; height: 38px; border-radius: 6px; overflow: hidden; border: 1px solid #485060; background: #1c1f24; box-sizing: border-box; }\n' +
+			'.bcw-seg-btn { flex: 1; height: 100%; padding: 0 10px; font-size: 12px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: transparent; border: none; color: #828997; transition: all 0.2s; white-space: nowrap; line-height: 1; box-sizing: border-box; }\n' +
 			'.bcw-seg-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }\n' +
 			'.bcw-seg-btn.active { background: #3273dc; color: #fff; font-weight: bold; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }\n' +
 			'.bcw-seg-btn.active.teal { background: #00d1b2; color: #000; font-weight: bold; }\n' +
 			'\n' +
 			'/* Main Unified Action Bar */\n' +
 			'.bcw-action-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 4px; }\n' +
-			'.bcw-btn-launch { padding: 12px 28px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none; background: #00d1b2; color: #000; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
+			'.bcw-btn-launch, .bcw-btn-stop, .bcw-btn-secondary { height: 44px; box-sizing: border-box; padding: 0 24px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; line-height: 1; white-space: nowrap; border: 1px solid transparent; }\n' +
+			'.bcw-btn-launch { background: #00d1b2; color: #000; border-color: #00d1b2; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
 			'.bcw-btn-launch:hover { background: #00e6c4; box-shadow: 0 0 16px rgba(0,209,178,0.45); transform: translateY(-1px); }\n' +
-			'.bcw-btn-stop { padding: 12px 28px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: none; background: #ff3860; color: #fff; transition: all 0.2s; }\n' +
+			'.bcw-btn-stop { background: #ff3860; color: #fff; border-color: #ff3860; box-shadow: 0 2px 8px rgba(255,56,96,0.25); }\n' +
 			'.bcw-btn-stop:hover { background: #ff4d73; box-shadow: 0 0 14px rgba(255,56,96,0.4); }\n' +
-			'.bcw-btn-secondary { padding: 11px 20px; font-size: 14px; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #485060; background: #282c34; color: #abb2bf; transition: all 0.2s; }\n' +
+			'.bcw-btn-secondary { background: #282c34; border-color: #485060; color: #e5e9f0; }\n' +
 			'.bcw-btn-secondary:hover { background: #323742; color: #fff; border-color: #3273dc; }\n' +
+			'\n' +
+			'/* Utility Buttons */\n' +
+			'.bcw-btn-sm { height: 32px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; cursor: pointer; transition: all 0.2s; white-space: nowrap; line-height: 1; }\n' +
 			'\n' +
 			'/* Code and Console Boxes */\n' +
 			'.bcw-code-box { box-sizing: border-box; background: #181a1f; color: #98c379; padding: 14px 16px; border-radius: 6px; font-size: 12px; font-family: "SF Mono", "Consolas", "Courier New", monospace; line-height: 1.45; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 250px; overflow-y: auto; border: 1px solid #282c34; }\n' +
 			'.bcw-log-tabs { display: flex; flex-wrap: wrap; gap: 8px; }\n' +
-			'.bcw-log-tab-btn { padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 4px; border: 1px solid #3e4451; background: #282c34; color: #abb2bf; transition: all 0.2s; }\n' +
+			'.bcw-log-tab-btn { height: 32px; padding: 0 14px; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 6px; border: 1px solid #3e4451; background: #282c34; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; line-height: 1; }\n' +
 			'.bcw-log-tab-btn.active { background: #3273dc; color: #fff; border-color: #3273dc; font-weight: bold; }\n' +
 			'\n' +
 			'/* Responsive */\n' +
@@ -355,18 +365,16 @@ return view.extend({
 
 		// Header Section
 		var zapretBadgeEl = E('span', {
-			class: (zapretInfo.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red',
-			style: 'font-size: 13px; font-weight: bold; padding: 6px 14px; border-radius: 6px;'
+			class: 'bcw-header-item ' + ((zapretInfo.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red'),
+			style: 'border: none;'
 		}, (zapretInfo.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен');
 
 		var versionBadgeEl = E('span', {
-			class: 'badge',
-			style: 'font-size: 13px; font-weight: bold; padding: 6px 12px; border-radius: 6px; background: #282c34; border: 1px solid #485060; color: #abb2bf;'
+			class: 'bcw-header-item bcw-header-badge'
 		}, 'v' + (versionInfo.current_version || '0.15'));
 
 		var btnCheckUpdate = E('button', {
-			class: 'bcw-btn-secondary',
-			style: 'padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;',
+			class: 'bcw-header-item bcw-header-btn',
 			click: function() { doCheckUpdate(true); }
 		}, [
 			E('span', {}, '🔄'),
@@ -374,8 +382,7 @@ return view.extend({
 		]);
 
 		var btnFeedback = E('a', {
-			class: 'bcw-btn-secondary',
-			style: 'padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;',
+			class: 'bcw-header-item bcw-header-btn',
 			href: 'https://github.com/prostoy23rus/blockcheckw/issues',
 			target: '_blank',
 			title: 'Сообщить об ошибке или предложить улучшение на GitHub'
@@ -465,7 +472,7 @@ return view.extend({
 			class: 'cbi-input-text',
 			placeholder: 'rutracker.org',
 			value: 'rutracker.org',
-			style: 'width: 380px; max-width: 100%; font-size: 14px; padding: 7px 12px;'
+			style: 'width: 380px; max-width: 100%; height: 38px; font-size: 14px; padding: 0 12px; box-sizing: border-box;'
 		});
 
 		var customDomainRow = E('div', {
@@ -478,7 +485,7 @@ return view.extend({
 		var testUrlInput = E('input', {
 			type: 'text',
 			class: 'cbi-input-text',
-			style: 'width: 100%; max-width: 420px; font-size: 13px; font-family: monospace;',
+			style: 'width: 100%; max-width: 420px; height: 38px; font-size: 13px; font-family: monospace; padding: 0 12px; box-sizing: border-box;',
 			value: 'https://googlevideo.com',
 			placeholder: 'https://googlevideo.com или любой URL'
 		});
@@ -540,18 +547,18 @@ return view.extend({
 			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 152px;' }, [
 				E('span', { style: 'font-size: 11px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:'),
 				E('button', {
-					class: 'cbi-button cbi-button-neutral',
-					style: 'padding: 2px 8px; font-size: 11px;',
+					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
 					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://googlevideo.com'; }
 				}, '📺 YouTube (googlevideo.com)'),
 				E('button', {
-					class: 'cbi-button cbi-button-neutral',
-					style: 'padding: 2px 8px; font-size: 11px;',
+					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
 					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://gateway.discord.gg'; }
 				}, '💬 Discord'),
 				E('button', {
-					class: 'cbi-button cbi-button-neutral',
-					style: 'padding: 2px 8px; font-size: 11px;',
+					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
 					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://rutracker.org'; }
 				}, '🌐 Rutracker')
 			])
@@ -638,17 +645,15 @@ return view.extend({
 				: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.'
 		);
 
-		var chkCircular = E('input', {
-			type: 'checkbox',
-			checked: doCircular,
-			style: 'margin-right: 8px; cursor: pointer;',
-			change: function(e) {
-				doCircular = e.target.checked;
-				paramCircularHintEl.textContent = doCircular
-					? '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.'
-					: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
-			}
-		});
+		var btnCircularOn = E('button', {
+			class: 'bcw-seg-btn' + (doCircular ? ' active' : ''),
+			click: function() { switchCircularMode(true); }
+		}, '🔄 Circular (Связка)');
+
+		var btnCircularOff = E('button', {
+			class: 'bcw-seg-btn' + (!doCircular ? ' active' : ''),
+			click: function() { switchCircularMode(false); }
+		}, '⚡ Одиночная');
 
 		var btnStartScan = E('button', {
 			class: 'bcw-btn-launch',
@@ -696,10 +701,7 @@ return view.extend({
 				// Box 3: Circular
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Отказоустойчивость:'),
-					E('label', { style: 'display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600;' }, [
-						chkCircular,
-						E('span', { style: 'color: #3273dc;' }, '🔄 Circular авто-ротация')
-					]),
+					E('div', { class: 'bcw-segmented' }, [ btnCircularOn, btnCircularOff ]),
 					paramCircularHintEl
 				])
 			]),
@@ -717,14 +719,14 @@ return view.extend({
 		var activeCodeEl = E('pre', { class: 'bcw-code-box', style: 'max-height: 220px;' }, '');
 
 		var btnCopyActive = E('button', {
-			class: 'cbi-button cbi-button-neutral',
-			style: 'padding: 4px 12px; font-size: 12px;',
+			class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+			style: 'height: 32px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
 			click: function() { copyActiveStrategy(); }
 		}, '📋 Скопировать');
 
 		var versionsSelectEl = E('select', {
 			class: 'bcw-select',
-			style: 'min-width: 220px; font-size: 12px; padding: 4px 10px;',
+			style: 'min-width: 220px; height: 32px; font-size: 12px; padding: 0 10px;',
 			change: function(e) {
 				var sec = e.target.value;
 				if (!sec) return;
@@ -733,16 +735,16 @@ return view.extend({
 		});
 
 		var btnActivateVersion = E('button', {
-			class: 'cbi-button cbi-button-action',
-			style: 'padding: 4px 14px; font-size: 12px; display: none; font-weight: bold;',
+			class: 'bcw-btn-sm cbi-button cbi-button-action',
+			style: 'height: 32px; font-size: 12px; display: none; font-weight: bold; align-items: center; justify-content: center; gap: 6px;',
 			click: function() {
 				activateSelectedVersion();
 			}
 		}, '⚡ Активировать');
 
 		var btnDeleteVersion = E('button', {
-			class: 'cbi-button cbi-button-negative',
-			style: 'padding: 4px 10px; font-size: 12px; display: none;',
+			class: 'bcw-btn-sm cbi-button cbi-button-negative',
+			style: 'height: 32px; font-size: 12px; display: none; align-items: center; justify-content: center; gap: 6px;',
 			click: function() {
 				deleteSelectedVersion();
 			}
@@ -823,7 +825,7 @@ return view.extend({
 		var circularCodeEl = E('pre', { class: 'bcw-code-box', style: 'color: #98c379; max-height: 220px;' }, '');
 		var btnApplyCircular = E('button', {
 			class: 'cbi-button cbi-button-positive',
-			style: 'padding: 8px 18px; font-weight: bold; font-size: 14px;',
+			style: 'height: 34px; padding: 0 16px; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
 			click: function() { applyStrategy(lastCircular, true); }
 		}, '✓ Применить Circular-связку в Zapret2');
 
@@ -891,13 +893,13 @@ return view.extend({
 						E('span', {}, 'Автоскролл')
 					]),
 					E('button', {
-						class: 'cbi-button cbi-button-neutral',
-						style: 'padding: 4px 10px; font-size: 12px;',
+						class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+						style: 'height: 32px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;',
 						click: function() { refreshLogs(); }
 					}, '🔄 Обновить'),
 					E('button', {
-						class: 'cbi-button cbi-button-reset',
-						style: 'padding: 4px 10px; font-size: 12px;',
+						class: 'bcw-btn-sm cbi-button cbi-button-reset',
+						style: 'height: 32px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;',
 						click: function() { consoleLogEl.textContent = ''; }
 					}, '🗑 Очистить')
 				])
@@ -1018,9 +1020,9 @@ return view.extend({
 			}
 
 			if (!v.enabled) {
-				btnActivateVersion.style.display = 'inline-block';
+				btnActivateVersion.style.display = 'inline-flex';
 				btnActivateVersion.textContent = '⚡ Активировать ' + v.section;
-				btnDeleteVersion.style.display = 'inline-block';
+				btnDeleteVersion.style.display = 'inline-flex';
 			} else {
 				btnActivateVersion.style.display = 'none';
 				btnDeleteVersion.style.display = 'none';
@@ -1047,7 +1049,7 @@ return view.extend({
 						updateSummaryBox();
 						updateActiveStrategyDisplay();
 						if (zapretBadgeEl) {
-							zapretBadgeEl.className = (info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red';
+							zapretBadgeEl.className = 'bcw-header-item ' + ((info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red');
 							zapretBadgeEl.textContent = (info.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен';
 						}
 					});
@@ -1210,6 +1212,19 @@ return view.extend({
 				btnApplyManual.classList.add('active');
 				btnApplyAuto.classList.remove('active', 'teal');
 				paramApplyHintEl.textContent = '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.';
+			}
+		}
+
+		function switchCircularMode(isCirc) {
+			doCircular = isCirc;
+			if (isCirc) {
+				btnCircularOn.classList.add('active');
+				btnCircularOff.classList.remove('active');
+				paramCircularHintEl.textContent = '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.';
+			} else {
+				btnCircularOff.classList.add('active');
+				btnCircularOn.classList.remove('active');
+				paramCircularHintEl.textContent = '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
 			}
 		}
 
@@ -1390,8 +1405,8 @@ return view.extend({
 							E('strong', { style: 'color: #61afef;' }, 'Одиночная стратегия')
 						]),
 						E('button', {
-							class: 'cbi-button cbi-button-positive',
-							style: 'padding: 4px 14px; font-weight: bold;',
+							class: 'bcw-btn-sm cbi-button cbi-button-positive',
+							style: 'height: 32px; padding: 0 14px; font-weight: bold; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;',
 							click: function() { applyStrategy(sText, false); }
 						}, '✓ Применить в Zapret2')
 					]),
@@ -1433,7 +1448,7 @@ return view.extend({
 						updateSummaryBox();
 						updateActiveStrategyDisplay();
 						if (zapretBadgeEl) {
-							zapretBadgeEl.className = (info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red';
+							zapretBadgeEl.className = 'bcw-header-item ' + ((info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red');
 							zapretBadgeEl.textContent = (info.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен';
 						}
 					});

@@ -716,6 +716,8 @@ return view.extend({
 					ui.addNotification(null, E('p', {}, 'Пожалуйста, укажите домен для проверки!'), 'danger');
 					return;
 				}
+				// Clean domain in case user typed https:// or trailing slash
+				domain = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
 			}
 
 			btnStartScan.style.display = 'none';
@@ -781,6 +783,10 @@ return view.extend({
 						if (st.auto_applied) {
 							ui.addNotification(null, E('p', {}, '✓ Лучшая найденная стратегия автоматически применена в Zapret2 и проверена!'), 'info');
 						}
+					} else if (st.status === 'error') {
+						resetScanUI();
+						ui.addNotification(null, E('p', {}, st.phase || 'Ошибка сканирования. Проверьте домен и логи.'), 'danger');
+						refreshLogs();
 					}
 				});
 			}, 1500);
@@ -790,7 +796,14 @@ return view.extend({
 			progressBarEl.style.width = (st.percent || 0) + '%';
 			progressPercentEl.textContent = (st.percent || 0) + '%';
 			progressTextEl.textContent = st.phase || '';
-			if (st.status === 'done') progressPhaseEl.textContent = 'Сканирование завершено';
+			if (st.status === 'done') {
+				progressPhaseEl.textContent = 'Сканирование завершено';
+				progressPhaseEl.style.color = '#00d1b2';
+			} else if (st.status === 'error') {
+				progressPhaseEl.textContent = 'Ошибка сканирования';
+				progressPhaseEl.style.color = '#ff3860';
+				progressBarEl.style.background = '#ff3860';
+			}
 
 			if (activeLogTab === 'scanner' && st.log) {
 				consoleLogEl.textContent = st.log;

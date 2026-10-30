@@ -75,6 +75,9 @@ prepare_turbo_corpus() {
         local d = json.parse(f:read("*a"))
         f:close()
         local strats = d and d.presets and d.presets["'"$preset"'"] and d.presets["'"$preset"'"].turbo_strategies
+        if not strats or #strats == 0 then
+            strats = d and d.presets and d.presets["builtin"] and d.presets["builtin"].turbo_strategies
+        end
         if strats and #strats > 0 then
             local out = io.open("'"$TURBO_FILE"'", "w")
             for _, s in ipairs(strats) do
@@ -173,9 +176,9 @@ cmd_start() {
 
     write_status "running" 10 "Инициализация сканирования ($domain)"
 
-    # Run in background via child process
+    # Run in background via child process detached from rpcd pipes
     (
-        local scan_args="-d $domain -p $protocols --auto"
+        local scan_args="-d $domain -p $protocols --dns doh --auto"
         if [ "$mode" = "turbo" ]; then
             prepare_turbo_corpus "$target"
             if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
@@ -271,7 +274,11 @@ cmd_start() {
 
         rm -f "$PID_FILE"
 
-        if [ "$found_count" -gt 0 ]; then
+        local dns_err=$(grep -E 'DNS resolve failed|no IPv4 addresses found' "$LOG_FILE" 2>/dev/null | tail -n 1)
+        if [ -n "$dns_err" ]; then
+            write_status "error" 0 "Ошибка DNS: $dns_err" ",\"strategies\":[]"
+            echo "[blockcheckw-helper] Scan failed with DNS error: $dns_err" >> "$LOG_FILE"
+        elif [ "$found_count" -gt 0 ]; then
             local final_msg="Найдено рабочих стратегий: $found_count"
             [ "$auto_apply" = "1" ] && final_msg="$final_msg (Успешно применена в Zapret2!)"
             write_status "done" 100 "$final_msg" ",\"strategies\":$strats_json$apply_info"
@@ -280,7 +287,7 @@ cmd_start() {
             write_status "done" 100 "Поиск завершен. Ничего не подошло, попробуйте глубокий скан." ",\"strategies\":[]"
             echo "[blockcheckw-helper] Scan completed with 0 matches." >> "$LOG_FILE"
         fi
-    ) &
+    ) </dev/null >/dev/null 2>&1 &
 
     local pid=$!
     echo "$pid" > "$PID_FILE"

@@ -239,9 +239,9 @@ function checkVersion() {
 				return JSON.parse(res.stdout);
 			} catch (e) {}
 		}
-		return { success: false, current_version: '1.3.0', has_update: false };
+		return { success: false, current_version: '0.15', has_update: false };
 	}).catch(function() {
-		return { success: false, current_version: '1.3.0', has_update: false };
+		return { success: false, current_version: '0.15', has_update: false };
 	});
 }
 
@@ -281,7 +281,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
-		var versionInfo = data[3] || { current_version: '1.3.1', has_update: false };
+		var versionInfo = data[3] || { current_version: '0.15', has_update: false };
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
 
@@ -362,7 +362,7 @@ return view.extend({
 		var versionBadgeEl = E('span', {
 			class: 'badge',
 			style: 'font-size: 13px; font-weight: bold; padding: 6px 12px; border-radius: 6px; background: #282c34; border: 1px solid #485060; color: #abb2bf;'
-		}, 'v' + (versionInfo.current_version || '1.3.0'));
+		}, 'v' + (versionInfo.current_version || '0.15'));
 
 		var btnCheckUpdate = E('button', {
 			class: 'bcw-btn-secondary',
@@ -1507,7 +1507,7 @@ return view.extend({
 			}, [
 				E('div', { style: 'flex: 1; min-width: 260px;' }, [
 					E('div', { style: 'font-size: 15px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
-						'🎉 Доступна новая версия: v' + (info.latest_version || '1.3.1'),
+						'🎉 Доступна новая версия: v' + (info.latest_version || '0.15'),
 						E('span', { style: 'font-size: 12px; font-weight: normal; color: #828997;' }, releaseDate)
 					]),
 					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, changelogText),
@@ -1556,7 +1556,7 @@ return view.extend({
 				} else {
 					updateBannerCard.style.display = 'none';
 					if (isManual) {
-						ui.addNotification(null, E('p', {}, '✓ У вас установлена актуальная версия BlockcheckW (v' + (parsed.current_version || '1.3.0') + ')!'), 'info');
+						ui.addNotification(null, E('p', {}, '✓ У вас установлена актуальная версия BlockcheckW (v' + (parsed.current_version || '0.15') + ')!'), 'info');
 					}
 				}
 			}).catch(function(err) {

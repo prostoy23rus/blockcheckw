@@ -21,13 +21,13 @@
 
 Если вы настраиваете роутер с ПК на Windows (10 / 11), вы можете установить службу в 1 клик без ручного ввода Linux-команд:
 
-1. Скачайте файл [**`install.bat`**](https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat) (или скачайте через командную строку CMD / PowerShell):
+1. Скачайте файл [**`install.bat` (прямая ссылка на скачивание)**](https://github.com/prostoy23rus/blockcheckw/releases/latest/download/install.bat) со страницы [**Релизов GitHub (Releases)**](https://github.com/prostoy23rus/blockcheckw/releases/tag/v0.15) (или через командную строку CMD / PowerShell):
    ```cmd
-   curl -sSLO https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat && install.bat
+   curl -sSLO https://github.com/prostoy23rus/blockcheckw/releases/latest/download/install.bat && install.bat
    ```
-2. Запустите **`install.bat`** двойным кликом мыши.
-3. В появившемся интерактивном меню выберите пункт **`[1] Установить BlockcheckW и LuCI`**.
-4. Скрипт автоматически подключится к роутеру через системный OpenSSH или PuTTY, выполнит установку всех компонентов, проверит зависимости и по завершении сам предложит открыть веб-интерфейс в вашем браузере!
+2. Запустите скачанный **`install.bat`** двойным кликом мыши.
+3. В появившемся меню выберите пункт **`[1] Установить BlockcheckW и LuCI`**.
+4. Скрипт автоматически подключится к роутеру через системный OpenSSH или PuTTY, выполнит установку всех компонентов, настроит правила и по завершении сам предложит открыть веб-интерфейс в вашем браузере!
 
 ### 🐧 Способ 2. Через консоль роутера по SSH (в 1 строку)
 

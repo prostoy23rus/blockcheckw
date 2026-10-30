@@ -24,7 +24,7 @@ write_status() {
     
     local log_tail=""
     if [ -f "$LOG_FILE" ]; then
-        log_tail=$(tail -n 30 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+        log_tail=$(tail -n 40 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
     fi
 
     local circular_esc=""
@@ -92,6 +92,7 @@ cmd_start() {
     local domain=""
     local mode="turbo"
     local do_circular="1"
+    local auto_apply="0"
     local workers="2"
 
     while [ "$#" -gt 0 ]; do
@@ -100,6 +101,7 @@ cmd_start() {
             --domain) domain="$2"; shift 2 ;;
             --mode) mode="$2"; shift 2 ;;
             --circular) do_circular="$2"; shift 2 ;;
+            --auto-apply) auto_apply="$2"; shift 2 ;;
             --workers) workers="$2"; shift 2 ;;
             *) shift ;;
         esac
@@ -118,7 +120,7 @@ cmd_start() {
     local protocols="tls12,tls13"
     if [ "$target" = "youtube" ]; then
         domain=$(get_preset_param "youtube" "domain")
-        [ -n "$domain" ] || domain="rr1---sn-xguxaxjvh-n8me.googlevideo.com"
+        [ -n "$domain" ] || domain="googlevideo.com"
         protocols="tls12,tls13"
     elif [ "$target" = "discord" ]; then
         domain=$(get_preset_param "discord" "domain")
@@ -138,7 +140,7 @@ cmd_start() {
 
     write_status "running" 10 "Инициализация сканирования ($domain)"
 
-    # Run in background via child script
+    # Run in background via child process
     (
         local scan_args="-d $domain -p $protocols --auto"
         if [ "$mode" = "turbo" ]; then
@@ -148,19 +150,16 @@ cmd_start() {
             fi
         fi
 
-        echo "[blockcheckw-helper] Starting scan for $domain (mode=$mode, workers=$workers)..." >> "$LOG_FILE"
+        echo "[blockcheckw-helper] Starting scan for $domain (target=$target, mode=$mode, workers=$workers, auto_apply=$auto_apply)..." >> "$LOG_FILE"
         write_status "running" 25 "Тестирование обхода DPI..."
 
         /usr/bin/blockcheckw -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1
-        local exit_code=$?
 
-        # Find latest vanilla report in /root
+        # Locate latest scan report in /root if needed
         local latest_vanilla=$(ls -t /root/*_report_vanilla.txt 2>/dev/null | head -n 1)
         if [ -n "$latest_vanilla" ] && [ -f "$latest_vanilla" ]; then
             cp -f "$latest_vanilla" "$OUTPUT_VANILLA"
         fi
-
-        # Find latest scan report in /root
         local latest_scan=$(ls -t /root/*_scan.json 2>/dev/null | head -n 1)
         if [ -n "$latest_scan" ] && [ -f "$latest_scan" ]; then
             cp -f "$latest_scan" "$OUTPUT_SCAN"
@@ -188,6 +187,7 @@ cmd_start() {
 
         # Extract strategy list for JSON output
         local strats_json="[]"
+        local top_strategy=""
         if [ -f "$OUTPUT_SCAN" ]; then
             strats_json=$(lua -e '
                 local json = require("luci.jsonc")
@@ -204,12 +204,44 @@ cmd_start() {
                     else print("[]") end
                 else print("[]") end
             ' 2>/dev/null)
+            
+            top_strategy=$(lua -e '
+                local json = require("luci.jsonc")
+                local f = io.open("'"$OUTPUT_SCAN"'", "r")
+                if f then
+                    local d = json.parse(f:read("*a"))
+                    f:close()
+                    if d and d.strategies and d.strategies[1] then
+                        print(d.strategies[1].args or d.strategies[1])
+                    end
+                end
+            ' 2>/dev/null)
+        fi
+
+        local apply_info=""
+        # Auto-apply if requested and strategies found
+        if [ "$auto_apply" = "1" ] && [ "$found_count" -gt 0 ]; then
+            write_status "running" 95 "Автоматическое применение стратегии в Zapret2..."
+            local apply_res=""
+            if [ "$do_circular" = "1" ] && [ -f "$OUTPUT_CIRCULAR" ] && [ -s "$OUTPUT_CIRCULAR" ]; then
+                apply_res=$(cmd_apply --target "$target" --file "$OUTPUT_CIRCULAR")
+            elif [ -n "$top_strategy" ]; then
+                echo "$top_strategy" > /tmp/blockcheckw_top_strat.txt
+                apply_res=$(cmd_apply --target "$target" --file /tmp/blockcheckw_top_strat.txt)
+            fi
+
+            if [ -n "$apply_res" ]; then
+                echo "[blockcheckw-helper] Auto-applied strategy to $target: $apply_res" >> "$LOG_FILE"
+                apply_info=",\"auto_applied\":true,\"apply_result\":$apply_res"
+            fi
         fi
 
         rm -f "$PID_FILE"
 
         if [ "$found_count" -gt 0 ]; then
-            write_status "done" 100 "Найдено рабочих стратегий: $found_count" ",\"strategies\":$strats_json"
+            local final_msg="Найдено рабочих стратегий: $found_count"
+            [ "$auto_apply" = "1" ] && final_msg="$final_msg (Успешно применена в Zapret2!)"
+            write_status "done" 100 "$final_msg" ",\"strategies\":$strats_json$apply_info"
             echo "[blockcheckw-helper] Finished successfully. Found $found_count working strategies." >> "$LOG_FILE"
         else
             write_status "done" 100 "Поиск завершен. Ничего не подошло, попробуйте глубокий скан." ",\"strategies\":[]"
@@ -219,7 +251,7 @@ cmd_start() {
 
     local pid=$!
     echo "$pid" > "$PID_FILE"
-    echo '{"status":"started","pid":'"$pid"',"domain":"'"$domain"'","mode":"'"$mode"'"}'
+    echo '{"status":"started","pid":'"$pid"',"domain":"'"$domain"'","mode":"'"$mode"'","auto_apply":'"$auto_apply"'}'
 }
 
 cmd_status() {
@@ -234,7 +266,6 @@ cmd_status() {
         fi
     fi
 
-    # Read status file and return
     cat "$STATUS_FILE"
 }
 
@@ -294,7 +325,7 @@ cmd_apply() {
         port="443"
         l7="tls"
         hostlist="list_hosts_youtube"
-        test_url="https://rr1---sn-xguxaxjvh-n8me.googlevideo.com"
+        test_url="https://googlevideo.com"
     elif [ "$target" = "discord" ]; then
         sec_name="BlockcheckW_Discord"
         port="443"
@@ -335,6 +366,7 @@ cmd_apply() {
 
     # Restart zapret2 service
     /etc/init.d/zapret2 restart >/dev/null 2>&1
+    sleep 1
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
 
     # Test connectivity with curl
@@ -369,18 +401,61 @@ cmd_test() {
 
 cmd_info() {
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
-    local youtube_strat=$(uci -q get zapret2.MyTube.script 2>/dev/null | head -n 3 | tr '\n' ' ')
-    local discord_strat=$(uci -q get zapret2.BlockcheckW_Discord.script 2>/dev/null | head -n 3 | tr '\n' ' ')
-    local general_strat=$(uci -q get zapret2.BlockcheckW_General.script 2>/dev/null | head -n 3 | tr '\n' ' ')
+
+    lua -e '
+        local uci = require("uci").cursor()
+        local json = require("luci.jsonc")
+
+        local res = {
+            zapret2_running = "'"$zapret_running"'",
+            services = {}
+        }
+
+        local targets = {
+            youtube = { section = "MyTube", name = "YouTube" },
+            discord = { section = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
+            general = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Блокированные сайты" }
+        }
+
+        for key, info in pairs(targets) do
+            local sec = info.section
+            local enabled = uci:get("zapret2", sec, "enabled")
+            if not enabled and info.fallback then
+                sec = info.fallback
+                enabled = uci:get("zapret2", sec, "enabled")
+            end
+
+            local script = uci:get("zapret2", sec, "script") or ""
+            local port = uci:get("zapret2", sec, "port") or "443"
+            local is_circ = (script:find("circular") ~= nil)
+
+            res.services[key] = {
+                section = sec,
+                name = info.name,
+                enabled = (enabled == "1" or enabled == 1),
+                port = port,
+                script = script,
+                is_circular = is_circ
+            }
+        end
+
+        print(json.stringify(res))
+    ' 2>/dev/null
+}
+
+cmd_logs() {
+    local zapret_log=$(logread -e zapret2 2>/dev/null | tail -n 40 | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    local scan_log=""
+    if [ -f "$LOG_FILE" ]; then
+        scan_log=$(tail -n 60 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    fi
+    local daemons=$(ps -w | grep -E 'nfqws2|blockcheckw' | grep -v grep | head -n 10 | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
 
     cat <<EOF
 {
-  "zapret2_running": "$zapret_running",
-  "active_strategies": {
-    "youtube": "$youtube_strat",
-    "discord": "$discord_strat",
-    "general": "$general_strat"
-  }
+  "scanner_log": "$scan_log",
+  "zapret2_log": "$zapret_log",
+  "daemons": "$daemons"
 }
 EOF
 }
@@ -392,8 +467,9 @@ case "$1" in
     apply) shift; cmd_apply "$@" ;;
     test) shift; cmd_test "$@" ;;
     info) cmd_info ;;
+    logs) shift; cmd_logs "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|test|info}"
+        echo "Usage: $0 {start|status|stop|apply|test|info|logs}"
         exit 1
         ;;
 esac

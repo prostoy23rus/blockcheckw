@@ -441,8 +441,8 @@ cmd_apply() {
     local ts=$(date +%Y%m%d_%H%M%S)
     cp -f /etc/config/zapret2 "/etc/config/zapret2.bak.$ts"
 
-    # Map target to strategy section
-    local sec_name=""
+    # Map target to base strategy section
+    local base_sec=""
     local port="443"
     local l7="tls"
     local hostlist=""
@@ -450,56 +450,57 @@ cmd_apply() {
 
     case "$target" in
         preset_youtube|youtube)
-            sec_name="MyTube"
+            base_sec="MyTube"
             port="443"
             l7="tls"
             hostlist="list_hosts_youtube"
             test_url="https://googlevideo.com"
             ;;
         preset_discord|discord)
-            sec_name="BlockcheckW_Discord"
+            base_sec="BlockcheckW_Discord"
             port="443"
             l7="tls discord"
             hostlist="list_hosts_discord"
             test_url="https://gateway.discord.gg"
             ;;
         preset_twitch|twitch)
-            sec_name="BlockcheckW_Twitch"
+            base_sec="BlockcheckW_Twitch"
             port="443"
             l7="tls"
             hostlist="list_hosts_user"
             test_url="https://twitch.tv"
             ;;
         preset_x|x)
-            sec_name="BlockcheckW_X"
+            base_sec="BlockcheckW_X"
             port="443"
             l7="tls"
             hostlist="list_hosts_user"
             test_url="https://x.com"
             ;;
         preset_instagram|instagram)
-            sec_name="BlockcheckW_Instagram"
+            base_sec="BlockcheckW_Instagram"
             port="443"
             l7="tls"
             hostlist="list_hosts_user"
             test_url="https://gateway.instagram.com"
             ;;
         tcp16)
-            sec_name="BlockcheckW_TCP16"
+            base_sec="BlockcheckW_TCP16"
             port="443"
             l7="tls"
             hostlist="list_hosts_user"
             test_url="https://media.miele.com"
             ;;
         builtin|general)
-            sec_name="BlockcheckW_General"
+            base_sec="BlockcheckW_General"
             port="80,443"
             l7="tls http"
             hostlist="list_hosts_user"
             test_url="https://rutracker.org"
             ;;
         *)
-            sec_name="BlockcheckW_$target"
+            local safe_t=$(echo "$target" | tr -c 'a-zA-Z0-9_' '_')
+            base_sec="BlockcheckW_$safe_t"
             port="443"
             l7="tls"
             hostlist="list_hosts_user"
@@ -507,8 +508,34 @@ cmd_apply() {
             ;;
     esac
 
-    # Set UCI parameters
-    uci -q delete "zapret2.$sec_name"
+    # Determine unique new section name without overwriting existing strategies
+    local sec_name=""
+    if ! uci -q get "zapret2.$base_sec" >/dev/null; then
+        sec_name="$base_sec"
+    else
+        local idx=2
+        while uci -q get "zapret2.${base_sec}_$idx" >/dev/null; do
+            idx=$((idx + 1))
+        done
+        sec_name="${base_sec}_$idx"
+    fi
+
+    # Disable previously active strategies for this target to prevent desync/filter conflicts,
+    # keeping all older strategies safely stored in /etc/config/zapret2
+    uci -q set "zapret2.$base_sec.enabled=0"
+    local s
+    for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.'"$base_sec"'_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+        uci -q set "zapret2.$s.enabled=0"
+    done
+    if [ "$base_sec" = "MyTube" ]; then
+        uci -q set "zapret2.Youtube_circular.enabled=0"
+    elif [ "$base_sec" = "BlockcheckW_Discord" ]; then
+        uci -q set "zapret2.Discord_circular.enabled=0"
+    elif [ "$base_sec" = "BlockcheckW_General" ]; then
+        uci -q set "zapret2.Routerich_circular.enabled=0"
+    fi
+
+    # Create new strategy section in zapret2
     uci set "zapret2.$sec_name=strategy"
     uci set "zapret2.$sec_name.enabled=1"
     uci set "zapret2.$sec_name.port=$port"
@@ -518,7 +545,7 @@ cmd_apply() {
         uci add_list "zapret2.$sec_name.filter_l7=$proto"
     done
     uci add_list "zapret2.$sec_name.hostlist=$hostlist"
-    if [ "$target" = "youtube" ] || [ "$target" = "general" ]; then
+    if [ "$target" = "preset_youtube" ] || [ "$target" = "youtube" ] || [ "$target" = "builtin" ] || [ "$target" = "general" ]; then
         uci add_list "zapret2.$sec_name.hostlist_exclude=list_hosts_user_exclude"
     fi
     uci set "zapret2.$sec_name.script=$script_text"
@@ -541,7 +568,7 @@ cmd_apply() {
     cat <<EOF
 {
   "success": true,
-  "message": "Стратегия успешно применена в Zapret2 и проверена!",
+  "message": "Новая запись стратегии ($sec_name) успешно создана в Zapret2, активирована и проверена!",
   "target": "$target",
   "section": "$sec_name",
   "zapret2_status": "$zapret_running",
@@ -550,6 +577,81 @@ cmd_apply() {
   "connected": $([ "$curl_status" = "1" ] && echo "true" || echo "false")
 }
 EOF
+}
+
+cmd_activate() {
+    local target=""
+    local section=""
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --target) target="$2"; shift 2 ;;
+            --section) section="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    if [ -z "$section" ]; then
+        echo '{"success":false,"error":"Missing --section argument"}'
+        return 1
+    fi
+
+    if ! uci -q get "zapret2.$section" >/dev/null; then
+        echo "{\"success\":false,\"error\":\"Strategy section '$section' not found in zapret2\"}"
+        return 1
+    fi
+
+    local base_sec=""
+    case "$target" in
+        preset_youtube|youtube) base_sec="MyTube" ;;
+        preset_discord|discord) base_sec="BlockcheckW_Discord" ;;
+        preset_twitch|twitch) base_sec="BlockcheckW_Twitch" ;;
+        preset_x|x) base_sec="BlockcheckW_X" ;;
+        preset_instagram|instagram) base_sec="BlockcheckW_Instagram" ;;
+        tcp16) base_sec="BlockcheckW_TCP16" ;;
+        builtin|general) base_sec="BlockcheckW_General" ;;
+        *)
+            if [ -n "$target" ]; then
+                base_sec="BlockcheckW_$(echo "$target" | tr -c 'a-zA-Z0-9_' '_')"
+            else
+                base_sec=$(echo "$section" | sed -E 's/_[0-9]+$//')
+            fi
+            ;;
+    esac
+
+    # Disable all other sections for this target
+    if [ -n "$base_sec" ]; then
+        uci -q set "zapret2.$base_sec.enabled=0"
+        local s
+        for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.'"$base_sec"'_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+            uci -q set "zapret2.$s.enabled=0"
+        done
+        [ "$base_sec" = "MyTube" ] && uci -q set "zapret2.Youtube_circular.enabled=0"
+        [ "$base_sec" = "BlockcheckW_Discord" ] && uci -q set "zapret2.Discord_circular.enabled=0"
+        [ "$base_sec" = "BlockcheckW_General" ] && uci -q set "zapret2.Routerich_circular.enabled=0"
+    fi
+
+    # Enable target section
+    uci set "zapret2.$section.enabled=1"
+    uci commit zapret2
+
+    /etc/init.d/zapret2 restart >/dev/null 2>&1
+    sleep 1
+    local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
+
+    echo "{\"success\":true,\"message\":\"Стратегия $section успешно активирована в Zapret2!\",\"section\":\"$section\",\"zapret2_status\":\"$zapret_running\"}"
+}
+
+cmd_delete_strategy() {
+    local section="$1"
+    if [ -z "$section" ]; then
+        echo '{"success":false,"error":"Missing section name"}'
+        return 1
+    fi
+    uci -q delete "zapret2.$section"
+    uci commit zapret2
+    /etc/init.d/zapret2 restart >/dev/null 2>&1
+    echo "{\"success\":true,\"message\":\"Запись $section удалена.\"}"
 }
 
 cmd_test() {
@@ -572,47 +674,6 @@ cmd_info() {
             services = {}
         }
 
-        local targets = {
-            builtin = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
-            general = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
-            preset_youtube = { section = "MyTube", fallback = "Youtube_circular", name = "Предустановленный список YouTube (3)" },
-            youtube = { section = "MyTube", fallback = "Youtube_circular", name = "YouTube" },
-            preset_discord = { section = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Предустановленный список Discord (3)" },
-            discord = { section = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
-            preset_twitch = { section = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Предустановленный список Twitch (3)" },
-            twitch = { section = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Twitch" },
-            preset_x = { section = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "Предустановленный список X (3)" },
-            x = { section = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "X (Twitter)" },
-            preset_instagram = { section = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Предустановленный список Instagram (2)" },
-            instagram = { section = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Instagram" },
-            tcp16 = { section = "BlockcheckW_TCP16", fallback = "BlockcheckW_General", name = "Кандидаты TCP 16-20 KB (110)" },
-            domains = { section = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
-            custom = { section = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
-            test_strategy = { section = "BlockcheckW_General", name = "Тест стратегии" }
-        }
-
-        for key, info in pairs(targets) do
-            local sec = info.section
-            local enabled = uci:get("zapret2", sec, "enabled")
-            if not enabled and info.fallback then
-                sec = info.fallback
-                enabled = uci:get("zapret2", sec, "enabled")
-            end
-
-            local script = uci:get("zapret2", sec, "script") or ""
-            local port = uci:get("zapret2", sec, "port") or "443"
-            local is_circ = (script:find("circular") ~= nil)
-
-            res.services[key] = {
-                section = sec,
-                name = info.name,
-                enabled = (enabled == "1" or enabled == 1),
-                port = port,
-                script = script,
-                is_circular = is_circ
-            }
-        end
-
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
             local name = s[".name"]
@@ -621,11 +682,97 @@ cmd_info() {
                     section = name,
                     enabled = (s.enabled == "1" or s.enabled == 1),
                     port = s.port or "443",
-                    script = s.script or ""
+                    script = s.script or "",
+                    is_circular = (s.script and s.script:find("circular") ~= nil) or false
                 })
             end
         end)
         res.all_strategies = all_strats
+
+        local targets = {
+            builtin = { base = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
+            general = { base = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
+            preset_youtube = { base = "MyTube", fallback = "Youtube_circular", name = "Предустановленный список YouTube (3)" },
+            youtube = { base = "MyTube", fallback = "Youtube_circular", name = "YouTube" },
+            preset_discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Предустановленный список Discord (3)" },
+            discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
+            preset_twitch = { base = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Предустановленный список Twitch (3)" },
+            twitch = { base = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Twitch" },
+            preset_x = { base = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "Предустановленный список X (3)" },
+            x = { base = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "X (Twitter)" },
+            preset_instagram = { base = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Предустановленный список Instagram (2)" },
+            instagram = { base = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Instagram" },
+            tcp16 = { base = "BlockcheckW_TCP16", fallback = "BlockcheckW_General", name = "Кандидаты TCP 16-20 KB (110)" },
+            domains = { base = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
+            custom = { base = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
+            test_strategy = { base = "BlockcheckW_General", name = "Тест стратегии" }
+        }
+
+        for key, info in pairs(targets) do
+            local base = info.base
+            local fallback = info.fallback
+
+            local matching = {}
+            for _, st in ipairs(all_strats) do
+                if st.section == base or st.section:match("^" .. base .. "_%d+$") then
+                    table.insert(matching, st)
+                elseif fallback and st.section == fallback then
+                    table.insert(matching, st)
+                end
+            end
+
+            table.sort(matching, function(a, b)
+                local num_a = tonumber(a.section:match("_(%d+)$")) or (a.section == base and 1 or 0)
+                local num_b = tonumber(b.section:match("_(%d+)$")) or (b.section == base and 1 or 0)
+                return num_a < num_b
+            end)
+
+            local active = nil
+            for _, st in ipairs(matching) do
+                if st.enabled then
+                    active = st
+                    break
+                end
+            end
+            if not active and #matching > 0 then
+                active = matching[#matching]
+            end
+
+            local vers = {}
+            for _, m in ipairs(matching) do
+                table.insert(vers, {
+                    section = m.section,
+                    enabled = m.enabled,
+                    port = m.port,
+                    is_circular = m.is_circular,
+                    script = m.script
+                })
+            end
+
+            if active then
+                res.services[key] = {
+                    section = active.section,
+                    name = info.name,
+                    enabled = active.enabled,
+                    port = active.port,
+                    script = active.script,
+                    is_circular = active.is_circular,
+                    versions_count = #vers,
+                    versions = vers
+                }
+            else
+                res.services[key] = {
+                    section = base,
+                    name = info.name,
+                    enabled = false,
+                    port = "443",
+                    script = "",
+                    is_circular = false,
+                    versions_count = 0,
+                    versions = {}
+                }
+            end
+        end
 
         print(json.stringify(res))
     ' 2>/dev/null
@@ -649,9 +796,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="1.3.0"
+    local cur_ver="1.3.1"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "1.3.0"); else print("1.3.0"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "1.3.1"); else print("1.3.1"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -665,7 +812,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "1.3.0"
+local cur_ver = arg[1] or "1.3.1"
 local file = arg[2]
 
 local f = io.open(file, "r")
@@ -752,13 +899,15 @@ case "$1" in
     status) cmd_status ;;
     stop) cmd_stop ;;
     apply) shift; cmd_apply "$@" ;;
+    activate) shift; cmd_activate "$@" ;;
+    delete_strategy) shift; cmd_delete_strategy "$@" ;;
     test) shift; cmd_test "$@" ;;
     info) cmd_info ;;
     logs) shift; cmd_logs "$@" ;;
     check_update) cmd_check_update ;;
     update) cmd_update ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|test|info|logs|check_update|update}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update}"
         exit 1
         ;;
 esac

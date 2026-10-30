@@ -199,7 +199,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
-		var versionInfo = data[3] || { current_version: '1.3.0', has_update: false };
+		var versionInfo = data[3] || { current_version: '1.3.1', has_update: false };
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
 
@@ -531,6 +531,41 @@ return view.extend({
 			click: function() { copyActiveStrategy(); }
 		}, '📋 Скопировать');
 
+		var versionsSelectEl = E('select', {
+			class: 'bcw-select',
+			style: 'min-width: 220px; font-size: 12px; padding: 4px 10px;',
+			change: function(e) {
+				var sec = e.target.value;
+				if (!sec) return;
+				selectSavedVersion(sec);
+			}
+		});
+
+		var btnActivateVersion = E('button', {
+			class: 'cbi-button cbi-button-action',
+			style: 'padding: 4px 14px; font-size: 12px; display: none; font-weight: bold;',
+			click: function() {
+				activateSelectedVersion();
+			}
+		}, '⚡ Активировать');
+
+		var btnDeleteVersion = E('button', {
+			class: 'cbi-button cbi-button-negative',
+			style: 'padding: 4px 10px; font-size: 12px; display: none;',
+			click: function() {
+				deleteSelectedVersion();
+			}
+		}, '🗑 Удалить');
+
+		var versionsBarEl = E('div', {
+			style: 'display: none; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 8px 12px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid #383e4a;'
+		}, [
+			E('span', { style: 'font-size: 12px; color: #abb2bf; font-weight: 600;' }, '📁 История записей Zapret2:'),
+			versionsSelectEl,
+			btnActivateVersion,
+			btnDeleteVersion
+		]);
+
 		var activeStratCard = E('div', { class: 'bcw-card', style: 'border-left: 4px solid #3273dc;' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, [
@@ -542,6 +577,7 @@ return view.extend({
 				])
 			]),
 			activeMetaBadgesEl,
+			versionsBarEl,
 			activeCodeEl
 		]);
 		mainLayout.appendChild(activeStratCard);
@@ -705,13 +741,143 @@ return view.extend({
 				activeMetaBadgesEl.appendChild(statusBadge);
 				activeMetaBadgesEl.appendChild(circBadge);
 
+				if (sData.versions_count && sData.versions_count > 1) {
+					var verCountBadge = E('span', { class: 'badge', style: 'background: #4b5263; color: #61afef; font-size: 11px;' }, '📁 Всего записей: ' + sData.versions_count);
+					activeMetaBadgesEl.appendChild(verCountBadge);
+				}
+
 				activeCodeEl.textContent = sData.script;
+
+				// Update versions history dropdown
+				if (sData.versions && sData.versions.length > 1) {
+					versionsBarEl.style.display = 'flex';
+					versionsSelectEl.innerHTML = '';
+					sData.versions.forEach(function(v) {
+						var opt = E('option', { value: v.section }, v.section + (v.enabled ? ' (✓ Активна)' : ' (Отключена)'));
+						if (v.section === sData.section) opt.selected = true;
+						versionsSelectEl.appendChild(opt);
+					});
+					btnActivateVersion.style.display = 'none';
+					btnDeleteVersion.style.display = 'none';
+				} else {
+					versionsBarEl.style.display = 'none';
+				}
 			} else {
+				versionsBarEl.style.display = 'none';
 				activeMetaBadgesEl.appendChild(
 					E('span', { class: 'badge cbi-color-neutral', style: 'font-size: 11px;' }, 'Стратегия не настроена')
 				);
 				activeCodeEl.textContent = '# Стратегия для выбранной цели (' + pDef.name + ') ещё не настроена в Zapret2.\n# Запустите турбо-поиск выше для автоматического подбора и активации!';
 			}
+		}
+
+		function selectSavedVersion(sec) {
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var targetKey = pDef.key || currentTarget;
+			var sData = zapretServicesData[targetKey];
+			if (!sData || !sData.versions) return;
+
+			var v = sData.versions.find(function(item) { return item.section === sec; });
+			if (!v) return;
+
+			activeCodeEl.textContent = v.script;
+			activeMetaBadgesEl.innerHTML = '';
+
+			var secBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + v.section);
+			var portBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + v.port);
+			var statusBadge = v.enabled ?
+				E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ Включена') :
+				E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Отключена');
+			var circBadge = v.is_circular ?
+				E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, '🔄 Circular-связка') :
+				E('span', { class: 'badge', style: 'background: #485060; color: #fff; font-size: 11px;' }, '⚡ Одиночная');
+
+			activeMetaBadgesEl.appendChild(secBadge);
+			activeMetaBadgesEl.appendChild(portBadge);
+			activeMetaBadgesEl.appendChild(statusBadge);
+			activeMetaBadgesEl.appendChild(circBadge);
+
+			if (sData.versions_count && sData.versions_count > 1) {
+				var verCountBadge = E('span', { class: 'badge', style: 'background: #4b5263; color: #61afef; font-size: 11px;' }, '📁 Всего записей: ' + sData.versions_count);
+				activeMetaBadgesEl.appendChild(verCountBadge);
+			}
+
+			if (!v.enabled) {
+				btnActivateVersion.style.display = 'inline-block';
+				btnActivateVersion.textContent = '⚡ Активировать ' + v.section;
+				btnDeleteVersion.style.display = 'inline-block';
+			} else {
+				btnActivateVersion.style.display = 'none';
+				btnDeleteVersion.style.display = 'none';
+			}
+		}
+
+		function activateSelectedVersion() {
+			var chosenSec = versionsSelectEl.value;
+			if (!chosenSec) return;
+
+			ui.showModal('Активация стратегии', [
+				E('p', { class: 'spinning' }, 'Переключение на запись ' + chosenSec + ' в Zapret2...')
+			]);
+
+			fs.exec(HELPER_BIN, ['activate', '--target', currentTarget, '--section', chosenSec]).then(function(res) {
+				ui.hideModal();
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+				if (parsed && parsed.success) {
+					ui.addNotification(null, E('p', {}, '✓ Запись ' + chosenSec + ' успешно активирована в Zapret2!'), 'info');
+					getZapretInfo().then(function(info) {
+						zapretServicesData = info.services || {};
+						zapretAllStrategies = info.all_strategies || [];
+						updateSummaryBox();
+						updateActiveStrategyDisplay();
+						if (zapretBadgeEl) {
+							zapretBadgeEl.className = (info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red';
+							zapretBadgeEl.textContent = (info.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен';
+						}
+					});
+					refreshLogs();
+				} else {
+					ui.addNotification(null, E('p', {}, 'Ошибка активации: ' + (parsed ? parsed.error : res.stderr)), 'danger');
+				}
+			}).catch(function(err) {
+				ui.hideModal();
+				ui.addNotification(null, E('p', {}, 'Ошибка активации: ' + err), 'danger');
+			});
+		}
+
+		function deleteSelectedVersion() {
+			var chosenSec = versionsSelectEl.value;
+			if (!chosenSec) return;
+
+			if (!confirm('Вы уверены, что хотите удалить сохранённую запись ' + chosenSec + ' из конфигурации Zapret2?')) {
+				return;
+			}
+
+			ui.showModal('Удаление стратегии', [
+				E('p', { class: 'spinning' }, 'Удаление записи ' + chosenSec + ' из Zapret2...')
+			]);
+
+			fs.exec(HELPER_BIN, ['delete_strategy', chosenSec]).then(function(res) {
+				ui.hideModal();
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+				if (parsed && parsed.success) {
+					ui.addNotification(null, E('p', {}, '✓ Запись ' + chosenSec + ' удалена.'), 'info');
+					getZapretInfo().then(function(info) {
+						zapretServicesData = info.services || {};
+						zapretAllStrategies = info.all_strategies || [];
+						updateSummaryBox();
+						updateActiveStrategyDisplay();
+					});
+					refreshLogs();
+				} else {
+					ui.addNotification(null, E('p', {}, 'Ошибка удаления: ' + (parsed ? parsed.error : res.stderr)), 'danger');
+				}
+			}).catch(function(err) {
+				ui.hideModal();
+				ui.addNotification(null, E('p', {}, 'Ошибка: ' + err), 'danger');
+			});
 		}
 
 		function updateSummaryBox() {
@@ -977,7 +1143,10 @@ return view.extend({
 				} catch(e) {}
 
 				if (parsed && parsed.success) {
-					var msg = isCirc ? 'Circular-связка успешно внедрена в Zapret2!' : 'Стратегия успешно внедрена в Zapret2!';
+					var secName = parsed.section || 'новая запись';
+					var msg = isCirc ?
+						('Circular-связка сохранена как ' + secName + ' и активирована в Zapret2!') :
+						('Стратегия сохранена как ' + secName + ' и активирована в Zapret2!');
 					if (parsed.connected) {
 						msg += ' Соединение с сервером подтверждено (HTTP ' + parsed.http_code + ').';
 					}

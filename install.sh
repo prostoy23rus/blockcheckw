@@ -204,7 +204,27 @@ chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
 
 echo -e "${GREEN}✓${NC} Файлы LuCI интерфейса успешно скопированы."
 
-# 7. Очистка кэша LuCI и перезапуск служб
+# 7. Настройка Firewall: блокировка QUIC (UDP 443)
+echo -e "${BLUE}ℹ${NC} Проверка настройки блокировки QUIC (UDP 443)..."
+if command -v uci >/dev/null 2>&1 && [ -f /etc/config/firewall ]; then
+    if ! uci get firewall.reject_quic >/dev/null 2>&1; then
+        echo -e "${YELLOW}ℹ${NC} Добавление правила Reject-QUIC в межсетевой экран..."
+        uci set firewall.reject_quic=rule
+        uci set firewall.reject_quic.name='Reject-QUIC'
+        uci set firewall.reject_quic.src='lan'
+        uci set firewall.reject_quic.dest='wan'
+        uci set firewall.reject_quic.proto='udp'
+        uci set firewall.reject_quic.dest_port='443'
+        uci set firewall.reject_quic.target='REJECT'
+        uci commit firewall
+        /etc/init.d/firewall reload >/dev/null 2>&1 || true
+        echo -e "${GREEN}✓${NC} Правило Reject-QUIC успешно добавлено."
+    else
+        echo -e "${GREEN}✓${NC} Правило Reject-QUIC уже активно."
+    fi
+fi
+
+# 8. Очистка кэша LuCI и перезапуск служб
 echo -e "${BLUE}ℹ${NC} Очистка кэша LuCI и перезапуск служб веб-интерфейса..."
 rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
 /etc/init.d/rpcd restart >/dev/null 2>&1 || true

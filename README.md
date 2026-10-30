@@ -28,7 +28,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 
 ---
 
-## 🚀 Что сделано в этой версии (prostoy23rus Edition)
+## 🚀 Что сделано в этом форке:
 
 Данный репозиторий представляет собой глубокую модернизацию и прокачку оригинального проекта `rcd27/blockcheckw`:
 

@@ -674,6 +674,17 @@ cmd_info() {
             services = {}
         }
 
+        local vf = io.open("'"$VERSION_FILE"'", "r")
+        if vf then
+            local vj = json.parse(vf:read("*a"))
+            vf:close()
+            if vj then
+                res.version = vj.version
+                res.changelog = vj.changelog
+            end
+        end
+        if not res.version then res.version = "0.15.2" end
+
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
             local name = s[".name"]
@@ -779,7 +790,12 @@ cmd_info() {
 }
 
 cmd_logs() {
-    local zapret_log=$(logread -e zapret2 2>/dev/null | tail -n 40 | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    local zapret_log=""
+    if ubus list log >/dev/null 2>&1; then
+        zapret_log=$(logread -e zapret2 2>/dev/null | tail -n 40 | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    elif [ -f /var/log/messages ]; then
+        zapret_log=$(grep -i zapret2 /var/log/messages 2>/dev/null | tail -n 40 | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    fi
     local scan_log=""
     if [ -f "$LOG_FILE" ]; then
         scan_log=$(tail -n 60 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
@@ -796,9 +812,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15"
+    local cur_ver="0.15.2"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15"); else print("0.15"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.2"); else print("0.15.2"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -807,7 +823,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15"
+local cur_ver = arg[1] or "0.15.2"
 local file = arg[2]
 local local_file = arg[3]
 

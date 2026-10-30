@@ -272,8 +272,7 @@ return view.extend({
 		return Promise.all([
 			checkHelperStatus(),
 			getZapretInfo(),
-			getLogs(),
-			checkVersion()
+			getLogs()
 		]);
 	},
 
@@ -281,7 +280,12 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
-		var versionInfo = data[3] || { current_version: '0.15.1', has_update: false };
+		var curVer = zapretInfo.version || '0.15.2';
+		var versionInfo = {
+			current_version: curVer,
+			has_update: false,
+			changelog: zapretInfo.changelog || []
+		};
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
 
@@ -326,11 +330,12 @@ return view.extend({
 			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; width: 100%; }\n' +
 			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; min-height: 125px; box-sizing: border-box; width: 100%; }\n' +
 			'.bcw-param-label { font-size: 13px; font-weight: bold; color: #abb2bf; }\n' +
-			'.bcw-segmented { display: flex; height: 38px; border-radius: 6px; overflow: hidden; border: 1px solid #485060; background: #1c1f24; box-sizing: border-box; width: 100%; }\n' +
-			'.bcw-seg-btn { flex: 1 1 0; min-width: 0; height: 100%; padding: 0 10px; font-size: 12px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: transparent; border: none; color: #828997; transition: all 0.2s; white-space: nowrap; line-height: 1; box-sizing: border-box; }\n' +
-			'.bcw-seg-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }\n' +
-			'.bcw-seg-btn.active { background: #3273dc; color: #fff; font-weight: bold; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }\n' +
-			'.bcw-seg-btn.active.teal { background: #00d1b2; color: #000; font-weight: bold; }\n' +
+			'/* Separate Option Buttons */\n' +
+			'.bcw-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; box-sizing: border-box; }\n' +
+			'.bcw-opt-btn { height: 44px; padding: 0 8px; font-size: 12.5px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: #1c2027; border: 1px solid #383e4a; border-radius: 8px; color: #828997; transition: all 0.2s ease; white-space: normal; line-height: 1.25; box-sizing: border-box; outline: none; user-select: none; -webkit-tap-highlight-color: transparent; }\n' +
+			'.bcw-opt-btn:hover { color: #e5e9f0; background: #252a34; border-color: #4e5565; }\n' +
+			'.bcw-opt-btn.active { background: #2458b8; border-color: #3b82f6; color: #ffffff; font-weight: bold; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35); }\n' +
+			'.bcw-opt-btn.active.teal { background: #00d1b2; border-color: #00d1b2; color: #0b1516; font-weight: bold; box-shadow: 0 2px 8px rgba(0, 209, 178, 0.35); }\n' +
 			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: #abb2bf; }\n' +
 			'\n' +
 			'/* Main Unified Action Bar */\n' +
@@ -374,10 +379,8 @@ return view.extend({
 			'  .bcw-chips-row { gap: 6px; }\n' +
 			'  .bcw-chip-btn { height: 28px; padding: 0 10px; font-size: 11px; }\n' +
 			'  .bcw-param-box { padding: 12px 14px; min-height: auto; }\n' +
-			'  .bcw-segmented { flex-direction: column; height: auto; border-radius: 6px; border: 1px solid #485060; }\n' +
-			'  .bcw-seg-btn { width: 100%; height: 38px; padding: 0 12px; font-size: 12.5px; justify-content: center; border-bottom: 1px solid #383e4a; border-radius: 0; }\n' +
-			'  .bcw-seg-btn:first-child { border-top-left-radius: 5px; border-top-right-radius: 5px; }\n' +
-			'  .bcw-seg-btn:last-child { border-bottom: none; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; }\n' +
+			'  .bcw-options-grid { grid-template-columns: 1fr; gap: 8px; }\n' +
+			'  .bcw-opt-btn { width: 100%; height: 48px; font-size: 14px; padding: 0 14px; border-radius: 8px; white-space: normal; }\n' +
 			'  .bcw-hint-box { padding: 10px 12px; }\n' +
 			'  .bcw-hint-grid { grid-template-columns: 1fr; gap: 8px; }\n' +
 			'  .bcw-target-summary { flex-direction: column; align-items: flex-start; gap: 8px; }\n' +
@@ -661,24 +664,24 @@ return view.extend({
 
 		// Parameters and Launch Control Card
 		var btnModeTurbo = E('button', {
-			class: 'bcw-seg-btn' + (currentMode === 'turbo' ? ' active' : ''),
+			class: 'bcw-opt-btn' + (currentMode === 'turbo' ? ' active' : ''),
 			click: function() { switchMode('turbo'); }
 		}, '⚡ Турбо (10-15 сек)');
 
 		var btnModeFull = E('button', {
-			class: 'bcw-seg-btn' + (currentMode === 'full' ? ' active' : ''),
+			class: 'bcw-opt-btn' + (currentMode === 'full' ? ' active' : ''),
 			click: function() { switchMode('full'); }
 		}, '🔬 Глубокий скан');
 
 		var btnApplyAuto = E('button', {
-			class: 'bcw-seg-btn' + (autoApply ? ' active teal' : ''),
+			class: 'bcw-opt-btn' + (autoApply ? ' active teal' : ''),
 			click: function() { switchApplyMode(true); }
-		}, '⚡ Авто (Auto-Apply)');
+		}, '⚡ Авто');
 
 		var btnApplyManual = E('button', {
-			class: 'bcw-seg-btn' + (!autoApply ? ' active' : ''),
+			class: 'bcw-opt-btn' + (!autoApply ? ' active' : ''),
 			click: function() { switchApplyMode(false); }
-		}, '✋ Вручную (По кнопке)');
+		}, '✋ Вручную');
 
 		var paramSpeedHintEl = E('div', { class: 'bcw-param-hint' },
 			currentMode === 'turbo'
@@ -699,12 +702,12 @@ return view.extend({
 		);
 
 		var btnCircularOn = E('button', {
-			class: 'bcw-seg-btn' + (doCircular ? ' active' : ''),
+			class: 'bcw-opt-btn' + (doCircular ? ' active' : ''),
 			click: function() { switchCircularMode(true); }
 		}, '🔄 Circular (Связка)');
 
 		var btnCircularOff = E('button', {
-			class: 'bcw-seg-btn' + (!doCircular ? ' active' : ''),
+			class: 'bcw-opt-btn' + (!doCircular ? ' active' : ''),
 			click: function() { switchCircularMode(false); }
 		}, '⚡ Одиночная');
 
@@ -742,19 +745,19 @@ return view.extend({
 				// Box 1: Mode
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Скорость подбора:'),
-					E('div', { class: 'bcw-segmented' }, [ btnModeTurbo, btnModeFull ]),
+					E('div', { class: 'bcw-options-grid' }, [ btnModeTurbo, btnModeFull ]),
 					paramSpeedHintEl
 				]),
 				// Box 2: Auto-apply
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Режим применения:'),
-					E('div', { class: 'bcw-segmented' }, [ btnApplyAuto, btnApplyManual ]),
+					E('div', { class: 'bcw-options-grid' }, [ btnApplyAuto, btnApplyManual ]),
 					paramApplyHintEl
 				]),
 				// Box 3: Circular
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Отказоустойчивость:'),
-					E('div', { class: 'bcw-segmented' }, [ btnCircularOn, btnCircularOff ]),
+					E('div', { class: 'bcw-options-grid' }, [ btnCircularOn, btnCircularOff ]),
 					paramCircularHintEl
 				])
 			]),
@@ -1857,6 +1860,11 @@ return view.extend({
 		if (versionInfo && versionInfo.has_update) {
 			showUpdateBanner(versionInfo);
 		}
+
+		// Check for updates asynchronously without blocking page render
+		setTimeout(function() {
+			doCheckUpdate(false);
+		}, 1500);
 
 		// Initial In-Memory Render
 		updateSummaryBox();

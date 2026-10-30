@@ -118,22 +118,55 @@ cmd_start() {
 
     # Resolve target and domain
     local protocols="tls12,tls13"
-    if [ "$target" = "youtube" ]; then
-        domain=$(get_preset_param "youtube" "domain")
-        [ -n "$domain" ] || domain="googlevideo.com"
-        protocols="tls12,tls13"
-    elif [ "$target" = "discord" ]; then
-        domain=$(get_preset_param "discord" "domain")
-        [ -n "$domain" ] || domain="gateway.discord.gg"
-        protocols="tls12,tls13"
-    elif [ "$target" = "general" ]; then
-        domain=$(get_preset_param "general" "domain")
-        [ -n "$domain" ] || domain="rutracker.org"
-        protocols="http,tls12,tls13"
-    else
-        [ -n "$domain" ] || domain="rutracker.org"
-        protocols="http,tls12,tls13"
-    fi
+    case "$target" in
+        preset_youtube|youtube)
+            domain=$(get_preset_param "preset_youtube" "domain")
+            [ -n "$domain" ] || domain="googlevideo.com"
+            protocols="tls12,tls13"
+            ;;
+        preset_discord|discord)
+            domain=$(get_preset_param "preset_discord" "domain")
+            [ -n "$domain" ] || domain="gateway.discord.gg"
+            protocols="tls12,tls13"
+            ;;
+        preset_twitch|twitch)
+            domain=$(get_preset_param "preset_twitch" "domain")
+            [ -n "$domain" ] || domain="twitch.tv"
+            protocols="tls12,tls13"
+            ;;
+        preset_x|x)
+            domain=$(get_preset_param "preset_x" "domain")
+            [ -n "$domain" ] || domain="x.com"
+            protocols="tls12,tls13"
+            ;;
+        preset_instagram|instagram)
+            domain=$(get_preset_param "preset_instagram" "domain")
+            [ -n "$domain" ] || domain="gateway.instagram.com"
+            protocols="tls12,tls13"
+            ;;
+        tcp16)
+            domain=$(get_preset_param "tcp16" "domain")
+            [ -n "$domain" ] || domain="media.miele.com"
+            protocols="tls12,tls13"
+            ;;
+        builtin|general)
+            domain=$(get_preset_param "builtin" "domain")
+            [ -n "$domain" ] || domain="rutracker.org"
+            protocols="http,tls12,tls13"
+            ;;
+        domains|custom)
+            [ -n "$domain" ] || domain="rutracker.org"
+            protocols="http,tls12,tls13"
+            ;;
+        test_strategy)
+            [ -n "$domain" ] || domain="rutracker.org"
+            protocols="http,tls12,tls13"
+            ;;
+        *)
+            [ -n "$domain" ] || domain="rutracker.org"
+            protocols="http,tls12,tls13"
+            ;;
+    esac
 
     rm -f "$OUTPUT_VANILLA" "$OUTPUT_SCAN" "$OUTPUT_CIRCULAR" "$TURBO_FILE" "$LOG_FILE"
     echo "" > "$LOG_FILE"
@@ -320,31 +353,64 @@ cmd_apply() {
     local hostlist=""
     local test_url=""
 
-    if [ "$target" = "youtube" ]; then
-        sec_name="MyTube"
-        port="443"
-        l7="tls"
-        hostlist="list_hosts_youtube"
-        test_url="https://googlevideo.com"
-    elif [ "$target" = "discord" ]; then
-        sec_name="BlockcheckW_Discord"
-        port="443"
-        l7="tls discord"
-        hostlist="list_hosts_discord"
-        test_url="https://gateway.discord.gg"
-    elif [ "$target" = "general" ]; then
-        sec_name="BlockcheckW_General"
-        port="80,443"
-        l7="tls http"
-        hostlist="list_hosts_user"
-        test_url="https://rutracker.org"
-    else
-        sec_name="BlockcheckW_$target"
-        port="443"
-        l7="tls"
-        hostlist="list_hosts_user"
-        test_url="https://$target"
-    fi
+    case "$target" in
+        preset_youtube|youtube)
+            sec_name="MyTube"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_youtube"
+            test_url="https://googlevideo.com"
+            ;;
+        preset_discord|discord)
+            sec_name="BlockcheckW_Discord"
+            port="443"
+            l7="tls discord"
+            hostlist="list_hosts_discord"
+            test_url="https://gateway.discord.gg"
+            ;;
+        preset_twitch|twitch)
+            sec_name="BlockcheckW_Twitch"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_user"
+            test_url="https://twitch.tv"
+            ;;
+        preset_x|x)
+            sec_name="BlockcheckW_X"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_user"
+            test_url="https://x.com"
+            ;;
+        preset_instagram|instagram)
+            sec_name="BlockcheckW_Instagram"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_user"
+            test_url="https://gateway.instagram.com"
+            ;;
+        tcp16)
+            sec_name="BlockcheckW_TCP16"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_user"
+            test_url="https://media.miele.com"
+            ;;
+        builtin|general)
+            sec_name="BlockcheckW_General"
+            port="80,443"
+            l7="tls http"
+            hostlist="list_hosts_user"
+            test_url="https://rutracker.org"
+            ;;
+        *)
+            sec_name="BlockcheckW_$target"
+            port="443"
+            l7="tls"
+            hostlist="list_hosts_user"
+            test_url="https://$target"
+            ;;
+    esac
 
     # Set UCI parameters
     uci -q delete "zapret2.$sec_name"
@@ -412,9 +478,22 @@ cmd_info() {
         }
 
         local targets = {
-            youtube = { section = "MyTube", name = "YouTube" },
+            builtin = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
+            general = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
+            preset_youtube = { section = "MyTube", fallback = "Youtube_circular", name = "Предустановленный список YouTube (3)" },
+            youtube = { section = "MyTube", fallback = "Youtube_circular", name = "YouTube" },
+            preset_discord = { section = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Предустановленный список Discord (3)" },
             discord = { section = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
-            general = { section = "BlockcheckW_General", fallback = "Routerich_circular", name = "Блокированные сайты" }
+            preset_twitch = { section = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Предустановленный список Twitch (3)" },
+            twitch = { section = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Twitch" },
+            preset_x = { section = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "Предустановленный список X (3)" },
+            x = { section = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "X (Twitter)" },
+            preset_instagram = { section = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Предустановленный список Instagram (2)" },
+            instagram = { section = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Instagram" },
+            tcp16 = { section = "BlockcheckW_TCP16", fallback = "BlockcheckW_General", name = "Кандидаты TCP 16-20 KB (110)" },
+            domains = { section = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
+            custom = { section = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
+            test_strategy = { section = "BlockcheckW_General", name = "Тест стратегии" }
         }
 
         for key, info in pairs(targets) do
@@ -438,6 +517,20 @@ cmd_info() {
                 is_circular = is_circ
             }
         end
+
+        local all_strats = {}
+        uci:foreach("zapret2", "strategy", function(s)
+            local name = s[".name"]
+            if name then
+                table.insert(all_strats, {
+                    section = name,
+                    enabled = (s.enabled == "1" or s.enabled == 1),
+                    port = s.port or "443",
+                    script = s.script or ""
+                })
+            end
+        end)
+        res.all_strategies = all_strats
 
         print(json.stringify(res))
     ' 2>/dev/null

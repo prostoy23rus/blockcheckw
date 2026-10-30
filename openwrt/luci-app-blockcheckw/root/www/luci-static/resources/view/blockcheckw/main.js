@@ -7,7 +7,7 @@ var HELPER_BIN = '/usr/bin/blockcheckw-helper';
 var isRunning = false;
 var pollInterval = null;
 var logPollInterval = null;
-var currentTarget = 'youtube';
+var currentTarget = 'preset_youtube';
 var currentMode = 'turbo';
 var doCircular = true;
 var autoApply = true;
@@ -16,6 +16,100 @@ var autoLogScroll = true;
 var lastResults = [];
 var lastCircular = '';
 var zapretServicesData = {};
+var zapretAllStrategies = [];
+
+var PRESET_DEFS = {
+	'builtin': {
+		name: 'Встроенные хосты (33)',
+		label: 'Встроенные хосты (33)',
+		icon: '🌐',
+		domain: 'rutracker.org',
+		domainsText: '33 хоста, 17 провайдеров (Rutracker, Pornhub, TorProject, BBC и др.)',
+		test_url: 'https://rutracker.org',
+		key: 'builtin',
+		port: '80,443'
+	},
+	'preset_youtube': {
+		name: 'Предустановленный список YouTube (3)',
+		label: 'YouTube (3)',
+		icon: '📺',
+		domain: 'googlevideo.com',
+		domainsText: 'googlevideo.com (видеопотоки), i.ytimg.com (превью), youtube.com',
+		test_url: 'https://googlevideo.com',
+		key: 'preset_youtube',
+		port: '443'
+	},
+	'preset_discord': {
+		name: 'Предустановленный список Discord (3)',
+		label: 'Discord (3)',
+		icon: '💬',
+		domain: 'gateway.discord.gg',
+		domainsText: 'gateway.discord.gg (голос), discord.com, cdn.discordapp.com',
+		test_url: 'https://gateway.discord.gg',
+		key: 'preset_discord',
+		port: '443'
+	},
+	'preset_twitch': {
+		name: 'Предустановленный список Twitch (3)',
+		label: 'Twitch (3)',
+		icon: '🎮',
+		domain: 'twitch.tv',
+		domainsText: 'twitch.tv, static-cdn.jtvnw.net, usher.ttvnw.net (стримы)',
+		test_url: 'https://twitch.tv',
+		key: 'preset_twitch',
+		port: '443'
+	},
+	'preset_x': {
+		name: 'Предустановленный список X (3)',
+		label: 'X / Twitter (3)',
+		icon: '🐦',
+		domain: 'x.com',
+		domainsText: 'x.com, api.x.com, pbs.twimg.com (медиа)',
+		test_url: 'https://x.com',
+		key: 'preset_x',
+		port: '443'
+	},
+	'preset_instagram': {
+		name: 'Предустановленный список Instagram (2)',
+		label: 'Instagram (2)',
+		icon: '📸',
+		domain: 'gateway.instagram.com',
+		domainsText: 'gateway.instagram.com, static.cdninstagram.com',
+		test_url: 'https://gateway.instagram.com',
+		key: 'preset_instagram',
+		port: '443'
+	},
+	'tcp16': {
+		name: 'Кандидаты TCP 16-20 KB (110)',
+		label: 'TCP 16-20 KB (110)',
+		icon: '⚡',
+		domain: 'media.miele.com',
+		domainsText: '110 хостов из suite.json (Miele, Roxio, GetScope и др.)',
+		test_url: 'https://media.miele.com',
+		key: 'tcp16',
+		port: '443'
+	},
+	'domains': {
+		name: 'Свои домены',
+		label: 'Свои домены',
+		icon: '🎯',
+		domain: 'rutracker.org',
+		domainsText: 'Пользовательский список доменов для поиска обхода',
+		test_url: 'https://rutracker.org',
+		key: 'domains',
+		port: '80,443'
+	},
+	'test_strategy': {
+		name: 'Тест стратегии',
+		label: 'Тест стратегии',
+		icon: '🧪',
+		domain: 'rutracker.org',
+		domainsText: 'Проверка работы существующей стратегии Zapret2 на ресурсе',
+		test_url: 'https://rutracker.org',
+		key: 'test_strategy',
+		port: '443'
+	}
+};
 
 function checkHelperStatus() {
 	return fs.exec(HELPER_BIN, ['status']).then(function(res) {
@@ -37,9 +131,9 @@ function getZapretInfo() {
 				return JSON.parse(res.stdout);
 			} catch (e) {}
 		}
-		return { zapret2_running: 'unknown', services: {} };
+		return { zapret2_running: 'unknown', services: {}, all_strategies: [] };
 	}).catch(function() {
-		return { zapret2_running: 'unknown', services: {} };
+		return { zapret2_running: 'unknown', services: {}, all_strategies: [] };
 	});
 }
 
@@ -70,10 +164,11 @@ return view.extend({
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
 		zapretServicesData = zapretInfo.services || {};
+		zapretAllStrategies = zapretInfo.all_strategies || [];
 
 		var container = E('div', { class: 'cbi-map bcw-wrapper' });
 
-		// Inject Scoped Styles for Clean, High-Contrast UI
+		// Scoped Styles
 		var styleSheet = E('style', {}, [
 			'/* BlockcheckW Unified Dashboard Styles */\n' +
 			'.bcw-wrapper * { box-sizing: border-box; }\n' +
@@ -82,14 +177,15 @@ return view.extend({
 			'.bcw-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); }\n' +
 			'.bcw-card-title { font-size: 15px; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; color: #e5e9f0; }\n' +
 			'\n' +
-			'/* Target Selection Grid */\n' +
-			'.bcw-target-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }\n' +
-			'.bcw-target-btn { background: #282c34; border: 2px solid #3e4451; border-radius: 8px; padding: 14px 16px; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; text-align: left; }\n' +
-			'.bcw-target-btn:hover { border-color: #3273dc; background: #2f343e; transform: translateY(-1px); }\n' +
-			'.bcw-target-btn.active { border-color: #00d1b2 !important; background: rgba(0, 209, 178, 0.1) !important; box-shadow: 0 0 12px rgba(0, 209, 178, 0.25); }\n' +
-			'.bcw-target-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }\n' +
-			'.bcw-target-title { font-size: 15px; font-weight: bold; display: flex; align-items: center; gap: 6px; }\n' +
-			'.bcw-target-desc { font-size: 12px; opacity: 0.75; line-height: 1.35; margin: 0; }\n' +
+			'/* Finder Mode Dropdown & Chips */\n' +
+			'.bcw-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }\n' +
+			'.bcw-select { box-sizing: border-box; min-width: 320px; max-width: 100%; padding: 8px 14px; font-size: 14px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
+			'.bcw-select:hover, .bcw-select:focus { border-color: #3273dc; box-shadow: 0 0 8px rgba(50, 115, 220, 0.3); }\n' +
+			'.bcw-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }\n' +
+			'.bcw-chip-btn { box-sizing: border-box; padding: 6px 14px; font-size: 12px; font-weight: 500; border-radius: 20px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }\n' +
+			'.bcw-chip-btn:hover { color: #fff; border-color: #3273dc; background: #323742; }\n' +
+			'.bcw-chip-btn.active { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; font-weight: bold; }\n' +
+			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }\n' +
 			'\n' +
 			'/* Control & Parameters Bar */\n' +
 			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; }\n' +
@@ -118,13 +214,9 @@ return view.extend({
 			'\n' +
 			'/* Responsive */\n' +
 			'@media (max-width: 900px) {\n' +
-			'  .bcw-target-grid { grid-template-columns: repeat(2, 1fr); }\n' +
 			'  .bcw-control-grid { grid-template-columns: 1fr; }\n' +
 			'  .bcw-action-bar { flex-direction: column; width: 100%; }\n' +
 			'  .bcw-action-bar button { width: 100%; justify-content: center; }\n' +
-			'}\n' +
-			'@media (max-width: 520px) {\n' +
-			'  .bcw-target-grid { grid-template-columns: 1fr; }\n' +
 			'}\n'
 		]);
 		container.appendChild(styleSheet);
@@ -154,64 +246,120 @@ return view.extend({
 		]);
 		mainLayout.appendChild(headerCard);
 
-		// Target Selection Card
-		var targetCardsMap = {};
-		var targetBadgesMap = {};
-		var targetDefs = [
-			{ id: 'youtube', name: 'YouTube', icon: '📺', desc: 'Превью, 1080p/4K стримы (googlevideo)', key: 'youtube' },
-			{ id: 'discord', name: 'Discord', icon: '💬', desc: 'Голосовые каналы, шлюзы, чат', key: 'discord' },
-			{ id: 'general', name: 'Блокированные сайты', icon: '🌐', desc: 'Рутрекер, X/Twitter, Instagram, ntc.party', key: 'general' },
-			{ id: 'custom', name: 'Свой домен', icon: '🎯', desc: 'Произвольный ресурс для проверки обхода', key: 'general' }
+		// Target Selection Section (Zapret Finder Style Dropdown + Quick Chips)
+		var modeSelectEl = E('select', {
+			class: 'bcw-select',
+			change: function(e) { selectTarget(e.target.value); }
+		}, [
+			E('option', { value: 'builtin' }, 'Встроенные хосты (33)'),
+			E('option', { value: 'preset_youtube', selected: 'selected' }, 'Предустановленный список YouTube (3)'),
+			E('option', { value: 'preset_discord' }, 'Предустановленный список Discord (3)'),
+			E('option', { value: 'preset_twitch' }, 'Предустановленный список Twitch (3)'),
+			E('option', { value: 'preset_x' }, 'Предустановленный список X (3)'),
+			E('option', { value: 'preset_instagram' }, 'Предустановленный список Instagram (2)'),
+			E('option', { value: 'tcp16' }, 'Кандидаты TCP 16-20 KB (110)'),
+			E('option', { value: 'domains' }, 'Свои домены'),
+			E('option', { value: 'test_strategy' }, 'Тест стратегии')
+		]);
+
+		var chipButtonsMap = {};
+		var quickChipsList = [
+			{ id: 'preset_youtube', icon: '📺', name: 'YouTube' },
+			{ id: 'preset_discord', icon: '💬', name: 'Discord' },
+			{ id: 'preset_twitch', icon: '🎮', name: 'Twitch' },
+			{ id: 'preset_x', icon: '🐦', name: 'X / Twitter' },
+			{ id: 'preset_instagram', icon: '📸', name: 'Instagram' },
+			{ id: 'builtin', icon: '🌐', name: 'Встроенные хосты (33)' },
+			{ id: 'tcp16', icon: '⚡', name: 'TCP 16-20 KB' }
 		];
 
-		var targetGridEl = E('div', { class: 'bcw-target-grid' });
-		targetDefs.forEach(function(t) {
-			var svc = zapretServicesData[t.key] || {};
-			var badgeText = 'Не настроено';
-			var badgeClass = 'badge cbi-color-neutral';
-			if (svc.enabled) {
-				badgeText = svc.is_circular ? '🔄 Circular' : '✓ Включено';
-				badgeClass = svc.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
-			}
+		var chipsRowEl = E('div', { class: 'bcw-chips-row' }, [
+			E('span', { style: 'font-size: 12px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:')
+		]);
 
-			var bEl = E('span', { class: badgeClass, style: 'font-size: 11px; padding: 2px 8px;' }, badgeText);
-			targetBadgesMap[t.id] = bEl;
-
-			var card = E('div', {
-				class: 'bcw-target-btn' + (currentTarget === t.id ? ' active' : ''),
-				click: function() { selectTarget(t.id); }
+		quickChipsList.forEach(function(ch) {
+			var btn = E('div', {
+				class: 'bcw-chip-btn' + (currentTarget === ch.id ? ' active' : ''),
+				click: function() { selectTarget(ch.id); }
 			}, [
-				E('div', { class: 'bcw-target-top' }, [
-					E('div', { class: 'bcw-target-title' }, [ t.icon + ' ' + t.name ]),
-					bEl
-				]),
-				E('p', { class: 'bcw-target-desc' }, t.desc)
+				E('span', {}, ch.icon),
+				E('span', {}, ch.name)
 			]);
-
-			targetCardsMap[t.id] = card;
-			targetGridEl.appendChild(card);
+			chipButtonsMap[ch.id] = btn;
+			chipsRowEl.appendChild(btn);
 		});
 
 		var customDomainInput = E('input', {
 			type: 'text',
 			class: 'cbi-input-text',
 			placeholder: 'rutracker.org',
-			style: 'width: 320px; max-width: 100%; font-size: 14px; padding: 6px 10px;'
+			value: 'rutracker.org',
+			style: 'width: 380px; max-width: 100%; font-size: 14px; padding: 7px 12px;'
 		});
 
 		var customDomainRow = E('div', {
-			style: (currentTarget === 'custom' ? 'display: block; margin-top: 14px;' : 'display: none; margin-top: 14px;')
+			style: 'display: none; margin-top: 14px; padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
 		}, [
-			E('label', { style: 'font-weight: bold; margin-right: 10px;' }, 'Домен для сканирования:'),
+			E('label', { style: 'font-weight: bold; margin-right: 10px; display: inline-block; margin-bottom: 4px;' }, 'Домены для поиска (через пробел):'),
 			customDomainInput
+		]);
+
+		// Test Strategy Mode Dropdown
+		var testStrategySelectEl = E('select', {
+			class: 'bcw-select',
+			style: 'min-width: 260px;',
+			change: function(e) {
+				var chosen = e.target.value;
+				if (!chosen) return;
+				var found = zapretAllStrategies.find(function(s) { return s.section === chosen; });
+				if (found && found.script) {
+					activeCodeEl.textContent = found.script;
+					activeMetaBadgesEl.innerHTML = '';
+					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + found.section));
+					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + found.port));
+					activeMetaBadgesEl.appendChild(E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, '🧪 Режим теста'));
+				}
+			}
+		}, [
+			E('option', { value: '' }, '-- Выберите стратегию для теста --')
+		]);
+
+		zapretAllStrategies.forEach(function(st) {
+			testStrategySelectEl.appendChild(E('option', { value: st.section }, st.section + (st.enabled ? ' [Включена]' : ' [Отключена]')));
+		});
+
+		var testStrategyRow = E('div', {
+			style: 'display: none; margin-top: 14px; padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
+		}, [
+			E('label', { style: 'font-weight: bold; margin-right: 10px;' }, 'Стратегия Zapret2:'),
+			testStrategySelectEl
+		]);
+
+		// Summary Banner
+		var summaryTitleEl = E('strong', { style: 'color: #61afef; font-size: 14px;' }, 'YouTube (3 хоста)');
+		var summaryDescEl = E('div', { style: 'font-size: 12px; opacity: 0.8; margin-top: 2px;' }, 'googlevideo.com, i.ytimg.com, youtube.com');
+		var summaryStatusBadgeEl = E('span', { class: 'badge cbi-color-green', style: 'font-size: 12px; padding: 4px 10px;' }, '✓ Настроено в Zapret2');
+
+		var targetSummaryBox = E('div', { class: 'bcw-target-summary' }, [
+			E('div', {}, [
+				summaryTitleEl,
+				summaryDescEl
+			]),
+			summaryStatusBadgeEl
 		]);
 
 		var targetSectionCard = E('div', { class: 'bcw-card' }, [
 			E('div', { class: 'bcw-card-header' }, [
-				E('h3', { class: 'bcw-card-title' }, '1. Выберите цель обхода')
+				E('h3', { class: 'bcw-card-title' }, '1. Цель обхода (Пресеты Zapret Finder)')
 			]),
-			targetGridEl,
-			customDomainRow
+			E('div', { class: 'bcw-mode-row' }, [
+				E('label', { style: 'font-weight: bold; font-size: 14px; color: #abb2bf;' }, 'Режим работы:'),
+				modeSelectEl
+			]),
+			chipsRowEl,
+			customDomainRow,
+			testStrategyRow,
+			targetSummaryBox
 		]);
 		mainLayout.appendChild(targetSectionCard);
 
@@ -433,17 +581,11 @@ return view.extend({
 		// Business Logic Functions
 
 		function updateActiveStrategyDisplay() {
-			var targetKey = (currentTarget === 'custom') ? 'general' : currentTarget;
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var targetKey = pDef.key || currentTarget;
 			var sData = zapretServicesData[targetKey];
 
-			var names = {
-				youtube: 'YouTube (Видео/Аудио)',
-				discord: 'Discord (Голос/Чат)',
-				general: 'Блокированные сайты (Рутрекер, X и др.)',
-				custom: 'Пользовательский домен (общие правила)'
-			};
-
-			activeTargetTitleEl.textContent = names[currentTarget] || currentTarget;
+			activeTargetTitleEl.textContent = pDef.name;
 			activeMetaBadgesEl.innerHTML = '';
 
 			if (sData && sData.script && sData.script.trim() !== '') {
@@ -466,20 +608,42 @@ return view.extend({
 				activeMetaBadgesEl.appendChild(
 					E('span', { class: 'badge cbi-color-neutral', style: 'font-size: 11px;' }, 'Стратегия не настроена')
 				);
-				activeCodeEl.textContent = '# Стратегия для данного сервиса ещё не задана в Zapret2.\n# Запустите турбо-поиск выше, чтобы подобрать и применить рабочую стратегию!';
+				activeCodeEl.textContent = '# Стратегия для выбранной цели (' + pDef.name + ') ещё не настроена в Zapret2.\n# Запустите турбо-поиск выше для автоматического подбора и активации!';
+			}
+		}
+
+		function updateSummaryBox() {
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			summaryTitleEl.textContent = pDef.icon + ' ' + pDef.name;
+			summaryDescEl.textContent = pDef.domainsText || pDef.domain;
+
+			var sData = zapretServicesData[pDef.key || currentTarget];
+			if (sData && sData.enabled) {
+				summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
+				summaryStatusBadgeEl.textContent = sData.is_circular ? '🔄 Активна Circular-связка (' + sData.section + ')' : '✓ Активна стратегия (' + sData.section + ')';
+			} else {
+				summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
+				summaryStatusBadgeEl.textContent = 'Не настроено в Zapret2';
 			}
 		}
 
 		function selectTarget(targetId) {
 			currentTarget = targetId;
-			targetDefs.forEach(function(t) {
-				var btn = targetCardsMap[t.id];
-				if (btn) {
-					if (t.id === targetId) btn.classList.add('active');
-					else btn.classList.remove('active');
+			modeSelectEl.value = targetId;
+
+			// Update chips
+			quickChipsList.forEach(function(ch) {
+				var b = chipButtonsMap[ch.id];
+				if (b) {
+					if (ch.id === targetId) b.classList.add('active');
+					else b.classList.remove('active');
 				}
 			});
-			customDomainRow.style.display = (targetId === 'custom' ? 'block' : 'none');
+
+			customDomainRow.style.display = (targetId === 'domains' ? 'block' : 'none');
+			testStrategyRow.style.display = (targetId === 'test_strategy' ? 'block' : 'none');
+
+			updateSummaryBox();
 			updateActiveStrategyDisplay();
 		}
 
@@ -546,7 +710,7 @@ return view.extend({
 
 		function startScan() {
 			var domain = '';
-			if (currentTarget === 'custom') {
+			if (currentTarget === 'domains') {
 				domain = customDomainInput.value.trim();
 				if (!domain) {
 					ui.addNotification(null, E('p', {}, 'Пожалуйста, укажите домен для проверки!'), 'danger');
@@ -608,8 +772,9 @@ return view.extend({
 						resetScanUI();
 						getZapretInfo().then(function(info) {
 							zapretServicesData = info.services || {};
+							zapretAllStrategies = info.all_strategies || [];
+							updateSummaryBox();
 							updateActiveStrategyDisplay();
-							updateTargetBadges();
 						});
 						refreshLogs();
 
@@ -619,22 +784,6 @@ return view.extend({
 					}
 				});
 			}, 1500);
-		}
-
-		function updateTargetBadges() {
-			targetDefs.forEach(function(t) {
-				var bEl = targetBadgesMap[t.id];
-				var svc = zapretServicesData[t.key] || {};
-				if (bEl) {
-					if (svc.enabled) {
-						bEl.textContent = svc.is_circular ? '🔄 Circular' : '✓ Включено';
-						bEl.className = svc.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
-					} else {
-						bEl.textContent = 'Не настроено';
-						bEl.className = 'badge cbi-color-neutral';
-					}
-				}
-			});
 		}
 
 		function updateProgressUI(st) {
@@ -711,8 +860,9 @@ return view.extend({
 					ui.addNotification(null, E('p', {}, msg), 'info');
 					getZapretInfo().then(function(info) {
 						zapretServicesData = info.services || {};
+						zapretAllStrategies = info.all_strategies || [];
+						updateSummaryBox();
 						updateActiveStrategyDisplay();
-						updateTargetBadges();
 						if (zapretBadgeEl) {
 							zapretBadgeEl.className = (info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red';
 							zapretBadgeEl.textContent = (info.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен';
@@ -729,10 +879,9 @@ return view.extend({
 		}
 
 		function testActiveConnection() {
-			var url = 'https://rutracker.org';
-			if (currentTarget === 'youtube') url = 'https://googlevideo.com';
-			else if (currentTarget === 'discord') url = 'https://gateway.discord.gg';
-			else if (currentTarget === 'custom') {
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var url = pDef.test_url || 'https://rutracker.org';
+			if (currentTarget === 'domains') {
 				var d = customDomainInput.value.trim();
 				if (d) url = 'https://' + d;
 			}
@@ -746,9 +895,9 @@ return view.extend({
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
 				if (parsed && parsed.accessible) {
-					ui.addNotification(null, E('p', {}, '✓ Ресурс доступен! Ответ HTTP ' + parsed.http_code), 'info');
+					ui.addNotification(null, E('p', {}, '✓ Ресурс (' + url + ') доступен! Ответ HTTP ' + parsed.http_code), 'info');
 				} else {
-					ui.addNotification(null, E('p', {}, '✗ Ресурс не отвечает через текущую стратегию Zapret2 (код ' + (parsed ? parsed.http_code : 0) + '). Запустите подбор стратегий!'), 'warning');
+					ui.addNotification(null, E('p', {}, '✗ Ресурс (' + url + ') не отвечает через текущую стратегию Zapret2 (код ' + (parsed ? parsed.http_code : 0) + '). Запустите подбор стратегий!'), 'warning');
 				}
 			}).catch(function() {
 				ui.hideModal();
@@ -756,7 +905,8 @@ return view.extend({
 			});
 		}
 
-		// Initial Direct Update before DOM Mount
+		// Initial In-Memory Render
+		updateSummaryBox();
 		updateActiveStrategyDisplay();
 
 		// Periodic background log refresher

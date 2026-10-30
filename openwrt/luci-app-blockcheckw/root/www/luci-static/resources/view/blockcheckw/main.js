@@ -260,11 +260,23 @@ return view.extend({
 			'Проверить обновление'
 		]);
 
+		var btnFeedback = E('a', {
+			class: 'bcw-btn-secondary',
+			style: 'padding: 6px 12px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;',
+			href: 'https://github.com/prostoy23rus/blockcheckw/issues',
+			target: '_blank',
+			title: 'Сообщить об ошибке или предложить улучшение на GitHub'
+		}, [
+			E('span', {}, '💬'),
+			'Баг-репорты / Идеи'
+		]);
+
 		var headerRightActions = E('div', {
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			versionBadgeEl,
 			btnCheckUpdate,
+			btnFeedback,
 			zapretBadgeEl
 		]);
 

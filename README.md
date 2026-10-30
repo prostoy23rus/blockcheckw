@@ -198,6 +198,19 @@ blockcheckw status -d youtube.com -d discord.com -d rutracker.org
 
 ---
 
+## 💬 Обратная связь, баг-репорты и предложения
+
+Мы активно развиваем проект и приветствуем любые отзывы, сообщения об ошибках и идеи по развитию!
+
+* 🐛 **[Сообщить об ошибке (Bug Report)](https://github.com/prostoy23rus/blockcheckw/issues/new?template=bug_report.yml)**  
+  Если сканер завис, стратегия не применилась, веб-интерфейс отображается некорректно или возникла ошибка — создайте тикет с логами из вкладки «Мониторинг и логи службы».
+* 💡 **[Предложить идею или улучшение (Feature Request)](https://github.com/prostoy23rus/blockcheckw/issues/new?template=feature_request.yml)**  
+  Хотите добавить новый пресет сервиса, предложить оптимизацию алгоритма Circular или улучшение дизайна LuCI? Опишите вашу идею!
+* 💬 **[Обсуждения сообщества (GitHub Discussions)](https://github.com/prostoy23rus/blockcheckw/discussions)**  
+  Задавайте вопросы, делитесь рабочими Circular-связками под своего провайдера и обсуждайте актуальные методы обхода DPI.
+
+---
+
 ## 🤝 Вклад и лицензия
 
 * **Оригинальный zapret2**: автор [bol-van](https://github.com/bol-van/zapret2).

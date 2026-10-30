@@ -1,0 +1,72 @@
+name: "🐛 Сообщить об ошибке (Bug Report)"
+description: "Сообщить о неполадках в сканере, интерфейсе LuCI или интеграции с Zapret2"
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что помогаете улучшать проект! Пожалуйста, заполните форму ниже, чтобы мы могли быстрее воспроизвести и устранить проблему.
+
+  - type: input
+    id: router_model
+    attributes:
+      label: "Модель роутера и архитектура"
+      description: "Например: RouteRich RR-3.12 (MediaTek MT7981 aarch64), Keenetic Giga, Xiaomi AX3000T, x86_64 Mini PC"
+      placeholder: "Модель роутера (например, MT7981 / aarch64)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: openwrt_version
+    attributes:
+      label: "Версия OpenWrt"
+      description: "Какая версия прошивки установлена на роутере?"
+      options:
+        - "OpenWrt 25.x / Next-Gen (apk)"
+        - "OpenWrt 24.10"
+        - "OpenWrt 23.05"
+        - "OpenWrt 22.03"
+        - "OpenWrt 21.02"
+        - "RouteRich OS"
+        - "ImmortalWrt"
+        - "Другая / Snapshot"
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: "Версия BlockcheckW"
+      description: "Версия из правого верхнего угла LuCI (например: v1.3.0)"
+      placeholder: "v1.3.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem_description
+    attributes:
+      label: "Описание проблемы"
+      description: "Что пошло не так? При каких действиях возникла ошибка?"
+      placeholder: "При запуске подбора стратегии для YouTube поиск зависает на 50%..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Логи службы (из вкладки 'Мониторинг и логи службы')"
+      description: "Скопируйте вывод из окна логов в LuCI интерфейсе"
+      render: shell
+      placeholder: "[blockcheckw-helper] ..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: "Ожидаемое поведение"
+      description: "Как служба должна была сработать в этой ситуации?"
+      placeholder: "Стратегия должна была успешно примениться в /etc/config/zapret2 и видео должно открываться."
+    validations:
+      required: false

@@ -1,0 +1,51 @@
+name: "💡 Предложить идею или улучшение (Feature Request)"
+description: "Предложить новый пресет, функцию, доработку веб-интерфейса или стратегию обхода"
+title: "[IDEA]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Есть классная идея для BlockcheckW? Мы открыты к предложениям по улучшению интерфейса, добавлению новых пресетов и оптимизации подбора стратегий!
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: "Категория предложения"
+      description: "К какой части проекта относится идея?"
+      options:
+        - "Новый пресет сервиса (домены / порты)"
+        - "Интерфейс LuCI (дизайн / кнопки / визуализация)"
+        - "Алгоритм поиска и сборки Circular-стратегий"
+        - "Интеграция с Zapret2 / OpenWrt"
+        - "Другое"
+    validations:
+      required: true
+
+  - type: textarea
+    id: feature_description
+    attributes:
+      label: "Подробное описание идеи"
+      description: "Опишите вашу идею или предложение как можно подробнее."
+      placeholder: "Было бы здорово добавить пресет для Telegram голосовых вызовов или поддержку авто-тестирования скорости потока..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: "Какую проблему это решает?"
+      description: "Почему эта фича полезна пользователям?"
+      placeholder: "Это позволит быстро находить обход для звонков без ручного ввода доменов."
+    validations:
+      required: false
+
+  - type: textarea
+    id: raw_strategy
+    attributes:
+      label: "Рабочая стратегия десинка (если делитесь своим пресетом)"
+      description: "Если у вас уже есть проверенная рабочая строка nfqws2 / zapret2:"
+      render: shell
+      placeholder: "--lua-desync=..."
+    validations:
+      required: false

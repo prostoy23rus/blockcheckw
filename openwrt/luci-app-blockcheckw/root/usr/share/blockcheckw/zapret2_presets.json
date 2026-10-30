@@ -1,49 +1,17 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "updated": "2026-10-30",
   "presets": {
-    "youtube": {
-      "name": "YouTube (Видео, Стримы, Превью)",
-      "domain": "googlevideo.com",
-      "test_url": "https://googlevideo.com",
-      "hostlist": "list_hosts_youtube",
-      "port": "443",
-      "protocols": ["tls12", "tls13"],
-      "filter_l7": "tls",
-      "turbo_strategies": [
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=7,sld+1:ip_autottl=2,2-12",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,endhost-1:tcp_md5"
-      ]
-    },
-    "discord": {
-      "name": "Discord (Голос, Чат, Медиа)",
-      "domain": "gateway.discord.gg",
-      "test_url": "https://gateway.discord.gg",
-      "hostlist": "list_hosts_discord",
-      "port": "443",
-      "protocols": ["tls12", "tls13"],
-      "filter_l7": "tls discord",
-      "turbo_strategies": [
-        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=discord.com:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
-      ]
-    },
-    "general": {
-      "name": "Блокированные ресурсы (Рутрекер, X, Instagram)",
+    "builtin": {
+      "name": "Встроенные хосты (33)",
+      "label": "Встроенные хосты (33)",
       "domain": "rutracker.org",
       "test_url": "https://rutracker.org",
       "hostlist": "list_hosts_user",
       "port": "80,443",
       "protocols": ["http", "tls12", "tls13"],
       "filter_l7": "tls http",
+      "description": "33 хоста, 17 провайдеров (Rutracker, Pornhub, TorProject, BBC и др.)",
       "turbo_strategies": [
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
@@ -52,6 +20,141 @@
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
         "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld"
       ]
+    },
+    "preset_youtube": {
+      "name": "Предустановленный список YouTube (3)",
+      "label": "YouTube (3)",
+      "domain": "www.youtube.com",
+      "test_url": "https://www.youtube.com",
+      "hostlist": "list_hosts_youtube",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "description": "Видеопотоки googlevideo, превью ytimg, youtube.com",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1"
+      ]
+    },
+    "preset_discord": {
+      "name": "Предустановленный список Discord (3)",
+      "label": "Discord (3)",
+      "domain": "gateway.discord.gg",
+      "test_url": "https://gateway.discord.gg",
+      "hostlist": "list_hosts_discord",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls discord",
+      "description": "Голосовые каналы, API-шлюз gateway, cdn.discordapp.com",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=discord.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
+      ]
+    },
+    "preset_twitch": {
+      "name": "Предустановленный список Twitch (3)",
+      "label": "Twitch (3)",
+      "domain": "twitch.tv",
+      "test_url": "https://twitch.tv",
+      "hostlist": "list_hosts_user",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "description": "Стримы usher.ttvnw.net, static-cdn, twitch.tv",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=twitch.tv:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1"
+      ]
+    },
+    "preset_x": {
+      "name": "Предустановленный список X (3)",
+      "label": "X / Twitter (3)",
+      "domain": "x.com",
+      "test_url": "https://x.com",
+      "hostlist": "list_hosts_user",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "description": "Медиа pbs.twimg.com, API api.x.com, x.com",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:pos=1,host+1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld"
+      ]
+    },
+    "preset_instagram": {
+      "name": "Предустановленный список Instagram (2)",
+      "label": "Instagram (2)",
+      "domain": "gateway.instagram.com",
+      "test_url": "https://gateway.instagram.com",
+      "hostlist": "list_hosts_user",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "description": "Шлюз gateway.instagram.com, CDN static.cdninstagram.com",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2"
+      ]
+    },
+    "tcp16": {
+      "name": "Кандидаты TCP 16-20 KB (110)",
+      "label": "TCP 16-20 KB (110)",
+      "domain": "media.miele.com",
+      "test_url": "https://media.miele.com",
+      "hostlist": "list_hosts_user",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "description": "110 хостов TCP 16-20 KB (Miele, Roxio, GetScope и др.)",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1"
+      ]
+    },
+    "domains": {
+      "name": "Свои домены",
+      "label": "Свои домены",
+      "domain": "rutracker.org",
+      "test_url": "https://rutracker.org",
+      "hostlist": "list_hosts_user",
+      "port": "80,443",
+      "protocols": ["http", "tls12", "tls13"],
+      "filter_l7": "tls http",
+      "description": "Пользовательские домены для проверки обхода",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld"
+      ]
+    },
+    "test_strategy": {
+      "name": "Тест стратегии",
+      "label": "Тест стратегии",
+      "domain": "rutracker.org",
+      "test_url": "https://rutracker.org",
+      "hostlist": "list_hosts_user",
+      "port": "80,443",
+      "protocols": ["http", "tls12", "tls13"],
+      "filter_l7": "tls http",
+      "description": "Тестирование конкретной стратегии Zapret2",
+      "turbo_strategies": []
     }
   }
 }

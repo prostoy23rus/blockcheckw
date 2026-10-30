@@ -24,21 +24,21 @@
     "preset_youtube": {
       "name": "Предустановленный список YouTube (3)",
       "label": "YouTube (3)",
-      "domain": "googlevideo.com",
-      "test_url": "https://googlevideo.com",
+      "domain": "www.youtube.com",
+      "test_url": "https://www.youtube.com",
       "hostlist": "list_hosts_youtube",
       "port": "443",
       "protocols": ["tls12", "tls13"],
       "filter_l7": "tls",
       "description": "Видеопотоки googlevideo, превью ytimg, youtube.com",
       "turbo_strategies": [
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=7,sld+1:ip_autottl=2,2-12",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,endhost-1:tcp_md5"
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1"
       ]
     },
     "preset_discord": {

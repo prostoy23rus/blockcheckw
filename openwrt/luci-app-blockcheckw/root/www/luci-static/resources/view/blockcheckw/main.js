@@ -33,9 +33,9 @@ var PRESET_DEFS = {
 		name: 'Предустановленный список YouTube (3)',
 		label: 'YouTube (3)',
 		icon: '📺',
-		domain: 'googlevideo.com',
+		domain: 'www.youtube.com',
 		domainsText: 'googlevideo.com (видеопотоки), i.ytimg.com (превью), youtube.com',
-		test_url: 'https://googlevideo.com',
+		test_url: 'https://www.youtube.com',
 		key: 'preset_youtube',
 		port: '443'
 	},

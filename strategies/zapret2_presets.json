@@ -1,0 +1,57 @@
+{
+  "version": "1.0",
+  "updated": "2026-10-30",
+  "presets": {
+    "youtube": {
+      "name": "YouTube (Видео, Стримы, Превью)",
+      "domain": "googlevideo.com",
+      "test_url": "https://googlevideo.com",
+      "hostlist": "list_hosts_youtube",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=7,sld+1:ip_autottl=2,2-12",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,endhost-1:tcp_md5"
+      ]
+    },
+    "discord": {
+      "name": "Discord (Голос, Чат, Медиа)",
+      "domain": "gateway.discord.gg",
+      "test_url": "https://gateway.discord.gg",
+      "hostlist": "list_hosts_discord",
+      "port": "443",
+      "protocols": ["tls12", "tls13"],
+      "filter_l7": "tls discord",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=discord.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
+      ]
+    },
+    "general": {
+      "name": "Блокированные ресурсы (Рутрекер, X, Instagram)",
+      "domain": "rutracker.org",
+      "test_url": "https://rutracker.org",
+      "hostlist": "list_hosts_user",
+      "port": "80,443",
+      "protocols": ["http", "tls12", "tls13"],
+      "filter_l7": "tls http",
+      "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld"
+      ]
+    }
+  }
+}

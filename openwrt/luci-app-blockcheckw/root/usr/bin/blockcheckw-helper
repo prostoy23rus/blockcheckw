@@ -1,0 +1,399 @@
+#!/bin/sh
+# BlockcheckW Zapret2 Integration Helper for OpenWrt
+# Bridges blockcheckw scanner with OpenWrt LuCI and Zapret2 configuration.
+
+STATUS_FILE="/tmp/blockcheckw_status.json"
+PID_FILE="/var/run/blockcheckw.pid"
+LOG_FILE="/tmp/blockcheckw_run.log"
+OUTPUT_VANILLA="/tmp/blockcheckw_vanilla.txt"
+OUTPUT_SCAN="/tmp/blockcheckw_scan.json"
+OUTPUT_CIRCULAR="/tmp/blockcheckw_circular.txt"
+TURBO_FILE="/tmp/blockcheckw_turbo.txt"
+PRESETS_FILE="/usr/share/blockcheckw/zapret2_presets.json"
+CIRCULAR_BUILDER="/usr/bin/circular-builder.lua"
+
+ensure_json() {
+    [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Ожидание запуска","strategies":[],"log":""}' > "$STATUS_FILE"
+}
+
+write_status() {
+    local status="$1"
+    local percent="$2"
+    local phase="$3"
+    local extra="$4"
+    
+    local log_tail=""
+    if [ -f "$LOG_FILE" ]; then
+        log_tail=$(tail -n 30 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+    fi
+
+    local circular_esc=""
+    if [ -f "$OUTPUT_CIRCULAR" ]; then
+        circular_esc=$(sed 's/"/\\"/g' "$OUTPUT_CIRCULAR" | awk '{printf "%s\\n", $0}')
+    fi
+
+    cat <<EOF > "$STATUS_FILE"
+{
+  "status": "$status",
+  "percent": $percent,
+  "phase": "$phase",
+  "log": "$log_tail",
+  "circular": "$circular_esc"
+  $extra
+}
+EOF
+}
+
+get_preset_param() {
+    local preset="$1"
+    local param="$2"
+    lua -e '
+        local json = require("luci.jsonc")
+        local f = io.open("'"$PRESETS_FILE"'", "r")
+        if not f then print("") return end
+        local d = json.parse(f:read("*a"))
+        f:close()
+        if d and d.presets and d.presets["'"$preset"'"] then
+            local val = d.presets["'"$preset"'"]["'"$param"'"]
+            if type(val) == "table" then
+                print(table.concat(val, ","))
+            else
+                print(tostring(val or ""))
+            end
+        else
+            print("")
+        end
+    ' 2>/dev/null
+}
+
+prepare_turbo_corpus() {
+    local preset="$1"
+    lua -e '
+        local json = require("luci.jsonc")
+        local f = io.open("'"$PRESETS_FILE"'", "r")
+        if not f then os.exit(1) end
+        local d = json.parse(f:read("*a"))
+        f:close()
+        local strats = d and d.presets and d.presets["'"$preset"'"] and d.presets["'"$preset"'"].turbo_strategies
+        if strats and #strats > 0 then
+            local out = io.open("'"$TURBO_FILE"'", "w")
+            for _, s in ipairs(strats) do
+                out:write(s .. "\n")
+            end
+            out:close()
+        else
+            os.exit(1)
+        end
+    ' 2>/dev/null
+}
+
+cmd_start() {
+    local target="youtube"
+    local domain=""
+    local mode="turbo"
+    local do_circular="1"
+    local workers="2"
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --target) target="$2"; shift 2 ;;
+            --domain) domain="$2"; shift 2 ;;
+            --mode) mode="$2"; shift 2 ;;
+            --circular) do_circular="$2"; shift 2 ;;
+            --workers) workers="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    # Check if already running
+    if [ -f "$PID_FILE" ]; then
+        local old_pid=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+            echo '{"error":"Scanner is already running","pid":'"$old_pid"'}'
+            return 1
+        fi
+    fi
+
+    # Resolve target and domain
+    local protocols="tls12,tls13"
+    if [ "$target" = "youtube" ]; then
+        domain=$(get_preset_param "youtube" "domain")
+        [ -n "$domain" ] || domain="rr1---sn-xguxaxjvh-n8me.googlevideo.com"
+        protocols="tls12,tls13"
+    elif [ "$target" = "discord" ]; then
+        domain=$(get_preset_param "discord" "domain")
+        [ -n "$domain" ] || domain="gateway.discord.gg"
+        protocols="tls12,tls13"
+    elif [ "$target" = "general" ]; then
+        domain=$(get_preset_param "general" "domain")
+        [ -n "$domain" ] || domain="rutracker.org"
+        protocols="http,tls12,tls13"
+    else
+        [ -n "$domain" ] || domain="rutracker.org"
+        protocols="http,tls12,tls13"
+    fi
+
+    rm -f "$OUTPUT_VANILLA" "$OUTPUT_SCAN" "$OUTPUT_CIRCULAR" "$TURBO_FILE" "$LOG_FILE"
+    echo "" > "$LOG_FILE"
+
+    write_status "running" 10 "Инициализация сканирования ($domain)"
+
+    # Run in background via child script
+    (
+        local scan_args="-d $domain -p $protocols --auto"
+        if [ "$mode" = "turbo" ]; then
+            prepare_turbo_corpus "$target"
+            if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
+                scan_args="$scan_args --from-file $TURBO_FILE"
+            fi
+        fi
+
+        echo "[blockcheckw-helper] Starting scan for $domain (mode=$mode, workers=$workers)..." >> "$LOG_FILE"
+        write_status "running" 25 "Тестирование обхода DPI..."
+
+        /usr/bin/blockcheckw -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1
+        local exit_code=$?
+
+        # Find latest vanilla report in /root
+        local latest_vanilla=$(ls -t /root/*_report_vanilla.txt 2>/dev/null | head -n 1)
+        if [ -n "$latest_vanilla" ] && [ -f "$latest_vanilla" ]; then
+            cp -f "$latest_vanilla" "$OUTPUT_VANILLA"
+        fi
+
+        # Find latest scan report in /root
+        local latest_scan=$(ls -t /root/*_scan.json 2>/dev/null | head -n 1)
+        if [ -n "$latest_scan" ] && [ -f "$latest_scan" ]; then
+            cp -f "$latest_scan" "$OUTPUT_SCAN"
+        fi
+
+        # Check for found strategies
+        local found_count=0
+        if [ -f "$OUTPUT_SCAN" ]; then
+            found_count=$(lua -e '
+                local json = require("luci.jsonc")
+                local f = io.open("'"$OUTPUT_SCAN"'", "r")
+                if f then
+                    local d = json.parse(f:read("*a"))
+                    f:close()
+                    if d and d.strategies then print(#d.strategies) else print(0) end
+                else print(0) end
+            ' 2>/dev/null)
+        fi
+
+        # Build circular strategy if requested
+        if [ "$do_circular" = "1" ] && [ "$found_count" -gt 0 ]; then
+            write_status "running" 85 "Сборка отказоустойчивой Circular-стратегии..."
+            lua "$CIRCULAR_BUILDER" "$OUTPUT_SCAN" 3 20 4 loop > "$OUTPUT_CIRCULAR" 2>> "$LOG_FILE"
+        fi
+
+        # Extract strategy list for JSON output
+        local strats_json="[]"
+        if [ -f "$OUTPUT_SCAN" ]; then
+            strats_json=$(lua -e '
+                local json = require("luci.jsonc")
+                local f = io.open("'"$OUTPUT_SCAN"'", "r")
+                if f then
+                    local d = json.parse(f:read("*a"))
+                    f:close()
+                    if d and d.strategies then
+                        local list = {}
+                        for _, s in ipairs(d.strategies) do
+                            table.insert(list, s.args or s)
+                        end
+                        print(json.stringify(list))
+                    else print("[]") end
+                else print("[]") end
+            ' 2>/dev/null)
+        fi
+
+        rm -f "$PID_FILE"
+
+        if [ "$found_count" -gt 0 ]; then
+            write_status "done" 100 "Найдено рабочих стратегий: $found_count" ",\"strategies\":$strats_json"
+            echo "[blockcheckw-helper] Finished successfully. Found $found_count working strategies." >> "$LOG_FILE"
+        else
+            write_status "done" 100 "Поиск завершен. Ничего не подошло, попробуйте глубокий скан." ",\"strategies\":[]"
+            echo "[blockcheckw-helper] Scan completed with 0 matches." >> "$LOG_FILE"
+        fi
+    ) &
+
+    local pid=$!
+    echo "$pid" > "$PID_FILE"
+    echo '{"status":"started","pid":'"$pid"',"domain":"'"$domain"'","mode":"'"$mode"'"}'
+}
+
+cmd_status() {
+    ensure_json
+    local running=false
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            running=true
+        else
+            rm -f "$PID_FILE"
+        fi
+    fi
+
+    # Read status file and return
+    cat "$STATUS_FILE"
+}
+
+cmd_stop() {
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$pid" ]; then
+            kill -TERM "$pid" 2>/dev/null
+            sleep 1
+            kill -9 "$pid" 2>/dev/null
+        fi
+        rm -f "$PID_FILE"
+    fi
+    killall -9 blockcheckw 2>/dev/null
+    nft delete table inet blockcheckw 2>/dev/null
+    /etc/init.d/zapret2 restart >/dev/null 2>&1
+    write_status "idle" 0 "Остановлено пользователем"
+    echo '{"status":"stopped"}'
+}
+
+cmd_apply() {
+    local target=""
+    local script_text=""
+    local script_file=""
+
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --target) target="$2"; shift 2 ;;
+            --script) script_text="$2"; shift 2 ;;
+            --file) script_file="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    if [ -n "$script_file" ] && [ -f "$script_file" ]; then
+        script_text=$(cat "$script_file")
+    fi
+
+    if [ -z "$target" ] || [ -z "$script_text" ]; then
+        echo '{"success":false,"error":"Missing --target or --script argument"}'
+        return 1
+    fi
+
+    # Backup zapret2 config
+    local ts=$(date +%Y%m%d_%H%M%S)
+    cp -f /etc/config/zapret2 "/etc/config/zapret2.bak.$ts"
+
+    # Map target to strategy section
+    local sec_name=""
+    local port="443"
+    local l7="tls"
+    local hostlist=""
+    local test_url=""
+
+    if [ "$target" = "youtube" ]; then
+        sec_name="MyTube"
+        port="443"
+        l7="tls"
+        hostlist="list_hosts_youtube"
+        test_url="https://rr1---sn-xguxaxjvh-n8me.googlevideo.com"
+    elif [ "$target" = "discord" ]; then
+        sec_name="BlockcheckW_Discord"
+        port="443"
+        l7="tls discord"
+        hostlist="list_hosts_discord"
+        test_url="https://gateway.discord.gg"
+    elif [ "$target" = "general" ]; then
+        sec_name="BlockcheckW_General"
+        port="80,443"
+        l7="tls http"
+        hostlist="list_hosts_user"
+        test_url="https://rutracker.org"
+    else
+        sec_name="BlockcheckW_$target"
+        port="443"
+        l7="tls"
+        hostlist="list_hosts_user"
+        test_url="https://$target"
+    fi
+
+    # Set UCI parameters
+    uci -q delete "zapret2.$sec_name"
+    uci set "zapret2.$sec_name=strategy"
+    uci set "zapret2.$sec_name.enabled=1"
+    uci set "zapret2.$sec_name.port=$port"
+    uci set "zapret2.$sec_name.protocol=tcp"
+    uci add_list "zapret2.$sec_name.filter_l3=ipv4"
+    for proto in $l7; do
+        uci add_list "zapret2.$sec_name.filter_l7=$proto"
+    done
+    uci add_list "zapret2.$sec_name.hostlist=$hostlist"
+    if [ "$target" = "youtube" ] || [ "$target" = "general" ]; then
+        uci add_list "zapret2.$sec_name.hostlist_exclude=list_hosts_user_exclude"
+    fi
+    uci set "zapret2.$sec_name.script=$script_text"
+
+    uci commit zapret2
+
+    # Restart zapret2 service
+    /etc/init.d/zapret2 restart >/dev/null 2>&1
+    local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
+
+    # Test connectivity with curl
+    local curl_status=0
+    local http_code=0
+    if [ -n "$test_url" ]; then
+        http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$test_url" 2>/dev/null)
+        [ "$http_code" -gt 0 ] && curl_status=1
+    fi
+
+    cat <<EOF
+{
+  "success": true,
+  "message": "Стратегия успешно применена в Zapret2 и проверена!",
+  "target": "$target",
+  "section": "$sec_name",
+  "zapret2_status": "$zapret_running",
+  "test_url": "$test_url",
+  "http_code": "$http_code",
+  "connected": $([ "$curl_status" = "1" ] && echo "true" || echo "false")
+}
+EOF
+}
+
+cmd_test() {
+    local url="${1:-https://rutracker.org}"
+    local code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 "$url" 2>/dev/null)
+    local ok=false
+    [ "$code" -gt 0 ] && ok=true
+    echo '{"url":"'"$url"'","http_code":"'"$code"'","accessible":'"$ok"'}'
+}
+
+cmd_info() {
+    local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
+    local youtube_strat=$(uci -q get zapret2.MyTube.script 2>/dev/null | head -n 3 | tr '\n' ' ')
+    local discord_strat=$(uci -q get zapret2.BlockcheckW_Discord.script 2>/dev/null | head -n 3 | tr '\n' ' ')
+    local general_strat=$(uci -q get zapret2.BlockcheckW_General.script 2>/dev/null | head -n 3 | tr '\n' ' ')
+
+    cat <<EOF
+{
+  "zapret2_running": "$zapret_running",
+  "active_strategies": {
+    "youtube": "$youtube_strat",
+    "discord": "$discord_strat",
+    "general": "$general_strat"
+  }
+}
+EOF
+}
+
+case "$1" in
+    start) shift; cmd_start "$@" ;;
+    status) cmd_status ;;
+    stop) cmd_stop ;;
+    apply) shift; cmd_apply "$@" ;;
+    test) shift; cmd_test "$@" ;;
+    info) cmd_info ;;
+    *)
+        echo "Usage: $0 {start|status|stop|apply|test|info}"
+        exit 1
+        ;;
+esac

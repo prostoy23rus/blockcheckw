@@ -1,0 +1,37 @@
+{
+	"luci-app-blockcheckw": {
+		"description": "Grant access to BlockcheckW automated scanner and Zapret2 integration",
+		"read": {
+			"ubus": {
+				"file": [ "list", "read", "stat", "remove", "exec", "write" ],
+				"uci": [ "get", "state" ],
+				"service": [ "list" ]
+			},
+			"uci": [ "zapret2" ],
+			"file": {
+				"/usr/bin/blockcheckw": [ "exec" ],
+				"/usr/bin/blockcheckw-helper": [ "exec" ],
+				"/usr/bin/circular-builder.lua": [ "exec" ],
+				"/tmp/blockcheckw_status.json": [ "read" ],
+				"/tmp/blockcheckw_run.log": [ "read" ],
+				"/tmp/blockcheckw_scan.json": [ "read" ],
+				"/tmp/blockcheckw_vanilla.txt": [ "read" ],
+				"/tmp/blockcheckw_circular.txt": [ "read" ],
+				"/usr/share/blockcheckw/*": [ "read", "list" ],
+				"/etc/config/zapret2": [ "read" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"file": [ "exec", "write", "remove" ],
+				"uci": [ "add", "apply", "changes", "commit", "delete", "order", "rename", "set" ]
+			},
+			"uci": [ "zapret2" ],
+			"file": {
+				"/usr/bin/blockcheckw-helper": [ "exec" ],
+				"/etc/config/zapret2": [ "read", "write" ],
+				"/tmp/blockcheckw_*": [ "read", "write", "remove" ]
+			}
+		}
+	}
+}

@@ -391,12 +391,23 @@ return view.extend({
 			'Баг-репорты / Идеи'
 		]);
 
+		var btnUninstall = E('button', {
+			class: 'bcw-header-item bcw-header-btn',
+			style: 'color: #e06c75;',
+			title: 'Полностью удалить BlockcheckW с роутера',
+			click: function() { confirmUninstall(); }
+		}, [
+			E('span', {}, '🗑'),
+			'Удалить службу'
+		]);
+
 		var headerRightActions = E('div', {
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			versionBadgeEl,
 			btnCheckUpdate,
 			btnFeedback,
+			btnUninstall,
 			zapretBadgeEl
 		]);
 
@@ -1626,6 +1637,60 @@ return view.extend({
 				ui.showModal('Ошибка сети', [
 					E('p', { class: 'cbi-color-red' }, 'Сбой при выполнении команды обновления: ' + err)
 				]);
+			});
+		}
+
+		function confirmUninstall() {
+			ui.showModal('Удаление BlockcheckW с роутера', [
+				E('p', { style: 'font-weight: bold; color: #ff3860; font-size: 14px;' }, '⚠️ Вы действительно хотите полностью удалить BlockcheckW с роутера?'),
+				E('div', { style: 'margin: 12px 0; font-size: 13px; line-height: 1.5; color: #abb2bf;' }, [
+					E('p', {}, 'Будут полностью удалены:'),
+					E('ul', { style: 'margin-left: 20px; margin-top: 6px;' }, [
+						E('li', {}, 'Исполняемый файл сканера /usr/bin/blockcheckw'),
+						E('li', {}, 'Веб-интерфейс OpenWrt LuCI и пункт в меню служб'),
+						E('li', {}, 'Вспомогательные скрипты и база пресетов'),
+						E('li', {}, 'Временные файлы и кэш LuCI')
+					]),
+					E('p', { style: 'margin-top: 10px; color: #98c379;' }, '✓ Ваши сохранённые стратегии в Zapret2 продолжат работать без изменений.')
+				]),
+				E('div', { class: 'right', style: 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;' }, [
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						click: function() { ui.hideModal(); }
+					}, 'Отмена'),
+					E('button', {
+						class: 'cbi-button cbi-button-negative',
+						click: function() {
+							doUninstallService();
+						}
+					}, '🗑 Подтвердить удаление')
+				])
+			]);
+		}
+
+		function doUninstallService() {
+			ui.showModal('Удаление службы...', [
+				E('p', { class: 'spinning' }, 'Удаление файлов BlockcheckW и сброс кэша роутера...')
+			]);
+
+			fs.exec(HELPER_BIN, ['uninstall']).then(function(res) {
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+				if (parsed && parsed.success) {
+					ui.showModal('Удаление завершено', [
+						E('p', { style: 'color: #00d1b2; font-weight: bold; font-size: 15px;' }, '✓ ' + (parsed.message || 'BlockcheckW успешно удалён с роутера!')),
+						E('p', { style: 'font-size: 13px; margin-top: 8px;' }, 'Сейчас вы будете перенаправлены на главную страницу OpenWrt...')
+					]);
+					setTimeout(function() {
+						window.location.href = L.url('admin/status/overview');
+					}, 2500);
+				} else {
+					ui.hideModal();
+					ui.addNotification(null, E('p', {}, 'Ошибка удаления: ' + (parsed ? parsed.error : res.stderr)), 'danger');
+				}
+			}).catch(function(err) {
+				ui.hideModal();
+				ui.addNotification(null, E('p', {}, 'Ошибка удаления: ' + err), 'danger');
 			});
 		}
 

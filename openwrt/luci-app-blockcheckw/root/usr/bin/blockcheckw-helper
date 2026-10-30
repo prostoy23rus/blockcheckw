@@ -894,6 +894,51 @@ cmd_update() {
     echo '{"success":true,"version":"'"$new_ver"'","message":"Служба успешно обновлена до версии '"$new_ver"'!"}'
 }
 
+cmd_uninstall() {
+    local remove_quic="$1"
+
+    # Stop active scanning processes
+    killall -9 blockcheckw 2>/dev/null || true
+
+    # Prepare background cleanup runner
+    cat << 'EOF' > /tmp/bcw_uninstall_exec.sh
+#!/bin/sh
+sleep 1
+killall -9 blockcheckw-helper 2>/dev/null || true
+
+rm -f /usr/bin/blockcheckw
+rm -f /usr/bin/blockcheckw-helper
+rm -f /usr/bin/circular-builder.lua
+rm -rf /usr/share/blockcheckw
+rm -f /usr/share/luci/menu.d/luci-app-blockcheckw.json
+rm -f /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
+rm -rf /www/luci-static/resources/view/blockcheckw
+
+rm -f /tmp/blockcheckw_*
+rm -f /var/run/blockcheckw.pid
+rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
+
+/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+ubus call luci reload >/dev/null 2>&1 || true
+
+rm -f /tmp/bcw_uninstall_exec.sh
+EOF
+    chmod +x /tmp/bcw_uninstall_exec.sh
+
+    if [ "$remove_quic" = "--remove-quic" ]; then
+        if command -v uci >/dev/null 2>&1 && [ -f /etc/config/firewall ]; then
+            uci delete firewall.reject_quic 2>/dev/null || true
+            uci commit firewall 2>/dev/null || true
+            /etc/init.d/firewall reload >/dev/null 2>&1 || true
+        fi
+    fi
+
+    /tmp/bcw_uninstall_exec.sh </dev/null >/dev/null 2>&1 &
+
+    echo '{"success":true,"message":"Служба BlockcheckW и веб-интерфейс LuCI успешно удалены с роутера"}'
+}
+
 case "$1" in
     start) shift; cmd_start "$@" ;;
     status) cmd_status ;;
@@ -906,8 +951,9 @@ case "$1" in
     logs) shift; cmd_logs "$@" ;;
     check_update) cmd_check_update ;;
     update) cmd_update ;;
+    uninstall) shift; cmd_uninstall "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall}"
         exit 1
         ;;
 esac

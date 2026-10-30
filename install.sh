@@ -31,6 +31,18 @@ echo -e "${NC}"
 echo -e "${BOLD}Универсальный установщик BlockcheckW и LuCI интерфейса для OpenWrt${NC}"
 echo -e "Репозиторий: ${BLUE}https://github.com/${REPO_OWNER}/${REPO_NAME}${NC}\n"
 
+# Проверка режима деинсталляции
+if [ "$1" = "--uninstall" ] || [ "$1" = "-u" ] || [ "$1" = "uninstall" ]; then
+    shift
+    echo -e "${YELLOW}ℹ${NC} Запуск деинсталлятора BlockcheckW..."
+    if [ -f "$(dirname "$0")/uninstall.sh" ]; then
+        exec sh "$(dirname "$0")/uninstall.sh" "$@"
+    else
+        exec sh -c "$(curl -sSL -k "$REPO_RAW/uninstall.sh")" -- "$@"
+    fi
+    exit 0
+fi
+
 # 1. Проверка прав суперпользователя (root)
 if [ "$(id -u)" -ne 0 ]; then
     echo -e "${RED}[ERROR] Скрипт установки должен быть запущен от имени root!${NC}"

@@ -1,0 +1,126 @@
+#!/bin/sh
+# ==============================================================================
+# BlockcheckW & LuCI Universal Uninstaller for OpenWrt
+# Repository: https://github.com/prostoy23rus/blockcheckw
+# ==============================================================================
+
+set -e
+
+# Terminal colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+AUTO_YES=0
+REMOVE_QUIC=0
+PURGE_ZAPRET=0
+
+for arg in "$@"; do
+    case "$arg" in
+        -y|--yes) AUTO_YES=1 ;;
+        --remove-quic) REMOVE_QUIC=1 ;;
+        --purge-zapret) PURGE_ZAPRET=1 ;;
+    esac
+done
+
+echo -e "${RED}${BOLD}"
+echo "  ____  _            _        _               _    __        __"
+echo " | __ )| | ___   ___| | _____| |__   ___  ___| | __\ \      / /"
+echo " |  _ \| |/ _ \ / __| |/ / __| '_ \ / _ \/ __| |/ / \ \ /\ / / "
+echo " | |_) | | (_) | (__|   < (__| | | |  __/ (__|   <   \ V  V /  "
+echo " |____/|_|\___/ \___|_|\_\___|_| |_|\___|\___|_|\_\   \_/\_/   "
+echo -e "${NC}"
+echo -e "${BOLD}Деинсталлятор службы BlockcheckW и LuCI интерфейса${NC}"
+echo -e "Репозиторий: ${BLUE}https://github.com/prostoy23rus/blockcheckw${NC}\n"
+
+# 1. Проверка root прав
+if [ "$(id -u)" -ne 0 ]; then
+    echo -e "${RED}[ERROR] Скрипт удаления должен быть запущен от имени root!${NC}"
+    exit 1
+fi
+
+# 2. Запрос подтверждения
+if [ "$AUTO_YES" -eq 0 ]; then
+    echo -e "${YELLOW}Будут полностью удалены:${NC}"
+    echo -e "  • Бинарный исполняемый файл сканера (/usr/bin/blockcheckw)"
+    echo -e "  • Скрипты помощника (/usr/bin/blockcheckw-helper, /usr/bin/circular-builder.lua)"
+    echo -e "  • Веб-интерфейс LuCI (/www/luci-static/resources/view/blockcheckw)"
+    echo -e "  • Меню и ACL права (/usr/share/luci/menu.d, /usr/share/rpcd/acl.d)"
+    echo -e "  • Файлы пресетов и данных (/usr/share/blockcheckw)"
+    echo -e "  • Временные файлы и кэш LuCI"
+    echo ""
+    echo -e "${GREEN}✓ Конфигурация Zapret2 (/etc/config/zapret2) будет сохранена,${NC}"
+    echo -e "  чтобы ваши настроенные стратегии десинка продолжали работать."
+    echo ""
+    printf "Вы действительно хотите удалить BlockcheckW? [y/N]: "
+    read -r CONFIRM
+    case "$CONFIRM" in
+        y|Y|yes|YES) ;;
+        *)
+            echo -e "\n${BLUE}Удаление отменено пользователем.${NC}"
+            exit 0
+            ;;
+    esac
+fi
+
+echo -e "\n${BLUE}ℹ${NC} Остановка активных процессов..."
+killall -9 blockcheckw 2>/dev/null || true
+killall -9 blockcheckw-helper 2>/dev/null || true
+
+echo -e "${BLUE}ℹ${NC} Удаление исполняемых файлов и библиотек..."
+rm -f /usr/bin/blockcheckw
+rm -f /usr/bin/blockcheckw-helper
+rm -f /usr/bin/circular-builder.lua
+rm -rf /usr/share/blockcheckw
+
+echo -e "${BLUE}ℹ${NC} Удаление модулей интерфейса LuCI..."
+rm -f /usr/share/luci/menu.d/luci-app-blockcheckw.json
+rm -f /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
+rm -rf /www/luci-static/resources/view/blockcheckw
+
+echo -e "${BLUE}ℹ${NC} Очистка временных файлов и логов..."
+rm -f /tmp/blockcheckw_*
+rm -f /var/run/blockcheckw.pid
+
+# Опциональное удаление правила Reject-QUIC
+if [ "$REMOVE_QUIC" -eq 1 ]; then
+    echo -e "${BLUE}ℹ${NC} Удаление правила Reject-QUIC из firewall..."
+    if command -v uci >/dev/null 2>&1 && [ -f /etc/config/firewall ]; then
+        uci delete firewall.reject_quic 2>/dev/null || true
+        uci commit firewall 2>/dev/null || true
+        /etc/init.d/firewall reload >/dev/null 2>&1 || true
+        echo -e "${GREEN}✓${NC} Правило Reject-QUIC удалено."
+    fi
+fi
+
+# Опциональная очистка секций zapret2, созданных blockcheckw
+if [ "$PURGE_ZAPRET" -eq 1 ]; then
+    echo -e "${YELLOW}ℹ${NC} Очистка записей BlockcheckW из /etc/config/zapret2..."
+    if command -v uci >/dev/null 2>&1 && [ -f /etc/config/zapret2 ]; then
+        for sec in $(uci show zapret2 | grep -E "=section" | cut -d'.' -f2 | cut -d'=' -f1); do
+            case "$sec" in
+                *Tube*|*Discord*|*Twitch*|*Twitter*|*Instagram*|*BlockcheckW*|*Custom*|*Test*)
+                    uci delete zapret2."$sec" 2>/dev/null || true
+                    ;;
+            esac
+        done
+        uci commit zapret2 2>/dev/null || true
+        /etc/init.d/zapret2 restart >/dev/null 2>&1 || true
+    fi
+fi
+
+echo -e "${BLUE}ℹ${NC} Очистка кэша LuCI и перезапуск служб веб-интерфейса..."
+rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
+/etc/init.d/rpcd restart >/dev/null 2>&1 || true
+/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+/etc/init.d/nginx restart >/dev/null 2>&1 || true
+/etc/init.d/lighttpd restart >/dev/null 2>&1 || true
+ubus call luci reload >/dev/null 2>&1 || true
+
+echo -e "\n${GREEN}${BOLD}==============================================================================${NC}"
+echo -e "${GREEN}${BOLD}       BlockcheckW и интерфейс LuCI успешно удалены с роутера!                ${NC}"
+echo -e "${GREEN}${BOLD}==============================================================================${NC}\n"

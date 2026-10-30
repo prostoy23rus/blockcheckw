@@ -382,6 +382,24 @@ return view.extend({
 			customDomainInput
 		]);
 
+		var testUrlInput = E('input', {
+			type: 'text',
+			class: 'cbi-input-text',
+			style: 'width: 100%; max-width: 420px; font-size: 13px; font-family: monospace;',
+			value: 'https://googlevideo.com',
+			placeholder: 'https://googlevideo.com или любой URL'
+		});
+
+		function guessUrlForStrategy(name) {
+			var n = (name || '').toLowerCase();
+			if (n.indexOf('tube') !== -1) return 'https://googlevideo.com';
+			if (n.indexOf('discord') !== -1) return 'https://gateway.discord.gg';
+			if (n.indexOf('twitch') !== -1) return 'https://twitch.tv';
+			if (n.indexOf('_x') !== -1 || n.indexOf('twitter') !== -1) return 'https://x.com';
+			if (n.indexOf('instagram') !== -1) return 'https://gateway.instagram.com';
+			return 'https://rutracker.org';
+		}
+
 		// Test Strategy Mode Dropdown
 		var testStrategySelectEl = E('select', {
 			class: 'bcw-select',
@@ -390,12 +408,21 @@ return view.extend({
 				var chosen = e.target.value;
 				if (!chosen) return;
 				var found = zapretAllStrategies.find(function(s) { return s.section === chosen; });
-				if (found && found.script) {
-					activeCodeEl.textContent = found.script;
+				if (found) {
+					testUrlInput.value = guessUrlForStrategy(found.section);
+					activeCodeEl.textContent = found.script || '# Скрипт стратегии пуст';
 					activeMetaBadgesEl.innerHTML = '';
 					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + found.section));
 					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + found.port));
-					activeMetaBadgesEl.appendChild(E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, '🧪 Режим теста'));
+					activeMetaBadgesEl.appendChild(found.enabled ?
+						E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ Включена в Zapret2') :
+						E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Отключена в Zapret2')
+					);
+					activeMetaBadgesEl.appendChild(found.is_circular ?
+						E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, '🔄 Circular-связка') :
+						E('span', { class: 'badge', style: 'background: #485060; color: #fff; font-size: 11px;' }, '⚡ Одиночная')
+					);
+					updateSummaryBox();
 				}
 			}
 		}, [
@@ -407,10 +434,34 @@ return view.extend({
 		});
 
 		var testStrategyRow = E('div', {
-			style: 'display: none; margin-top: 14px; padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
+			style: 'display: none; margin-top: 14px; padding: 14px 16px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
 		}, [
-			E('label', { style: 'font-weight: bold; margin-right: 10px;' }, 'Стратегия Zapret2:'),
-			testStrategySelectEl
+			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px;' }, [
+				E('label', { style: 'font-weight: bold; min-width: 140px;' }, 'Стратегия Zapret2:'),
+				testStrategySelectEl
+			]),
+			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px;' }, [
+				E('label', { style: 'font-weight: bold; min-width: 140px;' }, 'Тестовый адрес / URL:'),
+				testUrlInput
+			]),
+			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 152px;' }, [
+				E('span', { style: 'font-size: 11px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:'),
+				E('button', {
+					class: 'cbi-button cbi-button-neutral',
+					style: 'padding: 2px 8px; font-size: 11px;',
+					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://googlevideo.com'; }
+				}, '📺 YouTube (googlevideo.com)'),
+				E('button', {
+					class: 'cbi-button cbi-button-neutral',
+					style: 'padding: 2px 8px; font-size: 11px;',
+					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://gateway.discord.gg'; }
+				}, '💬 Discord'),
+				E('button', {
+					class: 'cbi-button cbi-button-neutral',
+					style: 'padding: 2px 8px; font-size: 11px;',
+					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://rutracker.org'; }
+				}, '🌐 Rutracker')
+			])
 		]);
 
 		// Summary Banner
@@ -485,10 +536,20 @@ return view.extend({
 			click: function() { testActiveConnection(); }
 		}, '🌐 Проверить доступность (curl)');
 
+		var testStrategyHintBox = E('div', {
+			style: 'display: none; padding: 12px 16px; background: rgba(50, 115, 220, 0.12); border-left: 4px solid #3273dc; border-radius: 4px; margin-bottom: 14px; font-size: 13px; line-height: 1.5;'
+		}, [
+			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
+			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2 (например, MyTube). Нажмите кнопку '),
+			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность (curl) ]'),
+			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ▶ Запустить поиск стратегий ] нужна только если вы хотите с нуля подобрать новую связку взамен этой.')
+		]);
+
 		var controlCard = E('div', { class: 'bcw-card' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, '2. Параметры поиска и запуск')
 			]),
+			testStrategyHintBox,
 			E('div', { class: 'bcw-control-grid' }, [
 				// Box 1: Mode
 				E('div', { class: 'bcw-param-box' }, [
@@ -726,6 +787,30 @@ return view.extend({
 			activeTargetTitleEl.textContent = pDef.name;
 			activeMetaBadgesEl.innerHTML = '';
 
+			if (currentTarget === 'test_strategy') {
+				var chosen = testStrategySelectEl.value;
+				var found = zapretAllStrategies.find(function(s) { return s.section === chosen; });
+				if (found) {
+					activeTargetTitleEl.textContent = 'Тест стратегии (' + found.section + ')';
+					activeCodeEl.textContent = found.script || '# Скрипт стратегии пуст';
+					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + found.section));
+					activeMetaBadgesEl.appendChild(E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + found.port));
+					activeMetaBadgesEl.appendChild(found.enabled ?
+						E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ Включена в Zapret2') :
+						E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Отключена в Zapret2')
+					);
+					activeMetaBadgesEl.appendChild(found.is_circular ?
+						E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, '🔄 Circular-связка') :
+						E('span', { class: 'badge', style: 'background: #485060; color: #fff; font-size: 11px;' }, '⚡ Одиночная')
+					);
+				} else {
+					activeTargetTitleEl.textContent = 'Тест стратегии';
+					activeCodeEl.textContent = '# Выберите стратегию для тестирования в выпадающем списке выше';
+				}
+				versionsBarEl.style.display = 'none';
+				return;
+			}
+
 			if (sData && sData.script && sData.script.trim() !== '') {
 				var secBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + sData.section);
 				var portBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + sData.port);
@@ -885,6 +970,21 @@ return view.extend({
 			summaryTitleEl.textContent = pDef.icon + ' ' + pDef.name;
 			summaryDescEl.textContent = pDef.domainsText || pDef.domain;
 
+			if (currentTarget === 'test_strategy') {
+				var chosen = testStrategySelectEl.value;
+				var found = zapretAllStrategies.find(function(s) { return s.section === chosen; });
+				if (found) {
+					summaryTitleEl.textContent = '🧪 Тест стратегии: zapret2.' + found.section;
+					summaryDescEl.textContent = 'Порт: ' + found.port + ' • ' + (found.is_circular ? 'Circular-связка' : 'Одиночная стратегия');
+					summaryStatusBadgeEl.className = found.enabled ? 'badge cbi-color-green' : 'badge cbi-color-red';
+					summaryStatusBadgeEl.textContent = found.enabled ? '✓ Запись включена в Zapret2' : '✗ Запись отключена в Zapret2';
+				} else {
+					summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
+					summaryStatusBadgeEl.textContent = 'Выберите стратегию выше';
+				}
+				return;
+			}
+
 			var sData = zapretServicesData[pDef.key || currentTarget];
 			if (sData && sData.enabled) {
 				summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
@@ -910,6 +1010,17 @@ return view.extend({
 
 			customDomainRow.style.display = (targetId === 'domains' ? 'block' : 'none');
 			testStrategyRow.style.display = (targetId === 'test_strategy' ? 'block' : 'none');
+			if (testStrategyHintBox) {
+				testStrategyHintBox.style.display = (targetId === 'test_strategy' ? 'block' : 'none');
+			}
+
+			if (targetId === 'test_strategy' && !testStrategySelectEl.value) {
+				var defStrat = zapretAllStrategies.find(function(s) { return s.enabled; }) || zapretAllStrategies[0];
+				if (defStrat) {
+					testStrategySelectEl.value = defStrat.section;
+					testUrlInput.value = guessUrlForStrategy(defStrat.section);
+				}
+			}
 
 			updateSummaryBox();
 			updateActiveStrategyDisplay();
@@ -1176,11 +1287,23 @@ return view.extend({
 			var url = pDef.test_url || 'https://rutracker.org';
 			if (currentTarget === 'domains') {
 				var d = customDomainInput.value.trim();
-				if (d) url = 'https://' + d;
+				if (d) {
+					if (!/^https?:\/\//i.test(d)) d = 'https://' + d;
+					url = d;
+				}
+			} else if (currentTarget === 'test_strategy') {
+				var u = testUrlInput.value.trim();
+				if (u) {
+					if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+					url = u;
+				}
 			}
 
+			var chosenStratName = (currentTarget === 'test_strategy') ? testStrategySelectEl.value : null;
+			var stratObj = chosenStratName ? zapretAllStrategies.find(function(s) { return s.section === chosenStratName; }) : null;
+
 			ui.showModal('Проверка доступности', [
-				E('p', { class: 'spinning' }, 'Отправка проверочного запроса к ' + url + '...')
+				E('p', { class: 'spinning' }, 'Отправка проверочного сетевого запроса к ' + url + '...')
 			]);
 
 			fs.exec(HELPER_BIN, ['test', url]).then(function(res) {
@@ -1188,13 +1311,23 @@ return view.extend({
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
 				if (parsed && parsed.accessible) {
-					ui.addNotification(null, E('p', {}, '✓ Ресурс (' + url + ') доступен! Ответ HTTP ' + parsed.http_code), 'info');
+					var msg = '✓ Ресурс (' + url + ') доступен! Код ответа: HTTP ' + parsed.http_code;
+					if (stratObj && !stratObj.enabled) {
+						msg += ' (Внимание: стратегия zapret2.' + stratObj.section + ' сейчас отключена в Zapret2, трафик идет без неё)';
+					}
+					ui.addNotification(null, E('p', {}, msg), 'info');
 				} else {
-					ui.addNotification(null, E('p', {}, '✗ Ресурс (' + url + ') не отвечает через текущую стратегию Zapret2 (код ' + (parsed ? parsed.http_code : 0) + '). Запустите подбор стратегий!'), 'warning');
+					var errMsg = '✗ Ресурс (' + url + ') не отвечает (код ' + (parsed ? parsed.http_code : 0) + ').';
+					if (stratObj && !stratObj.enabled) {
+						errMsg += ' Стратегия zapret2.' + stratObj.section + ' сейчас отключена в Zapret2! Нажмите [ ⚡ Активировать ] ниже, чтобы включить её.';
+					} else {
+						errMsg += ' Проверьте правильность адреса или запустите поиск новой стратегии.';
+					}
+					ui.addNotification(null, E('p', {}, errMsg), 'warning');
 				}
 			}).catch(function() {
 				ui.hideModal();
-				ui.addNotification(null, E('p', {}, 'Не удалось выполнить проверку.'), 'danger');
+				ui.addNotification(null, E('p', {}, 'Не удалось выполнить сетевую проверку.'), 'danger');
 			});
 		}
 

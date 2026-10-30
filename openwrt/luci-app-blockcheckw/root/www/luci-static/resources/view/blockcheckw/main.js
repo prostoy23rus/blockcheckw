@@ -239,9 +239,9 @@ function checkVersion() {
 				return JSON.parse(res.stdout);
 			} catch (e) {}
 		}
-		return { success: false, current_version: '0.15', has_update: false };
+		return { success: false, current_version: '0.15.1', has_update: false };
 	}).catch(function() {
-		return { success: false, current_version: '0.15', has_update: false };
+		return { success: false, current_version: '0.15.1', has_update: false };
 	});
 }
 
@@ -281,7 +281,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
-		var versionInfo = data[3] || { current_version: '0.15', has_update: false };
+		var versionInfo = data[3] || { current_version: '0.15.1', has_update: false };
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
 
@@ -290,11 +290,12 @@ return view.extend({
 		// Scoped Styles
 		var styleSheet = E('style', {}, [
 			'/* BlockcheckW Unified Dashboard Styles */\n' +
+			'.bcw-wrapper { width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }\n' +
 			'.bcw-wrapper * { box-sizing: border-box; }\n' +
-			'.bcw-container { display: flex; flex-direction: column; gap: 18px; margin-top: 8px; }\n' +
-			'.bcw-card { background: #20232a; border: 1px solid #323742; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }\n' +
-			'.bcw-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); }\n' +
-			'.bcw-card-title { font-size: 15px; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; color: #e5e9f0; }\n' +
+			'.bcw-container { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
+			'.bcw-card { background: #20232a; border: 1px solid #323742; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
+			'.bcw-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); width: 100%; }\n' +
+			'.bcw-card-title { font-size: 15px; font-weight: bold; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #e5e9f0; line-height: 1.4; word-break: break-word; }\n' +
 			'\n' +
 			'/* Header Action Elements */\n' +
 			'.bcw-header-item { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; font-size: 12px; font-weight: 600; border-radius: 6px; box-sizing: border-box; line-height: 1; white-space: nowrap; transition: all 0.2s; border: 1px solid #485060; }\n' +
@@ -303,36 +304,37 @@ return view.extend({
 			'.bcw-header-badge { background: #282c34; color: #abb2bf; }\n' +
 			'\n' +
 			'/* Finder Mode Dropdown & Chips */\n' +
-			'.bcw-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; }\n' +
-			'.bcw-select { box-sizing: border-box; min-width: 320px; max-width: 100%; height: 38px; padding: 0 14px; font-size: 14px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
+			'.bcw-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; width: 100%; }\n' +
+			'.bcw-select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; height: 38px; padding: 0 12px; font-size: 13px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
 			'.bcw-select:hover, .bcw-select:focus { border-color: #3273dc; box-shadow: 0 0 8px rgba(50, 115, 220, 0.3); }\n' +
-			'.bcw-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }\n' +
-			'.bcw-chip-btn { box-sizing: border-box; height: 32px; padding: 0 14px; font-size: 12px; font-weight: 500; border-radius: 16px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; white-space: nowrap; }\n' +
+			'.bcw-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; width: 100%; }\n' +
+			'.bcw-chip-btn { box-sizing: border-box; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 500; border-radius: 16px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; white-space: nowrap; }\n' +
 			'.bcw-chip-btn:hover { color: #fff; border-color: #3273dc; background: #323742; }\n' +
 			'.bcw-chip-btn.active { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; font-weight: bold; }\n' +
-			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }\n' +
+			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; width: 100%; }\n' +
 			'\n' +
 			'/* Mode Hints Box */\n' +
-			'.bcw-hint-box { margin-top: 14px; padding: 14px 16px; border-radius: 6px; background: rgba(97, 175, 239, 0.06); border: 1px solid rgba(97, 175, 239, 0.22); border-left: 4px solid #61afef; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; }\n' +
+			'.bcw-hint-box { margin-top: 14px; padding: 14px 16px; border-radius: 6px; background: rgba(97, 175, 239, 0.06); border: 1px solid rgba(97, 175, 239, 0.22); border-left: 4px solid #61afef; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5; width: 100%; }\n' +
 			'.bcw-hint-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: bold; color: #61afef; font-size: 14px; }\n' +
-			'.bcw-hint-summary { color: #e5e9f0; font-size: 13px; font-weight: 500; }\n' +
-			'.bcw-hint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); }\n' +
-			'.bcw-hint-item { display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); height: 100%; box-sizing: border-box; }\n' +
+			'.bcw-hint-summary { color: #e5e9f0; font-size: 13px; font-weight: 500; word-break: break-word; }\n' +
+			'.bcw-hint-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 6px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); width: 100%; }\n' +
+			'.bcw-hint-item { display: flex; flex-direction: column; justify-content: flex-start; gap: 4px; background: rgba(0, 0, 0, 0.25); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); height: 100%; box-sizing: border-box; width: 100%; }\n' +
 			'.bcw-hint-item-title { font-weight: bold; font-size: 12px; color: #98c379; display: flex; align-items: center; gap: 6px; }\n' +
-			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; }\n' +
+			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; word-break: break-word; }\n' +
 			'\n' +
 			'/* Control & Parameters Bar */\n' +
-			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; }\n' +
-			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; min-height: 125px; box-sizing: border-box; }\n' +
+			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; width: 100%; }\n' +
+			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; min-height: 125px; box-sizing: border-box; width: 100%; }\n' +
 			'.bcw-param-label { font-size: 13px; font-weight: bold; color: #abb2bf; }\n' +
-			'.bcw-segmented { display: flex; height: 38px; border-radius: 6px; overflow: hidden; border: 1px solid #485060; background: #1c1f24; box-sizing: border-box; }\n' +
-			'.bcw-seg-btn { flex: 1; height: 100%; padding: 0 10px; font-size: 12px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: transparent; border: none; color: #828997; transition: all 0.2s; white-space: nowrap; line-height: 1; box-sizing: border-box; }\n' +
+			'.bcw-segmented { display: flex; height: 38px; border-radius: 6px; overflow: hidden; border: 1px solid #485060; background: #1c1f24; box-sizing: border-box; width: 100%; }\n' +
+			'.bcw-seg-btn { flex: 1 1 0; min-width: 0; height: 100%; padding: 0 10px; font-size: 12px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: transparent; border: none; color: #828997; transition: all 0.2s; white-space: nowrap; line-height: 1; box-sizing: border-box; }\n' +
 			'.bcw-seg-btn:hover { color: #fff; background: rgba(255,255,255,0.06); }\n' +
 			'.bcw-seg-btn.active { background: #3273dc; color: #fff; font-weight: bold; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }\n' +
 			'.bcw-seg-btn.active.teal { background: #00d1b2; color: #000; font-weight: bold; }\n' +
+			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: #abb2bf; }\n' +
 			'\n' +
 			'/* Main Unified Action Bar */\n' +
-			'.bcw-action-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 4px; }\n' +
+			'.bcw-action-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 4px; width: 100%; }\n' +
 			'.bcw-btn-launch, .bcw-btn-stop, .bcw-btn-secondary { height: 44px; box-sizing: border-box; padding: 0 24px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; line-height: 1; white-space: nowrap; border: 1px solid transparent; }\n' +
 			'.bcw-btn-launch { background: #00d1b2; color: #000; border-color: #00d1b2; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
 			'.bcw-btn-launch:hover { background: #00e6c4; box-shadow: 0 0 16px rgba(0,209,178,0.45); transform: translateY(-1px); }\n' +
@@ -345,16 +347,53 @@ return view.extend({
 			'.bcw-btn-sm { height: 32px; padding: 0 14px; font-size: 12px; font-weight: 600; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; cursor: pointer; transition: all 0.2s; white-space: nowrap; line-height: 1; }\n' +
 			'\n' +
 			'/* Code and Console Boxes */\n' +
-			'.bcw-code-box { box-sizing: border-box; background: #181a1f; color: #98c379; padding: 14px 16px; border-radius: 6px; font-size: 12px; font-family: "SF Mono", "Consolas", "Courier New", monospace; line-height: 1.45; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 250px; overflow-y: auto; border: 1px solid #282c34; }\n' +
-			'.bcw-log-tabs { display: flex; flex-wrap: wrap; gap: 8px; }\n' +
+			'.bcw-code-box { box-sizing: border-box; background: #181a1f; color: #98c379; padding: 12px 14px; border-radius: 6px; font-size: 11.5px; font-family: \"SF Mono\", \"Consolas\", \"Courier New\", monospace; line-height: 1.45; white-space: pre-wrap; word-break: break-all; overflow-wrap: anywhere; margin: 0; max-height: 250px; overflow-y: auto; overflow-x: hidden; width: 100%; max-width: 100%; border: 1px solid #282c34; }\n' +
+			'.bcw-log-tabs { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }\n' +
 			'.bcw-log-tab-btn { height: 32px; padding: 0 14px; font-size: 12px; font-weight: 500; cursor: pointer; border-radius: 6px; border: 1px solid #3e4451; background: #282c34; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; line-height: 1; }\n' +
 			'.bcw-log-tab-btn.active { background: #3273dc; color: #fff; border-color: #3273dc; font-weight: bold; }\n' +
+			'.bcw-line-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; width: 100%; }\n' +
+			'.bcw-form-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; width: 100%; }\n' +
+			'.bcw-form-label { font-weight: bold; min-width: 140px; font-size: 13px; color: #abb2bf; }\n' +
 			'\n' +
-			'/* Responsive */\n' +
+			'/* Responsive Overhaul */\n' +
 			'@media (max-width: 900px) {\n' +
 			'  .bcw-control-grid { grid-template-columns: 1fr; }\n' +
 			'  .bcw-action-bar { flex-direction: column; width: 100%; }\n' +
 			'  .bcw-action-bar button { width: 100%; justify-content: center; }\n' +
+			'}\n' +
+			'@media (max-width: 600px) {\n' +
+			'  .bcw-card { padding: 12px 14px; border-radius: 6px; }\n' +
+			'  .bcw-card-header { flex-direction: column; align-items: stretch; gap: 10px; }\n' +
+			'  .bcw-card-header > div:last-child { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }\n' +
+			'  .bcw-card-header > div:last-child button, .bcw-card-header > div:last-child a { width: 100%; justify-content: center; }\n' +
+			'  .bcw-header-title { font-size: 16px !important; }\n' +
+			'  .bcw-header-sub { font-size: 11.5px !important; }\n' +
+			'  .bcw-header-actions { width: 100% !important; gap: 6px !important; margin-top: 10px !important; }\n' +
+			'  .bcw-header-actions .bcw-header-item { flex: 1 1 calc(50% - 6px); justify-content: center; font-size: 11px; padding: 0 6px; }\n' +
+			'  .bcw-mode-row { flex-direction: column; align-items: stretch; gap: 6px; }\n' +
+			'  .bcw-chips-row { gap: 6px; }\n' +
+			'  .bcw-chip-btn { height: 28px; padding: 0 10px; font-size: 11px; }\n' +
+			'  .bcw-param-box { padding: 12px 14px; min-height: auto; }\n' +
+			'  .bcw-segmented { flex-direction: column; height: auto; border-radius: 6px; border: 1px solid #485060; }\n' +
+			'  .bcw-seg-btn { width: 100%; height: 38px; padding: 0 12px; font-size: 12.5px; justify-content: center; border-bottom: 1px solid #383e4a; border-radius: 0; }\n' +
+			'  .bcw-seg-btn:first-child { border-top-left-radius: 5px; border-top-right-radius: 5px; }\n' +
+			'  .bcw-seg-btn:last-child { border-bottom: none; border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; }\n' +
+			'  .bcw-hint-box { padding: 10px 12px; }\n' +
+			'  .bcw-hint-grid { grid-template-columns: 1fr; gap: 8px; }\n' +
+			'  .bcw-target-summary { flex-direction: column; align-items: flex-start; gap: 8px; }\n' +
+			'  .bcw-form-row { flex-direction: column; align-items: stretch; gap: 6px; }\n' +
+			'  .bcw-form-label { min-width: 0; }\n' +
+			'  .bcw-quick-urls { margin-left: 0 !important; }\n' +
+			'  .bcw-versions-bar { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }\n' +
+			'  .bcw-versions-bar select { width: 100% !important; max-width: 100% !important; }\n' +
+			'  .bcw-versions-actions { display: flex !important; gap: 8px !important; width: 100% !important; }\n' +
+			'  .bcw-versions-actions button { flex: 1 1 50% !important; justify-content: center !important; }\n' +
+			'  .bcw-line-grid { grid-template-columns: 1fr; }\n' +
+			'  .bcw-log-tab-btn { flex: 1 1 calc(33.3% - 6px); padding: 0 6px; font-size: 11px; justify-content: center; text-align: center; }\n' +
+			'  .bcw-log-controls { width: 100%; justify-content: space-between; }\n' +
+			'  .bcw-code-box { font-size: 11px; padding: 10px 12px; }\n' +
+			'  .bcw-strat-header { flex-direction: column; align-items: stretch !important; }\n' +
+			'  .bcw-strat-apply-btn { width: 100% !important; height: 36px !important; }\n' +
 			'}\n'
 		]);
 		container.appendChild(styleSheet);
@@ -373,7 +412,7 @@ return view.extend({
 			class: 'bcw-header-item bcw-header-btn bcw-header-badge',
 			title: 'Нажмите, чтобы посмотреть список изменений (Что нового)',
 			click: function() { showWhatsNewModal(versionInfo, false); }
-		}, 'v' + (versionInfo.current_version || '0.15'));
+		}, 'v' + (versionInfo.current_version || '0.15.1'));
 
 		var btnCheckUpdate = E('button', {
 			class: 'bcw-header-item bcw-header-btn',
@@ -404,6 +443,7 @@ return view.extend({
 		]);
 
 		var headerRightActions = E('div', {
+			class: 'bcw-header-actions',
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			versionBadgeEl,
@@ -416,10 +456,10 @@ return view.extend({
 		var headerCard = E('div', { class: 'bcw-card', style: 'padding: 16px 20px;' }, [
 			E('div', { style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;' }, [
 				E('div', {}, [
-					E('h2', { style: 'margin: 0; font-size: 21px; display: flex; align-items: center; gap: 8px;' }, [
+					E('h2', { class: 'bcw-header-title', style: 'margin: 0; font-size: 21px; display: flex; align-items: center; gap: 8px;' }, [
 						'⚡ BlockcheckW — Поиск стратегий Zapret2'
 					]),
-					E('div', { style: 'font-size: 13px; opacity: 0.8; margin-top: 4px;' }, [
+					E('div', { class: 'bcw-header-sub', style: 'font-size: 13px; opacity: 0.8; margin-top: 4px;' }, [
 						'Быстрый подбор рабочих параметров DPI для роутера, сборка отказоустойчивых Circular-связок и внедрение в 1 клик.'
 					])
 				]),
@@ -485,7 +525,7 @@ return view.extend({
 			class: 'cbi-input-text',
 			placeholder: 'rutracker.org',
 			value: 'rutracker.org',
-			style: 'width: 380px; max-width: 100%; height: 38px; font-size: 14px; padding: 0 12px; box-sizing: border-box;'
+			style: 'width: 100%; max-width: 380px; height: 38px; font-size: 14px; padding: 0 12px; box-sizing: border-box;'
 		});
 
 		var customDomainRow = E('div', {
@@ -516,7 +556,7 @@ return view.extend({
 		// Test Strategy Mode Dropdown
 		var testStrategySelectEl = E('select', {
 			class: 'bcw-select',
-			style: 'min-width: 260px;',
+			style: 'width: 100%; max-width: 380px;',
 			change: function(e) {
 				var chosen = e.target.value;
 				if (!chosen) return;
@@ -549,15 +589,15 @@ return view.extend({
 		var testStrategyRow = E('div', {
 			style: 'display: none; margin-top: 14px; padding: 14px 16px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
 		}, [
-			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px;' }, [
-				E('label', { style: 'font-weight: bold; min-width: 140px;' }, 'Стратегия Zapret2:'),
+			E('div', { class: 'bcw-form-row' }, [
+				E('label', { class: 'bcw-form-label' }, 'Стратегия Zapret2:'),
 				testStrategySelectEl
 			]),
-			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px;' }, [
-				E('label', { style: 'font-weight: bold; min-width: 140px;' }, 'Тестовый адрес / URL:'),
+			E('div', { class: 'bcw-form-row' }, [
+				E('label', { class: 'bcw-form-label' }, 'Тестовый адрес / URL:'),
 				testUrlInput
 			]),
-			E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 152px;' }, [
+			E('div', { class: 'bcw-quick-urls', style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 152px;' }, [
 				E('span', { style: 'font-size: 11px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:'),
 				E('button', {
 					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
@@ -640,19 +680,19 @@ return view.extend({
 			click: function() { switchApplyMode(false); }
 		}, '✋ Вручную (По кнопке)');
 
-		var paramSpeedHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+		var paramSpeedHintEl = E('div', { class: 'bcw-param-hint' },
 			currentMode === 'turbo'
 				? '⚡ Турбо: молниеносный перебор проверенных топ-стратегий 2026 года (multisplit, fake, disorder). Рекомендуется в 95% случаев.'
 				: '🔬 Глубокий скан: полный перебор комбинаций параметров Zapret (ack/ts смещения, fool/disorder, fake payloads). Для жестких блокировок.'
 		);
 
-		var paramApplyHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+		var paramApplyHintEl = E('div', { class: 'bcw-param-hint' },
 			autoApply
 				? '⚡ Авто: лучшая найденная связка сразу записывается в конфиг Zapret2 и перезапускает службу.'
 				: '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.'
 		);
 
-		var paramCircularHintEl = E('div', { style: 'font-size: 11px; opacity: 0.85; line-height: 1.4;' },
+		var paramCircularHintEl = E('div', { class: 'bcw-param-hint' },
 			doCircular
 				? '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.'
 				: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.'
@@ -739,7 +779,7 @@ return view.extend({
 
 		var versionsSelectEl = E('select', {
 			class: 'bcw-select',
-			style: 'min-width: 220px; height: 32px; font-size: 12px; padding: 0 10px;',
+			style: 'width: 100%; max-width: 320px; height: 32px; font-size: 12px; padding: 0 10px;',
 			change: function(e) {
 				var sec = e.target.value;
 				if (!sec) return;
@@ -764,21 +804,24 @@ return view.extend({
 		}, '🗑 Удалить');
 
 		var versionsBarEl = E('div', {
+			class: 'bcw-versions-bar',
 			style: 'display: none; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 10px; padding: 8px 12px; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid #383e4a;'
 		}, [
 			E('span', { style: 'font-size: 12px; color: #abb2bf; font-weight: 600;' }, '📁 История записей Zapret2:'),
 			versionsSelectEl,
-			btnActivateVersion,
-			btnDeleteVersion
+			E('div', { class: 'bcw-versions-actions', style: 'display: inline-flex; gap: 8px;' }, [
+				btnActivateVersion,
+				btnDeleteVersion
+			])
 		]);
 
 		var activeStratCard = E('div', { class: 'bcw-card', style: 'border-left: 4px solid #3273dc;' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, [
-					'🛡️ Активная стратегия в Zapret2: ',
+					E('span', {}, '🛡️ Активная стратегия в Zapret2:'),
 					activeTargetTitleEl
 				]),
-				E('div', { style: 'display: flex; gap: 8px; align-items: center;' }, [
+				E('div', { class: 'bcw-copy-wrap', style: 'display: flex; gap: 8px; align-items: center;' }, [
 					btnCopyActive
 				])
 			]),
@@ -807,7 +850,7 @@ return view.extend({
 				E('span', {}, '📡'),
 				'Исходные параметры линии и блокировки:'
 			]),
-			E('div', { style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px;' }, [
+			E('div', { class: 'bcw-line-grid' }, [
 				E('div', {}, [
 					E('strong', { style: 'color: #abb2bf;' }, 'Провайдер: '),
 					ispValEl
@@ -900,7 +943,7 @@ return view.extend({
 		var logCard = E('div', { class: 'bcw-card' }, [
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, '📋 Мониторинг и логи службы'),
-				E('div', { style: 'display: flex; flex-wrap: wrap; gap: 10px; align-items: center;' }, [
+				E('div', { class: 'bcw-log-controls', style: 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center;' }, [
 					E('label', { style: 'font-size: 12px; display: flex; align-items: center; gap: 4px; cursor: pointer;' }, [
 						chkAutoScroll,
 						E('span', {}, 'Автоскролл')
@@ -1410,15 +1453,16 @@ return view.extend({
 			strategies.forEach(function(strat, idx) {
 				var sText = (typeof strat === 'string') ? strat : (strat.args || JSON.stringify(strat));
 				var card = E('div', {
-					style: 'background: #282c34; padding: 14px; border-radius: 6px; border: 1px solid #3e4451; display: flex; flex-direction: column; gap: 8px;'
+					class: 'bcw-strat-item',
+					style: 'background: #282c34; padding: 14px; border-radius: 6px; border: 1px solid #3e4451; display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;'
 				}, [
-					E('div', { style: 'display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;' }, [
+					E('div', { class: 'bcw-strat-header', style: 'display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;' }, [
 						E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
 							E('span', { class: 'badge cbi-color-green', style: 'font-weight: bold;' }, '#' + (idx + 1) + ' 100% Работает'),
 							E('strong', { style: 'color: #61afef;' }, 'Одиночная стратегия')
 						]),
 						E('button', {
-							class: 'bcw-btn-sm cbi-button cbi-button-positive',
+							class: 'bcw-btn-sm cbi-button cbi-button-positive bcw-strat-apply-btn',
 							style: 'height: 32px; padding: 0 14px; font-weight: bold; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;',
 							click: function() { applyStrategy(sText, false); }
 						}, '✓ Применить в Zapret2')
@@ -1561,7 +1605,7 @@ return view.extend({
 		}
 
 		function showWhatsNewModal(info, isPostUpdate) {
-			var ver = info.current_version || '0.15';
+			var ver = info.current_version || '0.15.1';
 			var date = info.current_release_date || info.release_date || '31.10.2026';
 			var list = formatChangelogList(info.current_changelog || info.changelog);
 			var title = isPostUpdate ? ('🎉 Служба успешно обновлена до v' + ver + '!') : ('Что нового в BlockcheckW v' + ver);
@@ -1591,7 +1635,7 @@ return view.extend({
 		}
 
 		function showUpdateModal(info) {
-			var curVer = info.current_version || '0.15';
+			var curVer = info.current_version || '0.15.1';
 			var nextVer = info.latest_version || '0.16';
 			var date = info.release_date || '';
 			var list = formatChangelogList(info.changelog);
@@ -1636,9 +1680,9 @@ return view.extend({
 			updateBannerCard.appendChild(E('div', {
 				style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;'
 			}, [
-				E('div', { style: 'flex: 1; min-width: 260px;' }, [
+				E('div', { style: 'flex: 1 1 100%; min-width: 0;' }, [
 					E('div', { style: 'font-size: 15px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
-						'🎉 Доступна новая версия: v' + (info.latest_version || '0.15'),
+						'🎉 Доступна новая версия: v' + (info.latest_version || '0.15.1'),
 						E('span', { style: 'font-size: 12px; font-weight: normal; color: #828997;' }, releaseDate)
 					]),
 					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, 'Нажмите «Что нового», чтобы ознакомиться с изменениями и обновить компоненты.'),

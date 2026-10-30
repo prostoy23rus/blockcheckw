@@ -2,7 +2,7 @@
 # ==============================================================================
 # BlockcheckW & LuCI Universal Installer for OpenWrt
 # Repository: https://github.com/prostoy23rus/blockcheckw
-# Supported OpenWrt: 21.02, 22.03, 23.05, 24.10, snapshot
+# Supported OpenWrt: 21.02, 22.03, 23.05, 24.10, 25.x, snapshot (opkg & apk)
 # ==============================================================================
 
 set -e
@@ -53,9 +53,11 @@ fi
 echo -e "${BLUE}ℹ${NC} Определение архитектуры устройства..."
 detect_arch() {
     local u_arch=$(uname -m 2>/dev/null || echo "")
-    local opkg_arch=""
+    local pkg_arch=""
     if command -v opkg >/dev/null 2>&1; then
-        opkg_arch=$(opkg print-architecture 2>/dev/null | awk '{print $2}' | grep -v 'all\|noarch' | head -n1 || echo "")
+        pkg_arch=$(opkg print-architecture 2>/dev/null | awk '{print $2}' | grep -v 'all\|noarch' | head -n1 || echo "")
+    elif command -v apk >/dev/null 2>&1; then
+        pkg_arch=$(apk --print-arch 2>/dev/null || echo "")
     fi
 
     case "$u_arch" in
@@ -69,7 +71,7 @@ detect_arch() {
                 echo "mipsel"
             elif lscpu 2>/dev/null | grep -qi "little endian"; then
                 echo "mipsel"
-            elif [ -n "$opkg_arch" ] && echo "$opkg_arch" | grep -q "mipsel"; then
+            elif [ -n "$pkg_arch" ] && echo "$pkg_arch" | grep -q "mipsel"; then
                 echo "mipsel"
             else
                 echo "mips"
@@ -80,14 +82,16 @@ detect_arch() {
         powerpc*|ppc*) echo "ppc"; return ;;
     esac
 
-    if [ -n "$opkg_arch" ]; then
-        case "$opkg_arch" in
-            *aarch64*) echo "arm64"; return ;;
-            *x86_64*) echo "x86_64"; return ;;
+    if [ -n "$pkg_arch" ]; then
+        case "$pkg_arch" in
+            *aarch64*|*arm64*) echo "arm64"; return ;;
+            *x86_64*|*amd64*) echo "x86_64"; return ;;
             *i386*|*x86*) echo "x86"; return ;;
             *arm*) echo "arm"; return ;;
             *mipsel*) echo "mipsel"; return ;;
             *mips*) echo "mips"; return ;;
+            *riscv64*) echo "riscv64"; return ;;
+            *ppc*|*powerpc*) echo "ppc"; return ;;
         esac
     fi
 
@@ -102,31 +106,54 @@ fi
 echo -e "${GREEN}✓${NC} Архитектура: ${BOLD}${ARCH}${NC} ($(uname -m))"
 
 # 4. Проверка и установка зависимостей
-echo -e "${BLUE}ℹ${NC} Проверка системных зависимостей (curl, luci-compat, ca-bundle)..."
-NEED_UPDATE=0
-MISSING_PKGS=""
+echo -e "${BLUE}ℹ${NC} Проверка системных зависимостей (curl, ca-certificates/ca-bundle, tar)..."
 
-for pkg in curl luci-compat ca-bundle; do
-    if command -v opkg >/dev/null 2>&1; then
+if command -v apk >/dev/null 2>&1; then
+    # OpenWrt 25.x / Next-Gen с apk-tools
+    echo -e "${GREEN}✓${NC} Пакетный менеджер: ${BOLD}apk${NC} (OpenWrt 25.x / Next-Gen)"
+    apk update || true
+    for pkg in curl ca-certificates tar; do
+        if ! apk info -e "$pkg" >/dev/null 2>&1; then
+            echo -e "${YELLOW}ℹ${NC} Установка $pkg через apk..."
+            apk add "$pkg" || true
+        fi
+    done
+    # luci-compat не обязателен для современных JS-видов, но если доступен — устанавливаем
+    if ! apk info -e "luci-compat" >/dev/null 2>&1; then
+        apk add luci-compat >/dev/null 2>&1 || true
+    fi
+elif command -v opkg >/dev/null 2>&1; then
+    # OpenWrt 21.02 - 24.10 с opkg
+    echo -e "${GREEN}✓${NC} Пакетный менеджер: ${BOLD}opkg${NC}"
+    NEED_UPDATE=0
+    MISSING_PKGS=""
+    for pkg in curl ca-bundle tar; do
         if ! opkg list-installed | grep -q "^${pkg} "; then
             MISSING_PKGS="$MISSING_PKGS $pkg"
             NEED_UPDATE=1
         fi
-    fi
-done
-
-if [ "$NEED_UPDATE" -eq 1 ] && [ -n "$MISSING_PKGS" ]; then
-    echo -e "${YELLOW}ℹ${NC} Установка недостающих пакетов:${MISSING_PKGS}..."
-    opkg update || true
-    for p in $MISSING_PKGS; do
-        opkg install "$p" || {
-            if [ "$p" = "ca-bundle" ]; then
-                opkg install ca-certificates || true
-            fi
-        }
     done
+
+    if [ "$NEED_UPDATE" -eq 1 ] && [ -n "$MISSING_PKGS" ]; then
+        echo -e "${YELLOW}ℹ${NC} Установка недостающих пакетов:${MISSING_PKGS}..."
+        opkg update || true
+        for p in $MISSING_PKGS; do
+            opkg install "$p" || {
+                if [ "$p" = "ca-bundle" ]; then
+                    opkg install ca-certificates || true
+                fi
+            }
+        done
+    else
+        echo -e "${GREEN}✓${NC} Все необходимые системные пакеты уже установлены."
+    fi
+
+    # Пробуем установить luci-compat, если есть в репозитории (не ломая установку, если отсутствует)
+    if ! opkg list-installed | grep -q "^luci-compat "; then
+        opkg install luci-compat >/dev/null 2>&1 || true
+    fi
 else
-    echo -e "${GREEN}✓${NC} Все необходимые системные пакеты уже установлены."
+    echo -e "${YELLOW}[WARN] Ни opkg, ни apk не обнаружены. Пропускаем автоматическую установку пакетов.${NC}"
 fi
 
 # 5. Скачивание скомпилированного бинарника blockcheckw
@@ -178,9 +205,13 @@ chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
 echo -e "${GREEN}✓${NC} Файлы LuCI интерфейса успешно скопированы."
 
 # 7. Очистка кэша LuCI и перезапуск служб
-echo -e "${BLUE}ℹ${NC} Очистка кэша LuCI и перезапуск rpcd..."
+echo -e "${BLUE}ℹ${NC} Очистка кэша LuCI и перезапуск служб веб-интерфейса..."
 rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
 /etc/init.d/rpcd restart >/dev/null 2>&1 || true
+/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+/etc/init.d/nginx restart >/dev/null 2>&1 || true
+/etc/init.d/lighttpd restart >/dev/null 2>&1 || true
+ubus call luci reload >/dev/null 2>&1 || true
 
 # Очистка временных файлов
 rm -rf "$TMP_DIR"

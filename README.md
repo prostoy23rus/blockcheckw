@@ -5,6 +5,10 @@
 [![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel-success?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
+<p align="center">
+  <img src="docs/images/luci_dashboard.png" alt="BlockcheckW LuCI Dashboard" width="950" />
+</p>
+
 **BlockcheckW** — сверхбыстрый параллельный сканер и оптимизатор DPI-стратегий для **Zapret2**, оснащённый современным адаптивным веб-интерфейсом **LuCI OpenWrt**, автоматической сборкой отказоустойчивых **Circular-стратегий** и системой обновления в **1 клик** прямо из веб-панели роутера.
 
 ---

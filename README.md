@@ -13,11 +13,25 @@
 
 ---
 
-## ⚡ Быстрая установка на OpenWrt в 1 строку
+## ⚡ Быстрая установка на OpenWrt
 
-Поддерживаются **любые версии OpenWrt** (21.02, 22.03, 23.05, 24.10, 25.x, snapshot, RouteRich, Keenetic) с пакетными менеджерами **opkg** и **apk** (OpenWrt 25+), а также любые архитектуры (`aarch64`, `x86_64`, `arm`, `mipsel`, `mips`):
+Поддерживаются **любые версии OpenWrt** (21.02, 22.03, 23.05, 24.10, 25.x, snapshot, RouteRich, Keenetic) с пакетными менеджерами **opkg** и **apk** (OpenWrt 25+), а также любые архитектуры процессоров (`aarch64`, `x86_64`, `arm`, `mipsel`, `mips`):
 
-Подключитесь к роутеру по SSH и выполните:
+### 💻 Способ 1. Для пользователей Windows (через интерактивный `install.bat`)
+
+Если вы настраиваете роутер с ПК на Windows (10 / 11), вы можете установить службу в 1 клик без ручного ввода Linux-команд:
+
+1. Скачайте файл [**`install.bat`**](https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat) (или скачайте через командную строку CMD / PowerShell):
+   ```cmd
+   curl -sSLO https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat && install.bat
+   ```
+2. Запустите **`install.bat`** двойным кликом мыши.
+3. В появившемся интерактивном меню выберите пункт **`[1] Установить BlockcheckW и LuCI`**.
+4. Скрипт автоматически подключится к роутеру через системный OpenSSH или PuTTY, выполнит установку всех компонентов, проверит зависимости и по завершении сам предложит открыть веб-интерфейс в вашем браузере!
+
+### 🐧 Способ 2. Через консоль роутера по SSH (в 1 строку)
+
+Подключитесь к роутеру по SSH (например, `ssh root@192.168.1.1`) и выполните команду:
 
 ```bash
 sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh)"
@@ -275,6 +289,9 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 ```bash
 /usr/bin/blockcheckw-helper uninstall
 ```
+
+### Способ 3. С компьютера через Windows батник (`install.bat`)
+Запустите **`install.bat`** на компьютере с Windows и выберите пункт меню **`[5] Полностью удалить BlockcheckW с роутера`**.
 
 > [!NOTE]
 > Конфигурация Zapret2 (`/etc/config/zapret2`) сохраняется без изменений, поэтому все ваши настроенные рабочие стратегии обхода блокировок продолжат функционировать.

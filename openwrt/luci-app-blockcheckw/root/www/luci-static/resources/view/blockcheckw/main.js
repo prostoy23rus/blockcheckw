@@ -150,12 +150,26 @@ function getLogs() {
 	});
 }
 
+function checkVersion() {
+	return fs.exec(HELPER_BIN, ['check_update']).then(function(res) {
+		if (res && res.code === 0 && res.stdout) {
+			try {
+				return JSON.parse(res.stdout);
+			} catch (e) {}
+		}
+		return { success: false, current_version: '1.3.0', has_update: false };
+	}).catch(function() {
+		return { success: false, current_version: '1.3.0', has_update: false };
+	});
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
 			checkHelperStatus(),
 			getZapretInfo(),
-			getLogs()
+			getLogs(),
+			checkVersion()
 		]);
 	},
 
@@ -163,6 +177,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = data[2] || {};
+		var versionInfo = data[3] || { current_version: '1.3.0', has_update: false };
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
 
@@ -231,6 +246,28 @@ return view.extend({
 			style: 'font-size: 13px; font-weight: bold; padding: 6px 14px; border-radius: 6px;'
 		}, (zapretInfo.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен');
 
+		var versionBadgeEl = E('span', {
+			class: 'badge',
+			style: 'font-size: 13px; font-weight: bold; padding: 6px 12px; border-radius: 6px; background: #282c34; border: 1px solid #485060; color: #abb2bf;'
+		}, 'v' + (versionInfo.current_version || '1.3.0'));
+
+		var btnCheckUpdate = E('button', {
+			class: 'bcw-btn-secondary',
+			style: 'padding: 6px 14px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px;',
+			click: function() { doCheckUpdate(true); }
+		}, [
+			E('span', {}, '🔄'),
+			'Проверить обновление'
+		]);
+
+		var headerRightActions = E('div', {
+			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
+		}, [
+			versionBadgeEl,
+			btnCheckUpdate,
+			zapretBadgeEl
+		]);
+
 		var headerCard = E('div', { class: 'bcw-card', style: 'padding: 16px 20px;' }, [
 			E('div', { style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;' }, [
 				E('div', {}, [
@@ -241,10 +278,17 @@ return view.extend({
 						'Быстрый подбор рабочих параметров DPI для роутера, сборка отказоустойчивых Circular-связок и внедрение в 1 клик.'
 					])
 				]),
-				zapretBadgeEl
+				headerRightActions
 			])
 		]);
 		mainLayout.appendChild(headerCard);
+
+		// Update Notification Banner (Dynamic)
+		var updateBannerCard = E('div', {
+			class: 'bcw-card',
+			style: 'padding: 14px 20px; background: rgba(0, 209, 178, 0.08); border: 1px solid #00d1b2; display: none;'
+		});
+		mainLayout.appendChild(updateBannerCard);
 
 		// Target Selection Section (Zapret Finder Style Dropdown + Quick Chips)
 		var modeSelectEl = E('select', {
@@ -916,6 +960,129 @@ return view.extend({
 				ui.hideModal();
 				ui.addNotification(null, E('p', {}, 'Не удалось выполнить проверку.'), 'danger');
 			});
+		}
+
+		function showUpdateBanner(info) {
+			updateBannerCard.innerHTML = '';
+			var releaseDate = info.release_date ? ' (' + info.release_date + ')' : '';
+			var changelogText = info.changelog || 'Доступны новые улучшения и исправления BlockcheckW.';
+			var repoName = info.repo || 'prostoy23rus/blockcheckw';
+
+			updateBannerCard.appendChild(E('div', {
+				style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;'
+			}, [
+				E('div', { style: 'flex: 1; min-width: 260px;' }, [
+					E('div', { style: 'font-size: 15px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
+						'🎉 Доступна новая версия: v' + (info.latest_version || '1.3.1'),
+						E('span', { style: 'font-size: 12px; font-weight: normal; color: #828997;' }, releaseDate)
+					]),
+					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, changelogText),
+					E('div', { style: 'font-size: 11px; color: #abb2bf; margin-top: 3px;' }, 'Репозиторий: ' + repoName + ' (ветка main)')
+				]),
+				E('div', { style: 'display: flex; gap: 10px; align-items: center;' }, [
+					E('button', {
+						class: 'bcw-btn-launch',
+						style: 'padding: 8px 18px; font-size: 13px;',
+						click: function() { doRunUpdate(info.latest_version); }
+					}, '🚀 Обновить из GitHub'),
+					E('button', {
+						class: 'bcw-btn-secondary',
+						style: 'padding: 8px 14px; font-size: 13px;',
+						click: function() { updateBannerCard.style.display = 'none'; }
+					}, 'Скрыть')
+				])
+			]));
+			updateBannerCard.style.display = 'block';
+		}
+
+		function doCheckUpdate(isManual) {
+			if (isManual) {
+				ui.showModal('Проверка обновлений', [
+					E('p', { class: 'spinning' }, 'Запрос к репозиторию GitHub prostoy23rus/blockcheckw...')
+				]);
+			}
+
+			fs.exec(HELPER_BIN, ['check_update']).then(function(res) {
+				if (isManual) ui.hideModal();
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+
+				if (!parsed || !parsed.success) {
+					if (isManual) {
+						ui.addNotification(null, E('p', {}, 'Не удалось связаться с GitHub: ' + (parsed && parsed.error ? parsed.error : (res.stderr || 'ошибка сети'))), 'warning');
+					}
+					return;
+				}
+
+				if (parsed.has_update) {
+					showUpdateBanner(parsed);
+					if (isManual) {
+						ui.addNotification(null, E('p', {}, '🎉 Доступна новая версия: v' + parsed.latest_version + '!'), 'info');
+					}
+				} else {
+					updateBannerCard.style.display = 'none';
+					if (isManual) {
+						ui.addNotification(null, E('p', {}, '✓ У вас установлена актуальная версия BlockcheckW (v' + (parsed.current_version || '1.3.0') + ')!'), 'info');
+					}
+				}
+			}).catch(function(err) {
+				if (isManual) {
+					ui.hideModal();
+					ui.addNotification(null, E('p', {}, 'Ошибка при проверке обновлений: ' + err), 'danger');
+				}
+			});
+		}
+
+		function doRunUpdate(targetVer) {
+			if (!confirm('Вы действительно хотите обновить BlockcheckW и LuCI интерфейс из GitHub (prostoy23rus/blockcheckw)?')) {
+				return;
+			}
+
+			ui.showModal('Обновление службы BlockcheckW', [
+				E('p', { class: 'spinning', style: 'font-size: 14px; font-weight: bold;' }, 'Загрузка свежих файлов из GitHub и обновление...'),
+				E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; line-height: 1.6;' }, [
+					'1. Загрузка обновленного скрипта управления и LuCI интерфейса',
+					E('br'),
+					'2. Обновление базы пресетов Zapret2 и генератора связок',
+					E('br'),
+					'3. Сброс кэша интерфейса LuCI и перезапуск службы rpcd'
+				])
+			]);
+
+			fs.exec(HELPER_BIN, ['update']).then(function(res) {
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+
+				if (parsed && parsed.success) {
+					ui.showModal('Обновление успешно выполнено', [
+						E('p', { class: 'cbi-color-green', style: 'font-size: 16px; font-weight: bold;' }, '✓ ' + (parsed.message || 'Служба успешно обновлена!')),
+						E('p', { style: 'margin-top: 8px;' }, 'Интерфейс автоматически перезагрузится через 3 секунды...'),
+						E('div', { class: 'right', style: 'margin-top: 16px;' }, [
+							E('button', {
+								class: 'btn cbi-button-action',
+								click: function() { location.reload(); }
+							}, 'Перезагрузить страницу')
+						])
+					]);
+					setTimeout(function() {
+						location.reload();
+					}, 3000);
+				} else {
+					ui.showModal('Ошибка обновления', [
+						E('p', { class: 'cbi-color-red', style: 'font-weight: bold;' }, '✗ Не удалось обновить компоненты:'),
+						E('pre', { class: 'bcw-code-box', style: 'color: #e06c75;' }, parsed && parsed.error ? parsed.error : (res.stderr || res.stdout || 'Неизвестная ошибка'))
+					]);
+				}
+			}).catch(function(err) {
+				ui.showModal('Ошибка сети', [
+					E('p', { class: 'cbi-color-red' }, 'Сбой при выполнении команды обновления: ' + err)
+				]);
+			});
+		}
+
+		// Show update banner if new version is already detected
+		if (versionInfo && versionInfo.has_update) {
+			showUpdateBanner(versionInfo);
 		}
 
 		// Initial In-Memory Render

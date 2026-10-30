@@ -12,6 +12,9 @@ TURBO_FILE="/tmp/blockcheckw_turbo.txt"
 PRESETS_FILE="/usr/share/blockcheckw/zapret2_presets.json"
 CIRCULAR_BUILDER="/usr/bin/circular-builder.lua"
 
+VERSION_FILE="/usr/share/blockcheckw/version.json"
+REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main"
+
 ensure_json() {
     [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Ожидание запуска","strategies":[],"log":""}' > "$STATUS_FILE"
 }
@@ -560,6 +563,105 @@ cmd_logs() {
 EOF
 }
 
+cmd_check_update() {
+    local cur_ver="1.3.0"
+    if [ -f "$VERSION_FILE" ]; then
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "1.3.0"); else print("1.3.0"); end' 2>/dev/null)
+    fi
+
+    local tmp_ver="/tmp/bcw_remote_ver.json"
+    rm -f "$tmp_ver"
+    curl -sSL -k --connect-timeout 5 "$REPO_RAW/openwrt/version.json" -o "$tmp_ver" 2>/dev/null
+
+    if [ ! -s "$tmp_ver" ]; then
+        echo "{\"success\":false,\"current_version\":\"$cur_ver\",\"error\":\"Не удалось связаться с GitHub\"}"
+        return 1
+    fi
+
+    lua - "$cur_ver" "$tmp_ver" << 'EOF'
+local json = require("luci.jsonc")
+local cur_ver = arg[1] or "1.3.0"
+local file = arg[2]
+
+local f = io.open(file, "r")
+if not f then
+    print(string.format('{"success":false,"current_version":"%s","error":"Файл не найден"}', cur_ver))
+    return
+end
+
+local content = f:read("*a")
+f:close()
+
+local rem = json.parse(content)
+if type(rem) ~= "table" or not rem.version then
+    print(string.format('{"success":false,"current_version":"%s","error":"Неверный ответ GitHub"}', cur_ver))
+    return
+end
+
+local has_update = (rem.version ~= cur_ver)
+local res = {
+    success = true,
+    current_version = cur_ver,
+    latest_version = rem.version,
+    has_update = has_update,
+    changelog = rem.changelog or "",
+    release_date = rem.release_date or "",
+    repo = rem.repo or "prostoy23rus/blockcheckw"
+}
+print(json.stringify(res))
+EOF
+    rm -f "$tmp_ver"
+}
+
+cmd_update() {
+    local tmp_dir="/tmp/bcw_update_$$"
+    mkdir -p "$tmp_dir"
+
+    echo "[blockcheckw-helper] Starting update from $REPO_RAW..." >> "$LOG_FILE"
+
+    # Download updated files
+    local ok=1
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/bin/blockcheckw-helper" -o "$tmp_dir/blockcheckw-helper" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/bin/circular-builder.lua" -o "$tmp_dir/circular-builder.lua" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" -o "$tmp_dir/main.js" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/strategies/zapret2_presets.json" -o "$tmp_dir/zapret2_presets.json" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/version.json" -o "$tmp_dir/version.json" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/share/luci/menu.d/luci-app-blockcheckw.json" -o "$tmp_dir/menu.json" || ok=0
+    curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-blockcheckw.json" -o "$tmp_dir/acl.json" || ok=0
+
+    if [ "$ok" = "0" ] || [ ! -s "$tmp_dir/main.js" ] || [ ! -s "$tmp_dir/blockcheckw-helper" ]; then
+        rm -rf "$tmp_dir"
+        echo '{"success":false,"error":"Ошибка скачивания файлов обновления с GitHub"}'
+        return 1
+    fi
+
+    mkdir -p /usr/bin /usr/share/blockcheckw /usr/share/luci/menu.d /usr/share/rpcd/acl.d /www/luci-static/resources/view/blockcheckw
+
+    # Install files
+    cp -f "$tmp_dir/blockcheckw-helper" /usr/bin/blockcheckw-helper
+    cp -f "$tmp_dir/circular-builder.lua" /usr/bin/circular-builder.lua
+    cp -f "$tmp_dir/main.js" /www/luci-static/resources/view/blockcheckw/main.js
+    cp -f "$tmp_dir/zapret2_presets.json" /usr/share/blockcheckw/zapret2_presets.json
+    cp -f "$tmp_dir/version.json" /usr/share/blockcheckw/version.json
+    [ -s "$tmp_dir/menu.json" ] && cp -f "$tmp_dir/menu.json" /usr/share/luci/menu.d/luci-app-blockcheckw.json
+    [ -s "$tmp_dir/acl.json" ] && cp -f "$tmp_dir/acl.json" /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
+
+    chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
+
+    local new_ver="1.3.0"
+    if [ -f "/usr/share/blockcheckw/version.json" ]; then
+        new_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("/usr/share/blockcheckw/version.json", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "1.3.0"); else print("1.3.0"); end' 2>/dev/null)
+    fi
+
+    # Clean caches and reload LuCI
+    rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
+    /etc/init.d/rpcd restart >/dev/null 2>&1
+    rm -rf "$tmp_dir"
+
+    echo "[blockcheckw-helper] Successfully updated to version $new_ver" >> "$LOG_FILE"
+    echo '{"success":true,"version":"'"$new_ver"'","message":"Служба успешно обновлена до версии '"$new_ver"'!"}'
+}
+
 case "$1" in
     start) shift; cmd_start "$@" ;;
     status) cmd_status ;;
@@ -568,8 +670,10 @@ case "$1" in
     test) shift; cmd_test "$@" ;;
     info) cmd_info ;;
     logs) shift; cmd_logs "$@" ;;
+    check_update) cmd_check_update ;;
+    update) cmd_update ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|test|info|logs}"
+        echo "Usage: $0 {start|status|stop|apply|test|info|logs|check_update|update}"
         exit 1
         ;;
 esac

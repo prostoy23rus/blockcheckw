@@ -72,12 +72,12 @@ is_scanner_running() {
             local cmd=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\000' ' ')
             case "$cmd" in
                 *blockcheckw*) return 0 ;;
-                *) rm -f "$PID_FILE"; return 1 ;;
             esac
-        else
-            rm -f "$PID_FILE"
-            return 1
         fi
+    fi
+    # Robust fallback check in process table
+    if pgrep blockcheckw >/dev/null 2>&1 || ps | grep -E 'blockcheckw --profiles|blockcheckw scan|blockcheckw-helper start' | grep -v grep >/dev/null 2>&1; then
+        return 0
     fi
     return 1
 }
@@ -263,6 +263,11 @@ cmd_start() {
     # Clean domain if user entered multiple or dirty string
     if [ -n "$domain" ]; then
         domain=$(echo "$domain" | tr ',' ' ' | awk '{print $1}')
+    fi
+
+    # Clean up stale lock if no scanner is actually running
+    if ! pgrep -f blockcheckw >/dev/null 2>&1; then
+        rm -f /tmp/blockcheckw.lock 2>/dev/null || true
     fi
 
     # Check if already running with real process verification
@@ -660,31 +665,39 @@ if not st.status then
     st.strategies = {}
 end
 
--- Process death watchdog
+-- Process death watchdog: only trigger if really not running and status file is stale (>25s)
 if not is_running and st.status == "running" then
-    local finished = false
-    local lf = io.open(log_file, "r")
-    if lf then
-        local content = lf:read("*a") or ""
-        lf:close()
-        if content:find("Summary for") or content:find("OK scan report") then
-            finished = true
+    local nixio = require("nixio")
+    local attr = nixio.fs.stat(status_file)
+    local is_stale = true
+    if attr and attr.mtime and (os.time() - attr.mtime < 25) then
+        is_stale = false
+    end
+    if is_stale then
+        local finished = false
+        local lf = io.open(log_file, "r")
+        if lf then
+            local content = lf:read("*a") or ""
+            lf:close()
+            if content:find("Summary for") or content:find("OK scan report") then
+                finished = true
+            end
         end
-    end
-    if not finished then
-        st.status = "error"
-        st.phase = "Процесс сканера завершился неожиданно (нехватка RAM или сбой)."
-    else
-        st.status = "done"
-        st.percent = 100
-        st.phase = "Сканирование завершено"
-    end
-    local tmp = status_file .. ".tmp"
-    local out = io.open(tmp, "w")
-    if out then
-        out:write(json.stringify(st))
-        out:close()
-        os.rename(tmp, status_file)
+        if not finished then
+            st.status = "error"
+            st.phase = "Процесс сканера завершился неожиданно (нехватка RAM или сбой)."
+        else
+            st.status = "done"
+            st.percent = 100
+            st.phase = "Сканирование завершено"
+        end
+        local tmp = status_file .. ".tmp"
+        local out = io.open(tmp, "w")
+        if out then
+            out:write(json.stringify(st))
+            out:close()
+            os.rename(tmp, status_file)
+        end
     end
 end
 
@@ -740,12 +753,13 @@ cmd_stop() {
         local pid=$(cat "$PID_FILE" 2>/dev/null)
         if [ -n "$pid" ]; then
             kill -TERM "$pid" 2>/dev/null
-            sleep 1
+            sleep 0.5
             kill -9 "$pid" 2>/dev/null
         fi
         rm -f "$PID_FILE"
     fi
-    killall -9 blockcheckw 2>/dev/null
+    killall -9 blockcheckw blockcheckw-helper 2>/dev/null
+    rm -f /tmp/blockcheckw.lock
     nft delete table inet blockcheckw 2>/dev/null
     /etc/init.d/zapret2 restart >/dev/null 2>&1
     write_status "idle" 0 "Остановлено пользователем"
@@ -1021,7 +1035,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.6" end
+        if not res.version then res.version = "0.15.7" end
 
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
@@ -1150,9 +1164,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.6"
+    local cur_ver="0.15.7"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.6"); else print("0.15.6"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.7"); else print("0.15.7"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1161,7 +1175,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.6"
+local cur_ver = arg[1] or "0.15.7"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1383,7 +1397,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.6"
+local app_version = "0.15.7"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))

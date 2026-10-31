@@ -21,6 +21,49 @@ REPO_OWNER="prostoy23rus"
 REPO_NAME="blockcheckw"
 UPSTREAM_OWNER="rcd27"
 
+# Multi-mirror downloader function (GitHub Raw + jsDelivr Global CDN + Fastly + GHProxy)
+fetch_file() {
+    local rel_path="$1"
+    local dest="$2"
+    local timeout="${3:-8}"
+    local tmp_file="${dest}.dl.$$"
+
+    rm -f "$tmp_file"
+
+    _save_download() {
+        if [ -s "$tmp_file" ]; then
+            # Verify file does not contain HTML error page
+            if head -n 3 "$tmp_file" | grep -qiE 'not found|404|bad gateway|502|<html>|<head>|access denied'; then
+                rm -f "$tmp_file"
+                return 1
+            fi
+            mv -f "$tmp_file" "$dest"
+            return 0
+        fi
+        rm -f "$tmp_file"
+        return 1
+    }
+
+    # 1. Direct GitHub Raw
+    curl -fsSL -k --connect-timeout "$timeout" "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 2. jsDelivr Global CDN (Fast, unblocked in RU)
+    curl -fsSL -k --connect-timeout "$timeout" "https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 3. Fastly jsDelivr CDN
+    curl -fsSL -k --connect-timeout "$timeout" "https://fastly.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 4. GHProxy Mirror
+    curl -fsSL -k --connect-timeout "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    rm -f "$tmp_file"
+    return 1
+}
+
 echo -e "${CYAN}${BOLD}"
 echo "  ____  _            _        _               _    __        __"
 echo " | __ )| | ___   ___| | _____| |__   ___  ___| | __\ \      / /"
@@ -180,11 +223,13 @@ DOWNLOAD_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/down
 UPSTREAM_URL="https://github.com/${UPSTREAM_OWNER}/blockcheckw/releases/latest/download/${BIN_NAME}"
 
 if ! curl -sSL -k -f --connect-timeout 8 "$DOWNLOAD_URL" -o "$BIN_NAME" 2>/dev/null; then
-    echo -e "${YELLOW}ℹ${NC} Скачивание из репозитория ${REPO_OWNER} не удалось (релиз еще не создан), используем официальный бинарник ${UPSTREAM_OWNER}..."
-    if ! curl -sSL -k -f --connect-timeout 10 "$UPSTREAM_URL" -o "$BIN_NAME"; then
-        echo -e "${RED}[ERROR] Не удалось скачать бинарник blockcheckw для архитектуры ${ARCH}!${NC}"
-        rm -rf "$TMP_DIR"
-        exit 1
+    echo -e "${YELLOW}ℹ${NC} Скачивание из репозитория ${REPO_OWNER} не удалось, пробуем зеркала и апстрим..."
+    if ! curl -sSL -k -f --connect-timeout 10 "$UPSTREAM_URL" -o "$BIN_NAME" 2>/dev/null; then
+        if ! curl -sSL -k -f --connect-timeout 10 "https://ghproxy.net/$UPSTREAM_URL" -o "$BIN_NAME"; then
+            echo -e "${RED}[ERROR] Не удалось скачать бинарник blockcheckw для архитектуры ${ARCH}!${NC}"
+            rm -rf "$TMP_DIR"
+            exit 1
+        fi
     fi
 fi
 
@@ -204,13 +249,13 @@ echo -e "${BLUE}ℹ${NC} Скачивание модулей LuCI приложе
 
 mkdir -p /usr/bin /usr/share/blockcheckw /usr/share/luci/menu.d /usr/share/rpcd/acl.d /www/luci-static/resources/view/blockcheckw
 
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/bin/blockcheckw-helper" -o /usr/bin/blockcheckw-helper
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/bin/circular-builder.lua" -o /usr/bin/circular-builder.lua
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/strategies/zapret2_presets.json" -o /usr/share/blockcheckw/zapret2_presets.json
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/version.json" -o /usr/share/blockcheckw/version.json
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/share/luci/menu.d/luci-app-blockcheckw.json" -o /usr/share/luci/menu.d/luci-app-blockcheckw.json
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-blockcheckw.json" -o /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
-curl -sSL -k --connect-timeout 8 "$REPO_RAW/openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" -o /www/luci-static/resources/view/blockcheckw/main.js
+fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/blockcheckw-helper" /usr/bin/blockcheckw-helper 8
+fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/circular-builder.lua" /usr/bin/circular-builder.lua 8
+fetch_file "strategies/zapret2_presets.json" /usr/share/blockcheckw/zapret2_presets.json 8
+fetch_file "openwrt/version.json" /usr/share/blockcheckw/version.json 8
+fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/luci/menu.d/luci-app-blockcheckw.json" /usr/share/luci/menu.d/luci-app-blockcheckw.json 8 || true
+fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-blockcheckw.json" /usr/share/rpcd/acl.d/luci-app-blockcheckw.json 8 || true
+fetch_file "openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" /www/luci-static/resources/view/blockcheckw/main.js 8
 
 chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
 

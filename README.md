@@ -17,32 +17,43 @@
 
 Поддерживаются **любые версии OpenWrt** (21.02, 22.03, 23.05, 24.10, 25.x, snapshot, RouteRich, Keenetic) с пакетными менеджерами **opkg** и **apk** (OpenWrt 25+), а также любые архитектуры процессоров (`aarch64`, `x86_64`, `arm`, `mipsel`, `mips`):
 
-### 💻 Способ 1. Для пользователей Windows (через интерактивный `install.bat`)
+### 🐧 Способ 1. Установка прямо на роутере через SSH (Основной, 1 команда)
 
-Если вы настраиваете роутер с ПК на Windows (10 / 11), вы можете установить службу в 1 клик без ручного ввода Linux-команд:
-
-1. Скачайте файл [**`install.bat` (прямая ссылка на скачивание)**](https://github.com/prostoy23rus/blockcheckw/releases/latest/download/install.bat) со страницы [**Релизов GitHub (Releases)**](https://github.com/prostoy23rus/blockcheckw/releases/tag/v0.15) (или через командную строку CMD / PowerShell):
-   ```cmd
-   curl -sSLO https://github.com/prostoy23rus/blockcheckw/releases/latest/download/install.bat && install.bat
-   ```
-2. Запустите скачанный **`install.bat`** двойным кликом мыши.
-3. В появившемся меню выберите пункт **`[1] Установить BlockcheckW и LuCI`**.
-4. Скрипт автоматически подключится к роутеру через системный OpenSSH или PuTTY, выполнит установку всех компонентов, настроит правила и по завершении сам предложит открыть веб-интерфейс в вашем браузере!
-
-### 🐧 Способ 2. Через консоль роутера по SSH (в 1 строку)
-
-Подключитесь к роутеру по SSH (например, `ssh root@192.168.1.1`) и выполните команду:
+Подключитесь к роутеру по SSH (например, `ssh root@192.168.1.1` или через пункт «Терминал» в LuCI) и выполните одну команду:
 
 ```bash
 sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh)"
 ```
 
+> [!TIP]
+> **Если GitHub заблокирован провайдером:** используйте быстрое зеркало через глобальный CDN (не блокируется в РФ):
+> ```bash
+> sh -c "$(curl -sSL https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/install.sh)"
+> ```
+
 Скрипт автоматически:
 1. Определит архитектуру процессора (`aarch64`, `x86_64`, `arm_cortex-a7`, `mipsel_24kc` и др.).
 2. Установит недостающие системные зависимости (`curl`, `luci-compat`, `ca-bundle`).
-3. Загрузит скомпилированное Rust-ядро сканера и модули веб-интерфейса LuCI.
+3. Загрузит скомпилированное Rust-ядро сканера и модули веб-интерфейса LuCI с автоматическим выбором зеркал (GitHub / jsDelivr / GHProxy).
 4. Сбросит кэш и перезапустит веб-службу роутера.
-5. Интерфейс мгновенно появится в веб-меню: **Службы ➔ BlockcheckW (Поиск стратегий)** (`http://192.168.1.1/cgi-bin/luci/admin/services/blockcheckw`).
+5. Интерфейс мгновенно появится в меню роутера: **Службы ➔ BlockcheckW (Поиск стратегий)** (`http://192.168.1.1/cgi-bin/luci/admin/services/blockcheckw`).
+
+---
+
+### 💻 Способ 2. Для пользователей Windows (Запуск с компьютера без входа в SSH)
+
+> [!IMPORTANT]
+> Этот способ предназначен для запуска **на вашем домашнем компьютере с Windows** (в командной строке Windows CMD/PowerShell), а **НЕ** внутри терминала роутера!
+
+Если вы настраиваете роутер с ПК на Windows (10 / 11), вы можете установить службу в 1 клик:
+
+1. Скачайте файл [**`install.bat`**](https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat) на свой компьютер (или выполните в командной строке Windows CMD / PowerShell):
+   ```cmd
+   curl -sSLO https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.bat && install.bat
+   ```
+2. Запустите скачанный **`install.bat`** двойным кликом мыши на компьютере.
+3. В появившемся меню выберите пункт **`[1] Установить BlockcheckW и LuCI`**.
+4. Скрипт сам подключится к роутеру по локальной сети через OpenSSH или PuTTY, выполнит установку всех компонентов, настроит правила и сам откроет веб-интерфейс в браузере!
 
 ---
 

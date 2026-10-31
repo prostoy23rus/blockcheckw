@@ -124,7 +124,7 @@ echo (Если потребуется, введите пароль от роут
 echo ------------------------------------------------------------------------------
 echo.
 
-set "CMD_INSTALL=curl -sSL -k https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh -o /tmp/inst.sh && sh /tmp/inst.sh && rm -f /tmp/inst.sh"
+set "CMD_INSTALL=(curl -sSL -k --connect-timeout 6 https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh -o /tmp/inst.sh || curl -sSL -k --connect-timeout 6 https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/install.sh -o /tmp/inst.sh) && sh /tmp/inst.sh && rm -f /tmp/inst.sh"
 
 where ssh.exe >nul 2>&1
 if %errorlevel% equ 0 (

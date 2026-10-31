@@ -267,6 +267,83 @@ function formatBlockType(bType) {
 	}
 }
 
+function initModalBackdropHandler() {
+	var overlay = document.getElementById('modal_overlay');
+	if (overlay) {
+		overlay.style.cursor = 'pointer';
+
+		if (!overlay._bcw_click_bound) {
+			overlay._bcw_click_bound = true;
+			overlay.addEventListener('click', function(e) {
+				if (e.target === overlay) {
+					ui.hideModal();
+				}
+			});
+		}
+
+		if (!overlay._bcw_observer_bound && window.MutationObserver) {
+			overlay._bcw_observer_bound = true;
+			var observer = new MutationObserver(function() {
+				if (!document.body.classList.contains('modal-overlay-active')) return;
+				var modal = overlay.querySelector('.modal');
+				if (!modal) return;
+				var h4 = modal.querySelector('h4');
+				if (!h4 || h4.querySelector('.bcw-modal-close-btn')) return;
+
+				var closeBtn = E('button', {
+					class: 'bcw-modal-close-btn',
+					type: 'button',
+					title: 'Закрыть окно (Esc)',
+					click: function(e) {
+						e.stopPropagation();
+						ui.hideModal();
+					}
+				}, '✕');
+				h4.appendChild(closeBtn);
+			});
+			observer.observe(overlay, { childList: true, subtree: true });
+		}
+	}
+
+	if (!window._bcw_esc_bound) {
+		window._bcw_esc_bound = true;
+		window.addEventListener('keydown', function(e) {
+			if ((e.key === 'Escape' || e.keyCode === 27) && document.body.classList.contains('modal-overlay-active')) {
+				ui.hideModal();
+			}
+		});
+	}
+}
+
+function bcwShowModal(titleText, bodyNodes, actions) {
+	initModalBackdropHandler();
+
+	var closeBtn = E('button', {
+		class: 'bcw-modal-close-btn',
+		type: 'button',
+		title: 'Закрыть окно (Esc)',
+		click: function(e) {
+			e.stopPropagation();
+			ui.hideModal();
+		}
+	}, '✕');
+
+	var titleEl = E('div', {
+		style: 'display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 10px;'
+	}, [
+		(typeof titleText === 'string') ? E('span', { style: 'font-weight: bold; font-size: 15px; color: #e5e9f0;' }, titleText) : titleText,
+		closeBtn
+	]);
+
+	var allChildren = Array.isArray(bodyNodes) ? bodyNodes.slice() : [bodyNodes];
+	if (actions && actions.length > 0) {
+		allChildren.push(E('div', { class: 'right', style: 'margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end;' }, actions));
+	}
+
+	var dlg = ui.showModal(titleEl, allChildren);
+	return dlg;
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
@@ -293,6 +370,12 @@ return view.extend({
 		// Scoped Styles
 		var styleSheet = E('style', {}, [
 			'/* BlockcheckW Unified Dashboard Styles */\n' +
+			'#modal_overlay { cursor: pointer !important; }\n' +
+			'#modal_overlay .modal { cursor: default !important; position: relative !important; }\n' +
+			'#modal_overlay .modal > h4 { display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 12px !important; width: 100% !important; box-sizing: border-box !important; }\n' +
+			'.bcw-modal-close-btn { background: transparent !important; border: none !important; color: #abb2bf !important; font-size: 20px !important; font-weight: bold !important; line-height: 1 !important; cursor: pointer !important; padding: 4px 10px !important; border-radius: 6px !important; margin-left: auto !important; transition: all 0.15s ease !important; outline: none !important; min-width: 36px !important; min-height: 36px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }\n' +
+			'.bcw-modal-close-btn:hover { color: #ffffff !important; background: rgba(255, 255, 255, 0.15) !important; }\n' +
+			'.bcw-modal-close-btn:active { background: rgba(255, 255, 255, 0.25) !important; transform: scale(0.95) !important; }\n' +
 			'.bcw-wrapper { width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }\n' +
 			'.bcw-wrapper * { box-sizing: border-box; }\n' +
 			'.bcw-container { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
@@ -1004,27 +1087,26 @@ return view.extend({
 				readonly: 'readonly'
 			}, reportText);
 
-			ui.showModal('📋 Диагностический отчёт для Telegram', [
+			bcwShowModal('📋 Диагностический отчёт для Telegram', [
 				E('p', { style: 'font-size: 13px; margin-bottom: 8px; color: #e5e9f0;' }, 'Выделите текст ниже и скопируйте его, чтобы отправить разработчику в Telegram:'),
-				ta,
-				E('div', { class: 'right', style: 'margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;' }, [
-					E('button', {
-						class: 'cbi-button cbi-button-action',
-						style: 'background: #00d1b2; color: #000; font-weight: bold;',
-						click: function() {
-							ta.focus();
-							ta.select();
-							try {
-								document.execCommand('copy');
-								ui.addNotification(null, E('p', {}, '✓ Скопировано в буфер обмена!'), 'info');
-							} catch(e) {}
-						}
-					}, 'Выделить и скопировать'),
-					E('button', {
-						class: 'cbi-button cbi-button-neutral',
-						click: function() { ui.hideModal(); }
-					}, 'Закрыть')
-				])
+				ta
+			], [
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					style: 'background: #00d1b2; color: #000; font-weight: bold;',
+					click: function() {
+						ta.focus();
+						ta.select();
+						try {
+							document.execCommand('copy');
+							ui.addNotification(null, E('p', {}, '✓ Скопировано в буфер обмена!'), 'info');
+						} catch(e) {}
+					}
+				}, 'Выделить и скопировать'),
+				E('button', {
+					class: 'cbi-button cbi-button-neutral',
+					click: function() { ui.hideModal(); }
+				}, 'Закрыть')
 			]);
 			setTimeout(function() { ta.focus(); ta.select(); }, 100);
 		}
@@ -1190,7 +1272,7 @@ return view.extend({
 			var chosenSec = versionsSelectEl.value;
 			if (!chosenSec) return;
 
-			ui.showModal('Активация стратегии', [
+			bcwShowModal('Активация стратегии', [
 				E('p', { class: 'spinning' }, 'Переключение на запись ' + chosenSec + ' в Zapret2...')
 			]);
 
@@ -1228,7 +1310,7 @@ return view.extend({
 				return;
 			}
 
-			ui.showModal('Удаление стратегии', [
+			bcwShowModal('Удаление стратегии', [
 				E('p', { class: 'spinning' }, 'Удаление записи ' + chosenSec + ' из Zapret2...')
 			]);
 
@@ -1629,7 +1711,7 @@ return view.extend({
 		}
 
 		function applyStrategy(scriptText, isCirc) {
-			ui.showModal('Применение стратегии', [
+			bcwShowModal('Применение стратегии', [
 				E('p', { class: 'spinning' }, 'Запись в конфигурацию Zapret2 и перезапуск службы...')
 			]);
 
@@ -1691,7 +1773,7 @@ return view.extend({
 			var chosenStratName = (currentTarget === 'test_strategy') ? testStrategySelectEl.value : null;
 			var stratObj = chosenStratName ? zapretAllStrategies.find(function(s) { return s.section === chosenStratName; }) : null;
 
-			ui.showModal('Проверка доступности', [
+			bcwShowModal('Проверка доступности', [
 				E('p', { class: 'spinning' }, 'Отправка проверочного сетевого запроса к ' + url + '...')
 			]);
 
@@ -1762,7 +1844,8 @@ return view.extend({
 			var list = formatChangelogList(info.current_changelog || info.changelog);
 			var title = isPostUpdate ? ('🎉 Служба успешно обновлена до v' + ver + '!') : ('Что нового в BlockcheckW v' + ver);
 
-			ui.showModal(title, [
+			bcwShowModal(title, [
+
 				E('div', { style: 'border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 14px;' }, [
 					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
 						isPostUpdate ? '🚀 Обновление успешно установлено' : ('🎉 Релиз v' + ver),
@@ -1783,6 +1866,13 @@ return view.extend({
 						click: function() { ui.hideModal(); }
 					}, '👍 Отлично, понятно')
 				])
+			
+			], [
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					style: 'padding: 6px 18px; font-size: 13px; font-weight: bold;',
+					click: function() { ui.hideModal(); }
+				}, '👍 Отлично, понятно')
 			]);
 		}
 
@@ -1793,7 +1883,8 @@ return view.extend({
 		};
 
 		function confirmRunUpdate(targetVer) {
-			ui.showModal('Обновление службы BlockcheckW', [
+			bcwShowModal('Обновление службы BlockcheckW', [
+
 				E('div', { style: 'margin-bottom: 14px;' }, [
 					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
 						'🚀 Доступна новая версия: v' + targetVer,
@@ -1817,6 +1908,20 @@ return view.extend({
 						}
 					}, '🚀 Установить обновление v' + targetVer)
 				])
+			
+			], [
+				E('button', {
+					class: 'cbi-button',
+					click: function() { ui.hideModal(); }
+				}, 'Отмена'),
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					style: 'font-weight: bold;',
+					click: function() {
+						ui.hideModal();
+						doRunUpdate(targetVer);
+					}
+				}, '🚀 Установить обновление v' + targetVer)
 			]);
 		}
 
@@ -1920,7 +2025,7 @@ return view.extend({
 			});
 		}
 		function doRunUpdate(targetVer) {
-			ui.showModal('Обновление службы BlockcheckW', [
+			bcwShowModal('Обновление службы BlockcheckW', [
 				E('p', { class: 'spinning', style: 'font-size: 14px; font-weight: bold;' }, 'Загрузка свежих файлов из GitHub и обновление...'),
 				E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; line-height: 1.6;' }, [
 					'1. Загрузка обновленного скрипта управления и LuCI интерфейса',
@@ -1940,34 +2045,48 @@ return view.extend({
 						localStorage.setItem('bcw_just_updated', '1');
 					} catch(e) {}
 
-					ui.showModal('Обновление успешно выполнено', [
+					bcwShowModal('Обновление успешно выполнено', [
 						E('p', { class: 'cbi-color-green', style: 'font-size: 16px; font-weight: bold;' }, '✓ ' + (parsed.message || 'Служба успешно обновлена!')),
-						E('p', { style: 'margin-top: 8px;' }, 'Интерфейс автоматически перезагрузится через 2 секунды...'),
-						E('div', { class: 'right', style: 'margin-top: 16px;' }, [
-							E('button', {
-								class: 'btn cbi-button-action',
-								click: function() { location.reload(); }
-							}, 'Перезагрузить сейчас')
-						])
+						E('p', { style: 'margin-top: 8px;' }, 'Интерфейс автоматически перезагрузится через 2 секунды...')
+					], [
+						E('button', {
+							class: 'btn cbi-button-action',
+							click: function() { location.reload(); }
+						}, 'Перезагрузить сейчас')
 					]);
 					setTimeout(function() {
 						location.reload();
 					}, 2000);
 				} else {
-					ui.showModal('Ошибка обновления', [
-						E('p', { class: 'cbi-color-red', style: 'font-weight: bold;' }, '✗ Не удалось обновить компоненты:'),
-						E('pre', { class: 'bcw-code-box', style: 'color: #e06c75;' }, parsed && parsed.error ? parsed.error : (res.stderr || res.stdout || 'Неизвестная ошибка'))
+					bcwShowModal('Ошибка обновления', [
+						E('p', { class: 'cbi-color-red', style: 'font-weight: bold; font-size: 14px;' }, '✗ Не удалось обновить компоненты:'),
+						E('pre', { class: 'bcw-code-box', style: 'color: #e06c75; margin: 10px 0;' }, parsed && parsed.error ? parsed.error : (res.stderr || res.stdout || 'Неизвестная ошибка')),
+						E('p', { style: 'font-size: 12px; color: #abb2bf; margin-top: 8px;' }, '💡 Вы также можете обновить службу вручную через терминал роутера командой:'),
+						E('code', { style: 'display: block; background: #1c2027; padding: 6px 10px; border-radius: 4px; color: #61afef; font-size: 12px; margin-top: 4px;' }, 'blockcheckw-helper update')
+					], [
+						E('button', {
+							class: 'cbi-button cbi-button-neutral',
+							style: 'padding: 6px 18px;',
+							click: function() { ui.hideModal(); }
+						}, 'Закрыть')
 					]);
 				}
 			}).catch(function(err) {
-				ui.showModal('Ошибка сети', [
-					E('p', { class: 'cbi-color-red' }, 'Сбой при выполнении команды обновления: ' + err)
+				bcwShowModal('Ошибка сети', [
+					E('p', { class: 'cbi-color-red', style: 'font-weight: bold; font-size: 14px;' }, '✗ Сбой при выполнении команды обновления:'),
+					E('pre', { class: 'bcw-code-box', style: 'color: #e06c75; margin: 10px 0;' }, String(err))
+				], [
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						style: 'padding: 6px 18px;',
+						click: function() { ui.hideModal(); }
+					}, 'Закрыть')
 				]);
 			});
 		}
 
 		function confirmUninstall() {
-			ui.showModal('Удаление BlockcheckW с роутера', [
+			bcwShowModal('Удаление BlockcheckW с роутера', [
 				E('p', { style: 'font-weight: bold; color: #ff3860; font-size: 14px;' }, '⚠️ Вы действительно хотите полностью удалить BlockcheckW с роутера?'),
 				E('div', { style: 'margin: 12px 0; font-size: 13px; line-height: 1.5; color: #abb2bf;' }, [
 					E('p', {}, 'Будут полностью удалены:'),
@@ -1978,24 +2097,25 @@ return view.extend({
 						E('li', {}, 'Временные файлы и кэш LuCI')
 					]),
 					E('p', { style: 'margin-top: 10px; color: #98c379;' }, '✓ Ваши сохранённые стратегии в Zapret2 продолжат работать без изменений.')
-				]),
-				E('div', { class: 'right', style: 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;' }, [
-					E('button', {
-						class: 'cbi-button cbi-button-neutral',
-						click: function() { ui.hideModal(); }
-					}, 'Отмена'),
-					E('button', {
-						class: 'cbi-button cbi-button-negative',
-						click: function() {
-							doUninstallService();
-						}
-					}, '🗑 Подтвердить удаление')
 				])
+			], [
+				E('button', {
+					class: 'cbi-button cbi-button-neutral',
+					click: function() { ui.hideModal(); }
+				}, 'Отмена'),
+				E('button', {
+					class: 'cbi-button cbi-button-negative',
+					style: 'background: #e06c75; color: #fff; font-weight: bold;',
+					click: function() {
+						ui.hideModal();
+						doUninstallService();
+					}
+				}, '🗑 Да, удалить BlockcheckW')
 			]);
 		}
 
 		function doUninstallService() {
-			ui.showModal('Удаление службы...', [
+			bcwShowModal('Удаление службы...', [
 				E('p', { class: 'spinning' }, 'Удаление файлов BlockcheckW и сброс кэша роутера...')
 			]);
 
@@ -2003,7 +2123,7 @@ return view.extend({
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
 				if (parsed && parsed.success) {
-					ui.showModal('Удаление завершено', [
+					bcwShowModal('Удаление завершено', [
 						E('p', { style: 'color: #00d1b2; font-weight: bold; font-size: 15px;' }, '✓ ' + (parsed.message || 'BlockcheckW успешно удалён с роутера!')),
 						E('p', { style: 'font-size: 13px; margin-top: 8px;' }, 'Сейчас вы будете перенаправлены на главную страницу OpenWrt...')
 					]);

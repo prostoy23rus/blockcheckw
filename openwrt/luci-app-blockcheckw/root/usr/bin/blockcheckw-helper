@@ -68,15 +68,15 @@ fetch_file() {
 is_scanner_running() {
     if [ -f "$PID_FILE" ]; then
         local pid=$(cat "$PID_FILE" 2>/dev/null | tr -d '[:space:]')
-        if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
+        if [ -n "$pid" ] && [ "$pid" != "$$" ] && [ -d "/proc/$pid" ]; then
             local cmd=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\000' ' ')
             case "$cmd" in
-                *blockcheckw*) return 0 ;;
+                *blockcheckw\ *|*/blockcheckw\ *|*blockcheckw-helper*) return 0 ;;
             esac
         fi
     fi
-    # Robust fallback check in process table
-    if pgrep blockcheckw >/dev/null 2>&1 || ps | grep -E 'blockcheckw --profiles|blockcheckw scan|blockcheckw-helper start' | grep -v grep >/dev/null 2>&1; then
+    # Robust check: only consider scanner running if the binary itself is running
+    if ps | grep -v grep | grep -v 'blockcheckw-helper' | grep -qE 'blockcheckw'; then
         return 0
     fi
     return 1

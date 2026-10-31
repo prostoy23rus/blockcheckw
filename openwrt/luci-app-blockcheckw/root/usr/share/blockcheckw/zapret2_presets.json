@@ -109,10 +109,14 @@
       "filter_l7": "tls",
       "description": "Медиа pbs.twimg.com, API api.x.com, x.com",
       "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
+        "--lua-init=fake_default_tls=tls_mod(fake_default_tls,'rnd') --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multisplit:pos=10,midsld:seqovl=1:seqovl_pattern=fake_default_tls",
         "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:pos=1,host+1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld"
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
       ]
     },
     "preset_instagram": {
@@ -129,10 +133,13 @@
       "filter_l7": "tls",
       "description": "Шлюз gateway.instagram.com, CDN static.cdninstagram.com",
       "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2"
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
       ]
     },
     "tcp16": {

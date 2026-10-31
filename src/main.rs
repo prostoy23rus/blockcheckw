@@ -617,7 +617,9 @@ async fn main() {
     // so the upstream pipe command can finish and release its lock first)
     let stdin_data = {
         use std::io::IsTerminal;
-        if matches!(cli.command, Some(Command::Check { .. })) && !std::io::stdin().is_terminal() {
+        if matches!(cli.command, Some(Command::Check { ref from_file, .. }) if from_file.is_none())
+            && !std::io::stdin().is_terminal()
+        {
             Some(std::io::read_to_string(std::io::stdin()).unwrap_or_default())
         } else {
             None

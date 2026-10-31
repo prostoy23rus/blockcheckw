@@ -93,6 +93,22 @@ ensure_json() {
     [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Готов к работе","strategies":[],"log":""}' > "$STATUS_FILE"
 }
 
+_add_domains_if_missing() {
+    local file="$1"
+    shift
+    touch "$file" 2>/dev/null
+    local added=0
+    for dom in "$@"; do
+        [ -n "$dom" ] || continue
+        local esc_dom=$(echo "$dom" | sed 's/\./\\./g')
+        if ! grep -qiE "^[[:space:]]*${esc_dom}[[:space:]]*$" "$file" 2>/dev/null; then
+            echo "$dom" >> "$file"
+            added=1
+        fi
+    done
+    chmod 644 "$file" 2>/dev/null
+}
+
 ensure_preset_hostlist() {
     local tgt="$1"
     local custom_dom="$2"
@@ -102,21 +118,9 @@ ensure_preset_hostlist() {
     case "$tgt" in
         preset_x|x)
             local x_file="$ipset_dir/zapret_hosts_x.txt"
-            if [ ! -f "$x_file" ] || [ ! -s "$x_file" ]; then
-                cat << 'EOF' > "$x_file"
-x.com
-twitter.com
-t.co
-twimg.com
-pbs.twimg.com
-abs.twimg.com
-api.x.com
-api.twitter.com
-video.twimg.com
-ton.twitter.com
-EOF
-                chmod 644 "$x_file" 2>/dev/null
-            fi
+            _add_domains_if_missing "$x_file" \
+                "x.com" "twitter.com" "t.co" "twimg.com" "pbs.twimg.com" \
+                "abs.twimg.com" "api.x.com" "api.twitter.com" "video.twimg.com" "ton.twitter.com"
             if ! uci -q get zapret2.list_hosts_x >/dev/null; then
                 uci set zapret2.list_hosts_x=list
                 uci set zapret2.list_hosts_x.path="$x_file"
@@ -124,18 +128,10 @@ EOF
             ;;
         preset_instagram|instagram)
             local ig_file="$ipset_dir/zapret_hosts_instagram.txt"
-            if [ ! -f "$ig_file" ] || [ ! -s "$ig_file" ]; then
-                cat << 'EOF' > "$ig_file"
-instagram.com
-cdninstagram.com
-fbcdn.net
-facebook.com
-threads.net
-gateway.instagram.com
-static.cdninstagram.com
-EOF
-                chmod 644 "$ig_file" 2>/dev/null
-            fi
+            _add_domains_if_missing "$ig_file" \
+                "instagram.com" "cdninstagram.com" "fbcdn.net" "facebook.com" \
+                "threads.net" "gateway.instagram.com" "static.cdninstagram.com" \
+                "graph.instagram.com" "i.instagram.com"
             if ! uci -q get zapret2.list_hosts_instagram >/dev/null; then
                 uci set zapret2.list_hosts_instagram=list
                 uci set zapret2.list_hosts_instagram.path="$ig_file"
@@ -143,16 +139,9 @@ EOF
             ;;
         preset_twitch|twitch)
             local tw_file="$ipset_dir/zapret_hosts_twitch.txt"
-            if [ ! -f "$tw_file" ] || [ ! -s "$tw_file" ]; then
-                cat << 'EOF' > "$tw_file"
-twitch.tv
-ttvnw.net
-jtvnw.net
-usher.ttvnw.net
-static-cdn.jtvnw.net
-EOF
-                chmod 644 "$tw_file" 2>/dev/null
-            fi
+            _add_domains_if_missing "$tw_file" \
+                "twitch.tv" "ttvnw.net" "jtvnw.net" "usher.ttvnw.net" \
+                "static-cdn.jtvnw.net" "gql.twitch.tv"
             if ! uci -q get zapret2.list_hosts_twitch >/dev/null; then
                 uci set zapret2.list_hosts_twitch=list
                 uci set zapret2.list_hosts_twitch.path="$tw_file"
@@ -161,21 +150,12 @@ EOF
         preset_youtube|youtube)
             local yt_file="$ipset_dir/zapret_hosts_youtube.txt"
             if [ ! -f "$yt_file" ] || [ ! -s "$yt_file" ]; then
-                if [ -f "$yt_file.default" ]; then
-                    cp -f "$yt_file.default" "$yt_file" 2>/dev/null
-                else
-                    cat << 'EOF' > "$yt_file"
-googlevideo.com
-youtube.com
-youtu.be
-ytimg.com
-ggpht.com
-gvt1.com
-youtubei.googleapis.com
-EOF
-                fi
-                chmod 644 "$yt_file" 2>/dev/null
+                [ -f "$yt_file.default" ] && cp -f "$yt_file.default" "$yt_file" 2>/dev/null
             fi
+            _add_domains_if_missing "$yt_file" \
+                "googlevideo.com" "youtube.com" "youtu.be" "ytimg.com" \
+                "ggpht.com" "gvt1.com" "youtubei.googleapis.com" \
+                "yt3.ggpht.com" "i.ytimg.com"
             if ! uci -q get zapret2.list_hosts_youtube >/dev/null; then
                 uci set zapret2.list_hosts_youtube=list
                 uci set zapret2.list_hosts_youtube.path="$yt_file"
@@ -183,63 +163,25 @@ EOF
             ;;
         preset_discord|discord)
             local dc_file="$ipset_dir/zapret_hosts_discord.txt"
-            if [ ! -f "$dc_file" ] || [ ! -s "$dc_file" ]; then
-                cat << 'EOF' > "$dc_file"
-discord.com
-discord.gg
-discord.media
-discordapp.com
-discordapp.net
-discordstatus.com
-gateway.discord.gg
-EOF
-                chmod 644 "$dc_file" 2>/dev/null
-            fi
+            _add_domains_if_missing "$dc_file" \
+                "discord.com" "discord.gg" "discord.media" "discordapp.com" \
+                "discordapp.net" "discordstatus.com" "gateway.discord.gg" \
+                "cdn.discordapp.com" "status.discord.com"
             if ! uci -q get zapret2.list_hosts_discord >/dev/null; then
                 uci set zapret2.list_hosts_discord=list
                 uci set zapret2.list_hosts_discord.path="$dc_file"
             fi
             ;;
-        builtin|general)
+        builtin|general|preset_builtin|preset_user)
             local u_file="$ipset_dir/zapret_hosts_user.txt"
-            if [ ! -f "$u_file" ] || [ ! -s "$u_file" ]; then
-                cat << 'EOF' > "$u_file"
-rutracker.org
-rutracker.cc
-nnmclub.to
-kinozal.tv
-rutor.info
-lostfilm.tv
-hdrezka.ag
-flibusta.is
-pornhub.com
-xvideos.com
-redtube.com
-torproject.org
-bbc.com
-bbc.co.uk
-meduza.io
-dw.com
-svoboda.org
-currenttime.tv
-theins.ru
-novayagazeta.eu
-linkedin.com
-notion.so
-canva.com
-medium.com
-soundcloud.com
-spotify.com
-deezer.com
-openai.com
-chatgpt.com
-claude.ai
-proton.me
-protonmail.com
-t.me
-EOF
-                chmod 644 "$u_file" 2>/dev/null
-            fi
+            _add_domains_if_missing "$u_file" \
+                "rutracker.org" "rutracker.cc" "nnmclub.to" "kinozal.tv" "rutor.info" \
+                "lostfilm.tv" "hdrezka.ag" "flibusta.is" "pornhub.com" "xvideos.com" \
+                "redtube.com" "torproject.org" "bbc.com" "bbc.co.uk" "meduza.io" \
+                "dw.com" "svoboda.org" "currenttime.tv" "theins.ru" "novayagazeta.eu" \
+                "linkedin.com" "notion.so" "canva.com" "medium.com" "soundcloud.com" \
+                "spotify.com" "deezer.com" "openai.com" "chatgpt.com" "claude.ai" \
+                "proton.me" "protonmail.com" "t.me"
             if ! uci -q get zapret2.list_hosts_user >/dev/null; then
                 uci set zapret2.list_hosts_user=list
                 uci set zapret2.list_hosts_user.path="$u_file"
@@ -250,8 +192,11 @@ EOF
             touch "$u_file" 2>/dev/null
             if [ -n "$custom_dom" ]; then
                 local cd_clean=$(echo "$custom_dom" | tr 'A-Z' 'a-z' | sed -e 's|^https*://||' -e 's|/.*||' | tr -d '[:space:]')
-                if [ -n "$cd_clean" ] && ! grep -qFx "$cd_clean" "$u_file" 2>/dev/null; then
-                    echo "$cd_clean" >> "$u_file"
+                if [ -n "$cd_clean" ]; then
+                    local esc_cd=$(echo "$cd_clean" | sed 's/\./\\./g')
+                    if ! grep -qiE "^[[:space:]]*${esc_cd}[[:space:]]*$" "$u_file" 2>/dev/null; then
+                        echo "$cd_clean" >> "$u_file"
+                    fi
                 fi
             fi
             if ! uci -q get zapret2.list_hosts_user >/dev/null; then
@@ -263,13 +208,36 @@ EOF
 }
 
 ensure_all_hostlists() {
+    local ipset_dir="/opt/zapret2/ipset"
+    mkdir -p "$ipset_dir" 2>/dev/null
+
+    local before_changes=$(uci changes zapret2 2>/dev/null)
+
     ensure_preset_hostlist "preset_youtube"
     ensure_preset_hostlist "preset_discord"
     ensure_preset_hostlist "preset_x"
     ensure_preset_hostlist "preset_instagram"
     ensure_preset_hostlist "preset_twitch"
     ensure_preset_hostlist "builtin"
-    uci commit zapret2 2>/dev/null || true
+
+    local excl_file="$ipset_dir/zapret_hosts_user_exclude.txt"
+    if [ ! -f "$excl_file" ]; then
+        if [ -f "$excl_file.default" ]; then
+            cp -f "$excl_file.default" "$excl_file" 2>/dev/null
+        else
+            touch "$excl_file" 2>/dev/null
+        fi
+        chmod 644 "$excl_file" 2>/dev/null
+    fi
+    if ! uci -q get zapret2.list_hosts_user_exclude >/dev/null; then
+        uci set zapret2.list_hosts_user_exclude=list
+        uci set zapret2.list_hosts_user_exclude.path="$excl_file"
+    fi
+
+    local after_changes=$(uci changes zapret2 2>/dev/null)
+    if [ "$before_changes" != "$after_changes" ] && [ -n "$after_changes" ]; then
+        uci commit zapret2 2>/dev/null || true
+    fi
 }
 
 write_status() {
@@ -1240,6 +1208,7 @@ cmd_test() {
 }
 
 cmd_info() {
+    ensure_all_hostlists
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
 
     lua -e '
@@ -1260,7 +1229,40 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.7" end
+        if not res.version then res.version = "0.15.9" end
+
+        local hostlists_info = {
+            { key = "youtube", name = "YouTube", file = "/opt/zapret2/ipset/zapret_hosts_youtube.txt", uci_sec = "list_hosts_youtube" },
+            { key = "discord", name = "Discord", file = "/opt/zapret2/ipset/zapret_hosts_discord.txt", uci_sec = "list_hosts_discord" },
+            { key = "x", name = "X (Twitter)", file = "/opt/zapret2/ipset/zapret_hosts_x.txt", uci_sec = "list_hosts_x" },
+            { key = "instagram", name = "Instagram", file = "/opt/zapret2/ipset/zapret_hosts_instagram.txt", uci_sec = "list_hosts_instagram" },
+            { key = "twitch", name = "Twitch", file = "/opt/zapret2/ipset/zapret_hosts_twitch.txt", uci_sec = "list_hosts_twitch" },
+            { key = "user", name = "Общие сайты (User)", file = "/opt/zapret2/ipset/zapret_hosts_user.txt", uci_sec = "list_hosts_user" }
+        }
+        local hl_res = {}
+        for _, hl in ipairs(hostlists_info) do
+            local count = 0
+            local f = io.open(hl.file, "r")
+            if f then
+                for l in f:lines() do
+                    l = l:gsub("^%s+", ""):gsub("%s+$", "")
+                    if l ~= "" and not l:match("^#") then
+                        count = count + 1
+                    end
+                end
+                f:close()
+            end
+            local has_uci = (uci:get("zapret2", hl.uci_sec) ~= nil)
+            table.insert(hl_res, {
+                key = hl.key,
+                name = hl.name,
+                file = hl.file,
+                exists = (count > 0 or f ~= nil),
+                domains_count = count,
+                uci_configured = has_uci
+            })
+        end
+        res.hostlists = hl_res
 
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
@@ -1389,9 +1391,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.7"
+    local cur_ver="0.15.9"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.7"); else print("0.15.7"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.9"); else print("0.15.9"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1400,7 +1402,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.7"
+local cur_ver = arg[1] or "0.15.9"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1625,7 +1627,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.7"
+local app_version = "0.15.9"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))
@@ -1711,6 +1713,11 @@ end
 EOF
 }
 
+cmd_ensure_hostlists() {
+    ensure_all_hostlists
+    cmd_info
+}
+
 case "$1" in
     start) shift; cmd_start "$@" ;;
     status) cmd_status ;;
@@ -1725,7 +1732,7 @@ case "$1" in
     update) cmd_update ;;
     uninstall) shift; cmd_uninstall "$@" ;;
     diag) shift; cmd_diag "$@" ;;
-    ensure_hostlists) shift; ensure_all_hostlists "$@" ;;
+    ensure_hostlists) shift; cmd_ensure_hostlists "$@" ;;
     *)
         echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
         exit 1

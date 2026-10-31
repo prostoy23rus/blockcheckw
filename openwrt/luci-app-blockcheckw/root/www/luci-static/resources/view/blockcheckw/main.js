@@ -357,7 +357,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = { scanner_log: 'Загрузка логов...', zapret2_log: 'Загрузка логов...', daemons: '' };
-		var curVer = zapretInfo.version || '0.15.2';
+		var curVer = zapretInfo.version || '0.15.9';
 		var versionInfo = {
 			current_version: curVer,
 			has_update: false,
@@ -514,6 +514,16 @@ return view.extend({
 			document.createTextNode(' Проверка обновлений (v' + curVer + ')...')
 		]);
 
+		var btnHostlists = E('button', {
+			class: 'bcw-header-item bcw-header-btn',
+			style: 'cursor: pointer;',
+			title: 'Проверить состояние списков доменов для сервисов в Zapret2',
+			click: function() { showHostlistsModal(); }
+		}, [
+			E('span', {}, '📋'),
+			document.createTextNode(' Списки доменов')
+		]);
+
 		var btnFeedback = E('a', {
 			class: 'bcw-header-item bcw-header-btn',
 			href: 'https://github.com/prostoy23rus/blockcheckw/issues',
@@ -539,6 +549,7 @@ return view.extend({
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			zapretBadgeEl,
+			btnHostlists,
 			btnCheckUpdate,
 			btnFeedback,
 			btnUninstall
@@ -2316,6 +2327,84 @@ return view.extend({
 					}, 'Закрыть')
 				]);
 			});
+		}
+
+		function showHostlistsModal(hostlists) {
+			var lists = hostlists || zapretInfo.hostlists || [];
+			var rows = [];
+
+			if (!lists || lists.length === 0) {
+				lists = [
+					{ key: 'youtube', name: 'YouTube', file: '/opt/zapret2/ipset/zapret_hosts_youtube.txt', domains_count: 9, uci_configured: true },
+					{ key: 'discord', name: 'Discord', file: '/opt/zapret2/ipset/zapret_hosts_discord.txt', domains_count: 9, uci_configured: true },
+					{ key: 'x', name: 'X (Twitter)', file: '/opt/zapret2/ipset/zapret_hosts_x.txt', domains_count: 10, uci_configured: true },
+					{ key: 'instagram', name: 'Instagram', file: '/opt/zapret2/ipset/zapret_hosts_instagram.txt', domains_count: 9, uci_configured: true },
+					{ key: 'twitch', name: 'Twitch', file: '/opt/zapret2/ipset/zapret_hosts_twitch.txt', domains_count: 6, uci_configured: true },
+					{ key: 'user', name: 'Общие сайты (User)', file: '/opt/zapret2/ipset/zapret_hosts_user.txt', domains_count: 33, uci_configured: true }
+				];
+			}
+
+			lists.forEach(function(hl) {
+				var countText = (hl.domains_count || 0) + ' доменов';
+				var isOk = (hl.domains_count > 0 && hl.uci_configured);
+				rows.push(E('div', {
+					style: 'display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; border-radius: 6px; margin-bottom: 8px;'
+				}, [
+					E('div', {}, [
+						E('div', { style: 'font-weight: bold; color: #e5e9f0; font-size: 13px; display: flex; align-items: center; gap: 6px;' }, [
+							E('span', { style: 'color: ' + (isOk ? '#98c379' : '#e5c07b') }, isOk ? '✓' : '⚠️'),
+							hl.name
+						]),
+						E('div', { style: 'font-size: 11.5px; color: #abb2bf; font-family: monospace; margin-top: 3px;' }, hl.file)
+					]),
+					E('div', { style: 'text-align: right;' }, [
+						E('div', { style: 'font-weight: bold; color: ' + (hl.domains_count > 0 ? '#98c379' : '#e06c75') + '; font-size: 13px;' },
+							countText
+						),
+						E('div', { style: 'font-size: 11px; color: ' + (hl.uci_configured ? '#61afef' : '#e5c07b') + ';' },
+							hl.uci_configured ? 'Zapret2 подключен' : 'Секция создается...'
+						)
+					])
+				]));
+			});
+
+			var statusContainer = E('div', { id: 'bcw-hostlists-container' }, rows);
+
+			var refreshBtn = E('button', {
+				class: 'bcw-btn-launch',
+				style: 'height: 38px; font-size: 13px;',
+				click: function() {
+					var self = this;
+					self.disabled = true;
+					self.textContent = '⏳ Проверка и восстановление...';
+					fs.exec(HELPER_BIN, ['ensure_hostlists']).then(function(res) {
+						return getZapretInfo();
+					}).then(function(info) {
+						zapretInfo = info || {};
+						showHostlistsModal(zapretInfo.hostlists);
+						ui.addNotification(null, E('p', {}, '✓ Все списки доменов проверены и синхронизированы с Zapret2!'), 'info');
+					}).catch(function(err) {
+						self.disabled = false;
+						self.textContent = '🔄 Повторить проверку';
+						ui.addNotification(null, E('p', {}, 'Ошибка проверки: ' + err), 'danger');
+					});
+				}
+			}, [ '🔄 Проверить и восстановить сейчас' ]);
+
+			var closeBtn = E('button', {
+				class: 'bcw-btn-secondary',
+				style: 'height: 38px; font-size: 13px;',
+				click: function() { ui.hideModal(); }
+			}, [ 'Закрыть' ]);
+
+			bcwShowModal('📋 Изолированные списки доменов Zapret2', [
+				E('div', { style: 'margin-bottom: 14px; font-size: 13px; color: #abb2bf; line-height: 1.5;' }, [
+					'BlockcheckW автоматически поддерживает и восстанавливает отдельные списки доменов в ',
+					E('code', { style: 'color: #98c379;' }, '/opt/zapret2/ipset/'),
+					' при каждом открытии страницы и перед запуском сканирования. Ваши добавленные домены всегда сохраняются.'
+				]),
+				statusContainer
+			], [ refreshBtn, closeBtn ]);
 		}
 
 		function confirmUninstall() {

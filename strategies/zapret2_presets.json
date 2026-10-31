@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "updated": "2026-10-30",
+  "updated": "2026-10-31",
   "presets": {
     "builtin": {
       "name": "Встроенные хосты (33)",
@@ -9,16 +9,21 @@
       "test_url": "https://rutracker.org",
       "hostlist": "list_hosts_user",
       "port": "80,443",
-      "protocols": ["http", "tls12", "tls13"],
+      "protocols": [
+        "http",
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls http",
       "description": "33 хоста, 17 провайдеров (Rutracker, Pornhub, TorProject, BBC и др.)",
       "turbo_strategies": [
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
-        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld"
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220"
       ]
     },
     "preset_youtube": {
@@ -28,14 +33,21 @@
       "test_url": "https://www.youtube.com",
       "hostlist": "list_hosts_youtube",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls",
       "description": "Видеопотоки googlevideo, превью ytimg, youtube.com",
       "turbo_strategies": [
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=2,midsld:seqovl=1",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=midsld",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2:tls_mod=rnd,dupsid,sni=www.google.com --lua-desync=multidisorder:pos=1,host+1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1"
@@ -48,7 +60,10 @@
       "test_url": "https://gateway.discord.gg",
       "hostlist": "list_hosts_discord",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls discord",
       "description": "Голосовые каналы, API-шлюз gateway, cdn.discordapp.com",
       "turbo_strategies": [
@@ -66,7 +81,10 @@
       "test_url": "https://twitch.tv",
       "hostlist": "list_hosts_user",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls",
       "description": "Стримы usher.ttvnw.net, static-cdn, twitch.tv",
       "turbo_strategies": [
@@ -84,7 +102,10 @@
       "test_url": "https://x.com",
       "hostlist": "list_hosts_user",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls",
       "description": "Медиа pbs.twimg.com, API api.x.com, x.com",
       "turbo_strategies": [
@@ -101,7 +122,10 @@
       "test_url": "https://gateway.instagram.com",
       "hostlist": "list_hosts_user",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls",
       "description": "Шлюз gateway.instagram.com, CDN static.cdninstagram.com",
       "turbo_strategies": [
@@ -118,7 +142,10 @@
       "test_url": "https://media.miele.com",
       "hostlist": "list_hosts_user",
       "port": "443",
-      "protocols": ["tls12", "tls13"],
+      "protocols": [
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls",
       "description": "110 хостов TCP 16-20 KB (Miele, Roxio, GetScope и др.)",
       "turbo_strategies": [
@@ -135,7 +162,11 @@
       "test_url": "https://rutracker.org",
       "hostlist": "list_hosts_user",
       "port": "80,443",
-      "protocols": ["http", "tls12", "tls13"],
+      "protocols": [
+        "http",
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls http",
       "description": "Пользовательские домены для проверки обхода",
       "turbo_strategies": [
@@ -151,7 +182,11 @@
       "test_url": "https://rutracker.org",
       "hostlist": "list_hosts_user",
       "port": "80,443",
-      "protocols": ["http", "tls12", "tls13"],
+      "protocols": [
+        "http",
+        "tls12",
+        "tls13"
+      ],
       "filter_l7": "tls http",
       "description": "Тестирование конкретной стратегии Zapret2",
       "turbo_strategies": []

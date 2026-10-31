@@ -64,7 +64,7 @@ struct Cli {
     workers: u16,
 
     /// How many strategies to keep loaded in one nfqws2 process at a time
-    #[arg(long, default_value_t = 1024)]
+    #[arg(long, default_value_t = 64)]
     profiles_per_instance: usize,
 
     /// Auto-confirm all prompts (non-interactive mode)
@@ -1245,8 +1245,8 @@ mod tests {
     }
 
     #[test]
-    fn profiles_per_instance_defaults_to_1024() {
+    fn profiles_per_instance_defaults_to_64() {
         let cli = Cli::try_parse_from(["blockcheckw", "scan", "-d", "example.com"]).expect("parse");
-        assert_eq!(cli.profiles_per_instance, 1024);
+        assert_eq!(cli.profiles_per_instance, 64);
     }
 }

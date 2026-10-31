@@ -239,9 +239,9 @@ function checkVersion() {
 				return JSON.parse(res.stdout);
 			} catch (e) {}
 		}
-		return { success: false, current_version: '0.15.4', has_update: false };
+		return { success: false, current_version: '0.15.5', has_update: false };
 	}).catch(function() {
-		return { success: false, current_version: '0.15.4', has_update: false };
+		return { success: false, current_version: '0.15.5', has_update: false };
 	});
 }
 
@@ -271,15 +271,14 @@ return view.extend({
 	load: function() {
 		return Promise.all([
 			checkHelperStatus(),
-			getZapretInfo(),
-			getLogs()
+			getZapretInfo()
 		]);
 	},
 
 	render: function(data) {
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
-		var logsData = data[2] || {};
+		var logsData = { scanner_log: 'Загрузка логов...', zapret2_log: 'Загрузка логов...', daemons: '' };
 		var curVer = zapretInfo.version || '0.15.2';
 		var versionInfo = {
 			current_version: curVer,
@@ -820,9 +819,9 @@ return view.extend({
 		]);
 
 		var activeStratCard = E('div', { class: 'bcw-card', style: 'border-left: 4px solid #3273dc;' }, [
-			E('div', { class: 'bcw-card-header' }, [
-				E('h3', { class: 'bcw-card-title' }, [
-					E('span', {}, '🛡️ Активная стратегия в Zapret2:'),
+			E('div', { class: 'bcw-card-header', style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px;' }, [
+				E('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
+					E('h3', { class: 'bcw-card-title', style: 'margin: 0; font-size: 15px;' }, '🛡️ Активная стратегия в Zapret2:'),
 					activeTargetTitleEl
 				]),
 				E('div', { class: 'bcw-copy-wrap', style: 'display: flex; gap: 8px; align-items: center;' }, [
@@ -2035,6 +2034,11 @@ return view.extend({
 		if (versionInfo && versionInfo.has_update) {
 			showUpdateBanner(versionInfo);
 		}
+
+		// Fetch logs immediately in background so initial page render is instant
+		setTimeout(function() {
+			refreshLogs();
+		}, 80);
 
 		// Check for updates asynchronously without blocking page render
 		setTimeout(function() {

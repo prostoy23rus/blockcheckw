@@ -158,26 +158,36 @@ get_preset_param() {
 
 prepare_turbo_corpus() {
     local preset="$1"
-    lua -e '
+    local dom="${2:-www.youtube.com}"
+    lua - "$preset" "$dom" "$PRESETS_FILE" "$TURBO_FILE" << 'EOF' 2>/dev/null
         local json = require("luci.jsonc")
-        local f = io.open("'"$PRESETS_FILE"'", "r")
+        local p = arg[1]
+        local domain = arg[2] or "www.youtube.com"
+        local presets_file = arg[3]
+        local turbo_file = arg[4]
+
+        local f = io.open(presets_file, "r")
         if not f then os.exit(1) end
         local d = json.parse(f:read("*a"))
         f:close()
-        local strats = d and d.presets and d.presets["'"$preset"'"] and d.presets["'"$preset"'"].turbo_strategies
+
+        local obj = d and d.presets and (d.presets[p] or d.presets["preset_" .. p] or d.presets[p:gsub("^preset_", "")])
+        local strats = obj and obj.turbo_strategies
         if not strats or #strats == 0 then
             strats = d and d.presets and d.presets["builtin"] and d.presets["builtin"].turbo_strategies
         end
         if strats and #strats > 0 then
-            local out = io.open("'"$TURBO_FILE"'", "w")
+            local out = io.open(turbo_file, "w")
             for _, s in ipairs(strats) do
-                out:write(s .. "\n")
+                local clean = s:gsub("^%s*nfqws2%s+", "")
+                out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, clean))
+                out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, clean))
             end
             out:close()
         else
             os.exit(1)
         end
-    ' 2>/dev/null
+EOF
 }
 
 cmd_start() {
@@ -189,130 +199,7 @@ cmd_start() {
     local workers="2"
 
     while [ "$#" -gt 0 ]; do
-        cmd_diag() {
-    local as_json=false
-    [ "$1" = "--json" ] && as_json=true
-
-    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
-local json = require("luci.jsonc")
-local status_file = arg[1]
-local log_file = arg[2]
-local version_file = arg[3]
-local scan_file = arg[4]
-local as_json = (arg[5] == "true")
-
-local function run_cmd(cmd)
-    local p = io.popen(cmd .. " 2>/dev/null", "r")
-    if not p then return "" end
-    local s = p:read("*a") or ""
-    p:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local function read_file(path)
-    local f = io.open(path, "r")
-    if not f then return "" end
-    local s = f:read("*a") or ""
-    f:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
-local uname_str = run_cmd("uname -a")
-local model_str = read_file("/tmp/sysinfo/model")
-if model_str == "" then model_str = read_file("/proc/device-tree/model") end
-if model_str == "" then model_str = "OpenWrt Device" end
-
-local os_release = read_file("/etc/openwrt_release")
-local memory_str = run_cmd("free -m")
-local loadavg_str = read_file("/proc/loadavg")
-local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
-
-local app_version = "0.15.4"
-local vf = io.open(version_file, "r")
-if vf then
-    local d = json.parse(vf:read("*a"))
-    vf:close()
-    if d and d.version then app_version = d.version end
-end
-
-local bcw_bin = run_cmd("which blockcheckw")
-local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
-local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
-local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
-
-local zapret_status = run_cmd("/etc/init.d/zapret2 status")
-local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
-local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
-local nft_tables = run_cmd("nft list tables 2>/dev/null")
-
-local status_json = read_file(status_file)
-local status_tbl = json.parse(status_json) or {}
-
-local log_tail = ""
-local lf = io.open(log_file, "r")
-if lf then
-    local lines = {}
-    for line in lf:lines() do table.insert(lines, line) end
-    lf:close()
-    local start_idx = math.max(1, #lines - 80)
-    local sub = {}
-    for i = start_idx, #lines do table.insert(sub, lines[i]) end
-    log_tail = table.concat(sub, "\n")
-end
-
-local report_lines = {
-    "============================================================",
-    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
-    "============================================================",
-    "Date:        " .. date_str,
-    "Device:      " .. model_str,
-    "Kernel/Arch: " .. uname_str,
-    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
-    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
-    "",
-    "--- OpenWrt Release Info ---",
-    os_release ~= "" and os_release or "N/A",
-    "",
-    "--- Hardware Resources ---",
-    "Load Average: " .. loadavg_str,
-    memory_str,
-    disk_str,
-    "",
-    "--- Zapret2 & Services ---",
-    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
-    "Running nfqws2 processes:",
-    nfqws_procs ~= "" and nfqws_procs or "  (none)",
-    "Active blockcheckw processes:",
-    bcw_procs ~= "" and bcw_procs or "  (none)",
-    "Nftables tables:",
-    nft_tables ~= "" and nft_tables or "  (none)",
-    "",
-    "--- Scanner State ---",
-    "Status:     " .. tostring(status_tbl.status or "unknown"),
-    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
-    "Phase:      " .. tostring(status_tbl.phase or "none"),
-    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
-    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
-    "",
-    "--- Recent Run Log (Last 80 lines) ---",
-    log_tail ~= "" and log_tail or "(log is empty)",
-    "============================================================",
-    "  END OF DIAGNOSTIC REPORT",
-    "============================================================"
-}
-
-local report_text = table.concat(report_lines, "\n")
-
-if as_json then
-    print(json.stringify({ success = true, report = report_text }))
-else
-    print(report_text)
-end
-EOF
-}
-
-case "$1" in
+        case "$1" in
             --target) target="$2"; shift 2 ;;
             --domain) domain="$2"; shift 2 ;;
             --mode) mode="$2"; shift 2 ;;
@@ -396,6 +283,22 @@ case "$1" in
     (
         cleanup_subshell() {
             rm -f "$PID_FILE"
+            # Remove scanner priority bypass rule from fw4 output chain
+            local handle=$(nft -a list chain inet fw4 output 2>/dev/null | grep '0x30000000' | awk '{print $NF}')
+            [ -n "$handle" ] && nft delete rule inet fw4 output handle "$handle" 2>/dev/null || true
+
+            # Restore suspended proxy services
+            [ "$zeroblock_stopped" = "1" ] && {
+                echo "[blockcheckw-helper] Restoring ZeroBlock..." >> "$LOG_FILE"
+                /etc/init.d/zeroblock start >/dev/null 2>&1
+            }
+            [ "$singbox_stopped" = "1" ] && /etc/init.d/sing-box start >/dev/null 2>&1
+            [ "$mihomo_stopped" = "1" ] && /etc/init.d/mihomo start >/dev/null 2>&1
+            [ "$xray_stopped" = "1" ] && /etc/init.d/xray start >/dev/null 2>&1
+            [ "$openclash_stopped" = "1" ] && /etc/init.d/openclash start >/dev/null 2>&1
+            [ "$passwall_stopped" = "1" ] && /etc/init.d/passwall start >/dev/null 2>&1
+
+            # Restore zapret2 if not running
             if ! /etc/init.d/zapret2 status 2>/dev/null | grep -q running; then
                 /etc/init.d/zapret2 restart >/dev/null 2>&1
             fi
@@ -403,15 +306,72 @@ case "$1" in
         trap cleanup_subshell EXIT INT TERM
 
         local timeout_sec=120
-        [ "$mode" != "turbo" ] && timeout_sec=300
+        [ "$mode" != "turbo" ] && timeout_sec=1800
 
         local scan_args="-d $domain -p $protocols --dns auto --timeout $timeout_sec --auto"
         if [ "$mode" = "turbo" ]; then
-            prepare_turbo_corpus "$target"
+            prepare_turbo_corpus "$target" "$domain"
             if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
                 scan_args="$scan_args --from-file $TURBO_FILE"
             fi
         fi
+
+        # Kill any zombie/orphan nfqws2 holding queue 200 from previous runs
+        local stray_pids=$(ps -w | grep -E 'nfqws2.*--qnum=200' | grep -v grep | awk '{print $1}')
+        if [ -n "$stray_pids" ]; then
+            echo "[blockcheckw-helper] Cleaning stray nfqws2 holding queue 200 ($stray_pids)..." >> "$LOG_FILE"
+            kill -9 $stray_pids 2>/dev/null || true
+            sleep 0.5
+        fi
+
+        # Suspend competing transparent proxies to ensure scanner has 100% direct WAN priority
+        local zeroblock_stopped=0
+        if /etc/init.d/zeroblock status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] ZeroBlock is running. Temporarily suspending for full scanner priority..." >> "$LOG_FILE"
+            /etc/init.d/zeroblock stop >/dev/null 2>&1
+            zeroblock_stopped=1
+        fi
+
+        local singbox_stopped=0
+        if /etc/init.d/sing-box status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] sing-box is running. Temporarily suspending..." >> "$LOG_FILE"
+            /etc/init.d/sing-box stop >/dev/null 2>&1
+            singbox_stopped=1
+        fi
+
+        local mihomo_stopped=0
+        if /etc/init.d/mihomo status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] mihomo is running. Temporarily suspending..." >> "$LOG_FILE"
+            /etc/init.d/mihomo stop >/dev/null 2>&1
+            mihomo_stopped=1
+        fi
+
+        local xray_stopped=0
+        if /etc/init.d/xray status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] xray is running. Temporarily suspending..." >> "$LOG_FILE"
+            /etc/init.d/xray stop >/dev/null 2>&1
+            xray_stopped=1
+        fi
+
+        local openclash_stopped=0
+        if /etc/init.d/openclash status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] openclash is running. Temporarily suspending..." >> "$LOG_FILE"
+            /etc/init.d/openclash stop >/dev/null 2>&1
+            openclash_stopped=1
+        fi
+
+        local passwall_stopped=0
+        if /etc/init.d/passwall status 2>/dev/null | grep -qiE 'running|active'; then
+            echo "[blockcheckw-helper] passwall is running. Temporarily suspending..." >> "$LOG_FILE"
+            /etc/init.d/passwall stop >/dev/null 2>&1
+            passwall_stopped=1
+        fi
+
+        # Flush DNS cache in case Fake-IP pool (198.18.x.x) was cached by dnsmasq
+        killall -HUP dnsmasq 2>/dev/null || true
+
+        # Add top priority rule in fw4 output to bypass any residual transparent proxy / redirect rules
+        nft insert rule inet fw4 output priority -250 meta mark and 0x30000000 != 0 accept 2>/dev/null || true
 
         echo "[blockcheckw-helper] Starting scan for $domain (target=$target, mode=$mode, workers=$workers, timeout=${timeout_sec}s, auto_apply=$auto_apply)..." >> "$LOG_FILE"
         write_status "running" 15 "Подготовка к сканированию ($domain)..."
@@ -422,7 +382,7 @@ case "$1" in
             exit 1
         fi
 
-        /usr/bin/blockcheckw -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1 &
+        /usr/bin/blockcheckw --profiles-per-instance 64 -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1 &
         local bcw_child=$!
         echo "$bcw_child" > "$PID_FILE"
 
@@ -720,130 +680,7 @@ cmd_apply() {
     local script_file=""
 
     while [ "$#" -gt 0 ]; do
-        cmd_diag() {
-    local as_json=false
-    [ "$1" = "--json" ] && as_json=true
-
-    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
-local json = require("luci.jsonc")
-local status_file = arg[1]
-local log_file = arg[2]
-local version_file = arg[3]
-local scan_file = arg[4]
-local as_json = (arg[5] == "true")
-
-local function run_cmd(cmd)
-    local p = io.popen(cmd .. " 2>/dev/null", "r")
-    if not p then return "" end
-    local s = p:read("*a") or ""
-    p:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local function read_file(path)
-    local f = io.open(path, "r")
-    if not f then return "" end
-    local s = f:read("*a") or ""
-    f:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
-local uname_str = run_cmd("uname -a")
-local model_str = read_file("/tmp/sysinfo/model")
-if model_str == "" then model_str = read_file("/proc/device-tree/model") end
-if model_str == "" then model_str = "OpenWrt Device" end
-
-local os_release = read_file("/etc/openwrt_release")
-local memory_str = run_cmd("free -m")
-local loadavg_str = read_file("/proc/loadavg")
-local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
-
-local app_version = "0.15.4"
-local vf = io.open(version_file, "r")
-if vf then
-    local d = json.parse(vf:read("*a"))
-    vf:close()
-    if d and d.version then app_version = d.version end
-end
-
-local bcw_bin = run_cmd("which blockcheckw")
-local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
-local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
-local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
-
-local zapret_status = run_cmd("/etc/init.d/zapret2 status")
-local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
-local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
-local nft_tables = run_cmd("nft list tables 2>/dev/null")
-
-local status_json = read_file(status_file)
-local status_tbl = json.parse(status_json) or {}
-
-local log_tail = ""
-local lf = io.open(log_file, "r")
-if lf then
-    local lines = {}
-    for line in lf:lines() do table.insert(lines, line) end
-    lf:close()
-    local start_idx = math.max(1, #lines - 80)
-    local sub = {}
-    for i = start_idx, #lines do table.insert(sub, lines[i]) end
-    log_tail = table.concat(sub, "\n")
-end
-
-local report_lines = {
-    "============================================================",
-    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
-    "============================================================",
-    "Date:        " .. date_str,
-    "Device:      " .. model_str,
-    "Kernel/Arch: " .. uname_str,
-    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
-    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
-    "",
-    "--- OpenWrt Release Info ---",
-    os_release ~= "" and os_release or "N/A",
-    "",
-    "--- Hardware Resources ---",
-    "Load Average: " .. loadavg_str,
-    memory_str,
-    disk_str,
-    "",
-    "--- Zapret2 & Services ---",
-    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
-    "Running nfqws2 processes:",
-    nfqws_procs ~= "" and nfqws_procs or "  (none)",
-    "Active blockcheckw processes:",
-    bcw_procs ~= "" and bcw_procs or "  (none)",
-    "Nftables tables:",
-    nft_tables ~= "" and nft_tables or "  (none)",
-    "",
-    "--- Scanner State ---",
-    "Status:     " .. tostring(status_tbl.status or "unknown"),
-    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
-    "Phase:      " .. tostring(status_tbl.phase or "none"),
-    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
-    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
-    "",
-    "--- Recent Run Log (Last 80 lines) ---",
-    log_tail ~= "" and log_tail or "(log is empty)",
-    "============================================================",
-    "  END OF DIAGNOSTIC REPORT",
-    "============================================================"
-}
-
-local report_text = table.concat(report_lines, "\n")
-
-if as_json then
-    print(json.stringify({ success = true, report = report_text }))
-else
-    print(report_text)
-end
-EOF
-}
-
-case "$1" in
+        case "$1" in
             --target) target="$2"; shift 2 ;;
             --script) script_text="$2"; shift 2 ;;
             --file) script_file="$2"; shift 2 ;;
@@ -1007,130 +844,7 @@ cmd_activate() {
     local section=""
 
     while [ "$#" -gt 0 ]; do
-        cmd_diag() {
-    local as_json=false
-    [ "$1" = "--json" ] && as_json=true
-
-    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
-local json = require("luci.jsonc")
-local status_file = arg[1]
-local log_file = arg[2]
-local version_file = arg[3]
-local scan_file = arg[4]
-local as_json = (arg[5] == "true")
-
-local function run_cmd(cmd)
-    local p = io.popen(cmd .. " 2>/dev/null", "r")
-    if not p then return "" end
-    local s = p:read("*a") or ""
-    p:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local function read_file(path)
-    local f = io.open(path, "r")
-    if not f then return "" end
-    local s = f:read("*a") or ""
-    f:close()
-    return s:gsub("^%s+", ""):gsub("%s+$", "")
-end
-
-local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
-local uname_str = run_cmd("uname -a")
-local model_str = read_file("/tmp/sysinfo/model")
-if model_str == "" then model_str = read_file("/proc/device-tree/model") end
-if model_str == "" then model_str = "OpenWrt Device" end
-
-local os_release = read_file("/etc/openwrt_release")
-local memory_str = run_cmd("free -m")
-local loadavg_str = read_file("/proc/loadavg")
-local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
-
-local app_version = "0.15.4"
-local vf = io.open(version_file, "r")
-if vf then
-    local d = json.parse(vf:read("*a"))
-    vf:close()
-    if d and d.version then app_version = d.version end
-end
-
-local bcw_bin = run_cmd("which blockcheckw")
-local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
-local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
-local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
-
-local zapret_status = run_cmd("/etc/init.d/zapret2 status")
-local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
-local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
-local nft_tables = run_cmd("nft list tables 2>/dev/null")
-
-local status_json = read_file(status_file)
-local status_tbl = json.parse(status_json) or {}
-
-local log_tail = ""
-local lf = io.open(log_file, "r")
-if lf then
-    local lines = {}
-    for line in lf:lines() do table.insert(lines, line) end
-    lf:close()
-    local start_idx = math.max(1, #lines - 80)
-    local sub = {}
-    for i = start_idx, #lines do table.insert(sub, lines[i]) end
-    log_tail = table.concat(sub, "\n")
-end
-
-local report_lines = {
-    "============================================================",
-    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
-    "============================================================",
-    "Date:        " .. date_str,
-    "Device:      " .. model_str,
-    "Kernel/Arch: " .. uname_str,
-    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
-    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
-    "",
-    "--- OpenWrt Release Info ---",
-    os_release ~= "" and os_release or "N/A",
-    "",
-    "--- Hardware Resources ---",
-    "Load Average: " .. loadavg_str,
-    memory_str,
-    disk_str,
-    "",
-    "--- Zapret2 & Services ---",
-    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
-    "Running nfqws2 processes:",
-    nfqws_procs ~= "" and nfqws_procs or "  (none)",
-    "Active blockcheckw processes:",
-    bcw_procs ~= "" and bcw_procs or "  (none)",
-    "Nftables tables:",
-    nft_tables ~= "" and nft_tables or "  (none)",
-    "",
-    "--- Scanner State ---",
-    "Status:     " .. tostring(status_tbl.status or "unknown"),
-    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
-    "Phase:      " .. tostring(status_tbl.phase or "none"),
-    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
-    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
-    "",
-    "--- Recent Run Log (Last 80 lines) ---",
-    log_tail ~= "" and log_tail or "(log is empty)",
-    "============================================================",
-    "  END OF DIAGNOSTIC REPORT",
-    "============================================================"
-}
-
-local report_text = table.concat(report_lines, "\n")
-
-if as_json then
-    print(json.stringify({ success = true, report = report_text }))
-else
-    print(report_text)
-end
-EOF
-}
-
-case "$1" in
+        case "$1" in
             --target) target="$2"; shift 2 ;;
             --section) section="$2"; shift 2 ;;
             *) shift ;;
@@ -1229,7 +943,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.4" end
+        if not res.version then res.version = "0.15.5" end
 
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
@@ -1358,9 +1072,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.4"
+    local cur_ver="0.15.5"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.4"); else print("0.15.4"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.5"); else print("0.15.5"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1369,7 +1083,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.4"
+local cur_ver = arg[1] or "0.15.5"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1591,7 +1305,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.4"
+local app_version = "0.15.5"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))
@@ -1604,7 +1318,8 @@ local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
 local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
 local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
 
-local zapret_status = run_cmd("/etc/init.d/zapret2 status")
+local zapret_status = run_cmd("/etc/init.d/zapret2 status 2>/dev/null")
+local zeroblock_status = run_cmd("/etc/init.d/zeroblock status 2>/dev/null")
 local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
 local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
 local nft_tables = run_cmd("nft list tables 2>/dev/null")
@@ -1643,7 +1358,8 @@ local report_lines = {
     disk_str,
     "",
     "--- Zapret2 & Services ---",
-    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "Zapret2 status:   " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "ZeroBlock status: " .. (zeroblock_status ~= "" and zeroblock_status or "not installed / stopped"),
     "Running nfqws2 processes:",
     nfqws_procs ~= "" and nfqws_procs or "  (none)",
     "Active blockcheckw processes:",

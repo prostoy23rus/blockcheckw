@@ -33,10 +33,10 @@ local function clean_strategy(line)
     if not line:find("lua%-desync") and not line:find("multisplit") and not line:find("multidisorder") and not line:find("fake") then
         return nil
     end
-    -- strip headers if attached
-    line = line:gsub("^%-%-payload=[^%s]+%s*", "")
-    line = line:gsub("^%-%-out%-range=[^%s]+%s*", "")
-    line = line:gsub("^%-%-in%-range=[^%s]+%s*", "")
+    -- strip headers if attached anywhere in line
+    line = line:gsub("%-%-payload=[^%s]+%s*", "")
+    line = line:gsub("%-%-out%-range=[^%s]+%s*", "")
+    line = line:gsub("%-%-in%-range=[^%s]+%s*", "")
     line = line:gsub("^%s*(.-)%s*$", "%1")
     if line == "" then return nil end
     return line

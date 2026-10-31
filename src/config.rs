@@ -119,7 +119,7 @@ impl Default for CoreConfig {
     fn default() -> Self {
         Self {
             worker_count: 8,
-            profiles_per_instance: 1024,
+            profiles_per_instance: 64,
             base_qnum: qnum(),
             nft_table: nft_table(),
             nfqws2_path: nfqws2_path("/opt/zapret2"),
@@ -202,7 +202,7 @@ mod parallelism_tests {
     fn defaults_are_consistent() {
         let c = super::CoreConfig::default();
         assert!(validate_parallelism(c.worker_count, c.profiles_per_instance).is_ok());
-        assert_eq!(c.profiles_per_instance, 1024);
+        assert_eq!(c.profiles_per_instance, 64);
     }
 }
 

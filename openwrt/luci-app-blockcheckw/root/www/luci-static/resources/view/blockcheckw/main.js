@@ -239,9 +239,9 @@ function checkVersion() {
 				return JSON.parse(res.stdout);
 			} catch (e) {}
 		}
-		return { success: false, current_version: '0.15.1', has_update: false };
+		return { success: false, current_version: '0.15.4', has_update: false };
 	}).catch(function() {
-		return { success: false, current_version: '0.15.1', has_update: false };
+		return { success: false, current_version: '0.15.4', has_update: false };
 	});
 }
 
@@ -866,9 +866,19 @@ return view.extend({
 			])
 		]);
 
+		var progressTimerEl = E('span', { style: 'font-size: 13px; color: #61afef; margin-left: 10px; font-weight: normal;' }, '');
+		var btnCopyDiagOnError = E('button', {
+			class: 'cbi-button cbi-button-action bcw-btn-diag-copy',
+			style: 'display: none; margin-top: 14px; height: 38px; padding: 0 16px; font-size: 13px; font-weight: bold; background: #3273dc; color: #fff; border-color: #3273dc; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border-radius: 6px;',
+			click: function() { copyDiagnosticReport(); }
+		}, '📋 Скопировать диагностический отчёт для Telegram');
+
 		var monitorCard = E('div', { class: 'bcw-card', style: 'display: none; border-left: 4px solid #00d1b2;' }, [
-			E('div', { class: 'bcw-card-header' }, [
-				progressPhaseEl
+			E('div', { class: 'bcw-card-header', style: 'display: flex; align-items: center; justify-content: space-between;' }, [
+				E('div', { style: 'display: flex; align-items: center; flex-wrap: wrap; gap: 6px;' }, [
+					progressPhaseEl,
+					progressTimerEl
+				])
 			]),
 			E('div', { style: 'background: #181a1f; border-radius: 8px; height: 20px; width: 100%; overflow: hidden; margin: 10px 0; border: 1px solid #383e4a;' }, [
 				progressBarEl
@@ -877,7 +887,8 @@ return view.extend({
 				progressTextEl,
 				progressPercentEl
 			]),
-			lineParamsBoxEl
+			lineParamsBoxEl,
+			btnCopyDiagOnError
 		]);
 		mainLayout.appendChild(monitorCard);
 
@@ -961,13 +972,100 @@ return view.extend({
 						class: 'bcw-btn-sm cbi-button cbi-button-reset',
 						style: 'height: 32px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;',
 						click: function() { consoleLogEl.textContent = ''; }
-					}, '🗑 Очистить')
+					}, '🗑 Очистить'),
+					E('button', {
+						class: 'bcw-btn-sm cbi-button cbi-button-action bcw-btn-diag-copy-header',
+						style: 'height: 32px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: #3273dc; color: #fff; border-color: #3273dc; font-weight: 600;',
+						click: function() { copyDiagnosticReport(); }
+					}, '📋 Скопировать отчёт для Telegram')
 				])
 			]),
 			logTabsBar,
 			E('div', { style: 'margin-top: 10px;' }, [ consoleLogEl ])
 		]);
 		mainLayout.appendChild(logCard);
+
+		// Diagnostic and Duration Helpers
+		var scanStartTime = null;
+		var scanTimerInterval = null;
+		var lastProgressChangeTime = Date.now();
+		var lastPercentVal = -1;
+
+		function formatDuration(ms) {
+			if (!ms || ms < 0) return '00:00';
+			var totalSec = Math.floor(ms / 1000);
+			var min = Math.floor(totalSec / 60);
+			var sec = totalSec % 60;
+			return (min < 10 ? '0' + min : min) + ':' + (sec < 10 ? '0' + sec : sec);
+		}
+
+		function showDiagnosticModal(reportText) {
+			var ta = E('textarea', {
+				style: 'width: 100%; height: 320px; font-family: monospace; font-size: 11px; background: #14161a; color: #abb2bf; border: 1px solid #383e4a; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: vertical;',
+				readonly: 'readonly'
+			}, reportText);
+
+			ui.showModal('📋 Диагностический отчёт для Telegram', [
+				E('p', { style: 'font-size: 13px; margin-bottom: 8px; color: #e5e9f0;' }, 'Выделите текст ниже и скопируйте его, чтобы отправить разработчику в Telegram:'),
+				ta,
+				E('div', { class: 'right', style: 'margin-top: 12px; display: flex; gap: 8px; justify-content: flex-end;' }, [
+					E('button', {
+						class: 'cbi-button cbi-button-action',
+						style: 'background: #00d1b2; color: #000; font-weight: bold;',
+						click: function() {
+							ta.focus();
+							ta.select();
+							try {
+								document.execCommand('copy');
+								ui.addNotification(null, E('p', {}, '✓ Скопировано в буфер обмена!'), 'info');
+							} catch(e) {}
+						}
+					}, 'Выделить и скопировать'),
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						click: function() { ui.hideModal(); }
+					}, 'Закрыть')
+				])
+			]);
+			setTimeout(function() { ta.focus(); ta.select(); }, 100);
+		}
+
+		function copyDiagnosticReport() {
+			var btns = document.querySelectorAll('.bcw-btn-diag-copy, .bcw-btn-diag-copy-header');
+			btns.forEach(function(b) { b.textContent = '⏳ Сбор данных...'; });
+
+			fs.exec(HELPER_BIN, ['diag', '--json']).then(function(res) {
+				var reportText = '';
+				if (res && res.stdout) {
+					try {
+						var d = JSON.parse(res.stdout);
+						reportText = d.report || res.stdout;
+					} catch(e) {
+						reportText = res.stdout;
+					}
+				}
+				if (!reportText || reportText.trim() === '') reportText = 'Ошибка получения диагностического отчета.';
+
+				if (navigator.clipboard && navigator.clipboard.writeText) {
+					navigator.clipboard.writeText(reportText).then(function() {
+						ui.addNotification(null, E('p', {}, '✓ Диагностический отчёт скопирован в буфер обмена! Отправьте его разработчику в Telegram.'), 'info');
+						btns.forEach(function(b) { b.textContent = '✓ Скопировано!'; });
+						setTimeout(function() {
+							btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+						}, 3000);
+					}).catch(function() {
+						showDiagnosticModal(reportText);
+						btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+					});
+				} else {
+					showDiagnosticModal(reportText);
+					btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+				}
+			}).catch(function(err) {
+				ui.addNotification(null, E('p', {}, 'Ошибка сбора диагностического отчёта: ' + err), 'danger');
+				btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+			});
+		}
 
 		// Business Logic Functions
 
@@ -1335,7 +1433,6 @@ return view.extend({
 					ui.addNotification(null, E('p', {}, 'Пожалуйста, укажите домен для проверки!'), 'danger');
 					return;
 				}
-				// Clean domain in case user typed https:// or trailing slash
 				domain = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
 			}
 
@@ -1344,8 +1441,16 @@ return view.extend({
 			monitorCard.style.display = 'block';
 			circularCard.style.display = 'none';
 			resultsCard.style.display = 'none';
+			btnCopyDiagOnError.style.display = 'none';
 			ispValEl.textContent = 'Определение...';
 			blockTypeValEl.textContent = 'Определение...';
+
+			progressBarEl.style.background = 'linear-gradient(90deg, #3273dc, #00d1b2)';
+			progressPhaseEl.textContent = 'Запуск подбора...';
+			progressPhaseEl.style.color = '#00d1b2';
+			progressBarEl.style.width = '10%';
+			progressPercentEl.textContent = '10%';
+			progressTextEl.textContent = 'Инициализация подбора стратегий...';
 
 			var helperArgs = [
 				'start',
@@ -1360,7 +1465,29 @@ return view.extend({
 			}
 
 			isRunning = true;
-			fs.exec(HELPER_BIN, helperArgs).then(function() {
+			scanStartTime = Date.now();
+			lastProgressChangeTime = Date.now();
+			lastPercentVal = 10;
+			progressTimerEl.textContent = '⏱ 00:00';
+
+			if (scanTimerInterval) clearInterval(scanTimerInterval);
+			scanTimerInterval = setInterval(function() {
+				if (isRunning && scanStartTime) {
+					progressTimerEl.textContent = '⏱ ' + formatDuration(Date.now() - scanStartTime);
+				}
+			}, 1000);
+
+			fs.exec(HELPER_BIN, helperArgs).then(function(res) {
+				if (res && res.stdout) {
+					try {
+						var parsed = JSON.parse(res.stdout);
+						if (parsed.error) {
+							ui.addNotification(null, E('p', {}, 'Ошибка запуска: ' + parsed.error), 'danger');
+							resetScanUI();
+							return;
+						}
+					} catch(e) {}
+				}
 				startPolling();
 			}).catch(function(err) {
 				ui.addNotification(null, E('p', {}, 'Ошибка запуска сканера: ' + err), 'danger');
@@ -1381,6 +1508,10 @@ return view.extend({
 			if (pollInterval) {
 				clearInterval(pollInterval);
 				pollInterval = null;
+			}
+			if (scanTimerInterval) {
+				clearInterval(scanTimerInterval);
+				scanTimerInterval = null;
 			}
 			btnStartScan.style.display = 'inline-flex';
 			btnStopScan.style.display = 'none';
@@ -1414,16 +1545,34 @@ return view.extend({
 		}
 
 		function updateProgressUI(st) {
-			progressBarEl.style.width = (st.percent || 0) + '%';
-			progressPercentEl.textContent = (st.percent || 0) + '%';
+			var pct = st.percent || 0;
+			progressBarEl.style.width = pct + '%';
+			progressPercentEl.textContent = pct + '%';
 			progressTextEl.textContent = st.phase || '';
+
+			if (pct !== lastPercentVal) {
+				lastPercentVal = pct;
+				lastProgressChangeTime = Date.now();
+			}
+
 			if (st.status === 'done') {
 				progressPhaseEl.textContent = 'Сканирование завершено';
 				progressPhaseEl.style.color = '#00d1b2';
+				progressBarEl.style.background = '#00d1b2';
+				btnCopyDiagOnError.style.display = 'none';
 			} else if (st.status === 'error') {
 				progressPhaseEl.textContent = 'Ошибка сканирования';
 				progressPhaseEl.style.color = '#ff3860';
 				progressBarEl.style.background = '#ff3860';
+				btnCopyDiagOnError.style.display = 'inline-flex';
+			} else if (st.status === 'running') {
+				progressBarEl.style.background = 'linear-gradient(90deg, #3273dc, #00d1b2)';
+				// Stall protection: show diagnostic button if no progress for > 180s
+				if (Date.now() - lastProgressChangeTime > 180000) {
+					btnCopyDiagOnError.style.display = 'inline-flex';
+				} else {
+					btnCopyDiagOnError.style.display = 'none';
+				}
 			}
 
 			if (st.isp && st.isp.trim() !== '') {

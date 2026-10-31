@@ -15,63 +15,122 @@ CIRCULAR_BUILDER="/usr/bin/circular-builder.lua"
 VERSION_FILE="/usr/share/blockcheckw/version.json"
 REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main"
 
+is_scanner_running() {
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE" 2>/dev/null | tr -d '[:space:]')
+        if [ -n "$pid" ] && [ -d "/proc/$pid" ]; then
+            local cmd=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\000' ' ')
+            case "$cmd" in
+                *blockcheckw*) return 0 ;;
+                *) rm -f "$PID_FILE"; return 1 ;;
+            esac
+        else
+            rm -f "$PID_FILE"
+            return 1
+        fi
+    fi
+    return 1
+}
+
 ensure_json() {
-    [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Ожидание запуска","strategies":[],"log":""}' > "$STATUS_FILE"
+    [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Готов к работе","strategies":[],"log":""}' > "$STATUS_FILE"
 }
 
 write_status() {
     local status="$1"
     local percent="$2"
     local phase="$3"
-    local extra="$4"
-    
-    local log_tail=""
-    if [ -f "$LOG_FILE" ]; then
-        log_tail=$(tail -n 40 "$LOG_FILE" | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
-    fi
+    local extra_raw="$4"
 
-    local circular_esc=""
-    if [ -f "$OUTPUT_CIRCULAR" ]; then
-        circular_esc=$(sed 's/"/\\"/g' "$OUTPUT_CIRCULAR" | awk '{printf "%s\\n", $0}')
-    fi
+    lua - "$STATUS_FILE" "$LOG_FILE" "$OUTPUT_CIRCULAR" "$OUTPUT_SCAN" "$status" "$percent" "$phase" "$extra_raw" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local circular_file = arg[3]
+local scan_file = arg[4]
+local status = arg[5] or "idle"
+local percent = tonumber(arg[6]) or 0
+local phase = arg[7] or ""
+local extra_raw = arg[8] or ""
 
-    local isp=""
-    local block_type=""
-    if [ -f "$LOG_FILE" ]; then
-        isp=$(grep -i "ISP:" "$LOG_FILE" 2>/dev/null | head -n 1 | sed 's/.*ISP:[[:space:]]*//' | sed 's/"/\\"/g' | tr -d '\r\n')
-    fi
-    if [ -f "$OUTPUT_SCAN" ]; then
-        block_type=$(lua -e '
-            local json = require("luci.jsonc")
-            local f = io.open("'"$OUTPUT_SCAN"'", "r")
-            if f then
-                local d = json.parse(f:read("*a"))
-                f:close()
-                if d and d.block_type then print(d.block_type) end
-            end
-        ' 2>/dev/null | tr -d '\r\n')
-    fi
-    if [ -z "$block_type" ] && [ -f "$LOG_FILE" ]; then
-        if grep -qi "SNI blocked" "$LOG_FILE"; then
-            block_type="sni_blocked"
-        elif grep -qi "IP blocked" "$LOG_FILE"; then
-            block_type="ip_blocked"
-        elif grep -qi "BLOCKED" "$LOG_FILE"; then
-            block_type="sni_blocked"
-        fi
-    fi
+local log_tail = ""
+local lf = io.open(log_file, "r")
+if lf then
+    local lines = {}
+    for line in lf:lines() do
+        table.insert(lines, line)
+    end
+    lf:close()
+    local start_idx = math.max(1, #lines - 45)
+    local tail_lines = {}
+    for i = start_idx, #lines do
+        table.insert(tail_lines, lines[i])
+    end
+    log_tail = table.concat(tail_lines, "\n")
+end
 
-    cat <<EOF > "$STATUS_FILE"
-{
-  "status": "$status",
-  "percent": $percent,
-  "phase": "$phase",
-  "log": "$log_tail",
-  "circular": "$circular_esc",
-  "isp": "$isp",
-  "block_type": "$block_type"
-  $extra
+local circular = ""
+local cf = io.open(circular_file, "r")
+if cf then
+    circular = cf:read("*a") or ""
+    cf:close()
+end
+
+local isp = ""
+local block_type = ""
+
+if log_tail ~= "" then
+    for line in log_tail:gmatch("[^\r\n]+") do
+        local m = line:match("ISP:%s*(.+)")
+        if m then
+            isp = m:gsub("^%s+", ""):gsub("%s+$", "")
+            break
+        end
+    end
+end
+
+local scf = io.open(scan_file, "r")
+if scf then
+    local sc = json.parse(scf:read("*a"))
+    scf:close()
+    if sc and sc.block_type then
+        block_type = sc.block_type
+    end
+end
+if block_type == "" and log_tail ~= "" then
+    if log_tail:find("SNI blocked") or log_tail:find("BLOCKED") then
+        block_type = "sni_blocked"
+    elseif log_tail:find("IP blocked") then
+        block_type = "ip_blocked"
+    end
+end
+
+local obj = {
+    status = status,
+    percent = percent,
+    phase = phase,
+    log = log_tail,
+    circular = circular,
+    isp = isp,
+    block_type = block_type
 }
+
+if extra_raw and extra_raw:match("^%s*,") then
+    local extra_parsed = json.parse("{" .. extra_raw:gsub("^%s*,", "") .. "}")
+    if extra_parsed then
+        for k, v in pairs(extra_parsed) do
+            obj[k] = v
+        end
+    end
+end
+
+local tmp_file = status_file .. ".tmp"
+local out = io.open(tmp_file, "w")
+if out then
+    out:write(json.stringify(obj))
+    out:close()
+    os.rename(tmp_file, status_file)
+end
 EOF
 }
 
@@ -130,7 +189,130 @@ cmd_start() {
     local workers="2"
 
     while [ "$#" -gt 0 ]; do
-        case "$1" in
+        cmd_diag() {
+    local as_json=false
+    [ "$1" = "--json" ] && as_json=true
+
+    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local version_file = arg[3]
+local scan_file = arg[4]
+local as_json = (arg[5] == "true")
+
+local function run_cmd(cmd)
+    local p = io.popen(cmd .. " 2>/dev/null", "r")
+    if not p then return "" end
+    local s = p:read("*a") or ""
+    p:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return "" end
+    local s = f:read("*a") or ""
+    f:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
+local uname_str = run_cmd("uname -a")
+local model_str = read_file("/tmp/sysinfo/model")
+if model_str == "" then model_str = read_file("/proc/device-tree/model") end
+if model_str == "" then model_str = "OpenWrt Device" end
+
+local os_release = read_file("/etc/openwrt_release")
+local memory_str = run_cmd("free -m")
+local loadavg_str = read_file("/proc/loadavg")
+local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
+
+local app_version = "0.15.4"
+local vf = io.open(version_file, "r")
+if vf then
+    local d = json.parse(vf:read("*a"))
+    vf:close()
+    if d and d.version then app_version = d.version end
+end
+
+local bcw_bin = run_cmd("which blockcheckw")
+local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
+local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
+local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
+
+local zapret_status = run_cmd("/etc/init.d/zapret2 status")
+local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
+local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
+local nft_tables = run_cmd("nft list tables 2>/dev/null")
+
+local status_json = read_file(status_file)
+local status_tbl = json.parse(status_json) or {}
+
+local log_tail = ""
+local lf = io.open(log_file, "r")
+if lf then
+    local lines = {}
+    for line in lf:lines() do table.insert(lines, line) end
+    lf:close()
+    local start_idx = math.max(1, #lines - 80)
+    local sub = {}
+    for i = start_idx, #lines do table.insert(sub, lines[i]) end
+    log_tail = table.concat(sub, "\n")
+end
+
+local report_lines = {
+    "============================================================",
+    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
+    "============================================================",
+    "Date:        " .. date_str,
+    "Device:      " .. model_str,
+    "Kernel/Arch: " .. uname_str,
+    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
+    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
+    "",
+    "--- OpenWrt Release Info ---",
+    os_release ~= "" and os_release or "N/A",
+    "",
+    "--- Hardware Resources ---",
+    "Load Average: " .. loadavg_str,
+    memory_str,
+    disk_str,
+    "",
+    "--- Zapret2 & Services ---",
+    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "Running nfqws2 processes:",
+    nfqws_procs ~= "" and nfqws_procs or "  (none)",
+    "Active blockcheckw processes:",
+    bcw_procs ~= "" and bcw_procs or "  (none)",
+    "Nftables tables:",
+    nft_tables ~= "" and nft_tables or "  (none)",
+    "",
+    "--- Scanner State ---",
+    "Status:     " .. tostring(status_tbl.status or "unknown"),
+    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
+    "Phase:      " .. tostring(status_tbl.phase or "none"),
+    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
+    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
+    "",
+    "--- Recent Run Log (Last 80 lines) ---",
+    log_tail ~= "" and log_tail or "(log is empty)",
+    "============================================================",
+    "  END OF DIAGNOSTIC REPORT",
+    "============================================================"
+}
+
+local report_text = table.concat(report_lines, "\n")
+
+if as_json then
+    print(json.stringify({ success = true, report = report_text }))
+else
+    print(report_text)
+end
+EOF
+}
+
+case "$1" in
             --target) target="$2"; shift 2 ;;
             --domain) domain="$2"; shift 2 ;;
             --mode) mode="$2"; shift 2 ;;
@@ -141,13 +323,16 @@ cmd_start() {
         esac
     done
 
-    # Check if already running
-    if [ -f "$PID_FILE" ]; then
-        local old_pid=$(cat "$PID_FILE" 2>/dev/null)
-        if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
-            echo '{"error":"Scanner is already running","pid":'"$old_pid"'}'
-            return 1
-        fi
+    # Clean domain if user entered multiple or dirty string
+    if [ -n "$domain" ]; then
+        domain=$(echo "$domain" | tr ',' ' ' | awk '{print $1}')
+    fi
+
+    # Check if already running with real process verification
+    if is_scanner_running; then
+        local cur_pid=$(cat "$PID_FILE" 2>/dev/null | tr -d '[:space:]')
+        echo "{\"error\":\"Сканер уже запущен (PID $cur_pid)\",\"pid\":$cur_pid}"
+        return 1
     fi
 
     # Resolve target and domain
@@ -209,7 +394,18 @@ cmd_start() {
 
     # Run in background via child process detached from rpcd pipes
     (
-        local scan_args="-d $domain -p $protocols --dns doh --auto"
+        cleanup_subshell() {
+            rm -f "$PID_FILE"
+            if ! /etc/init.d/zapret2 status 2>/dev/null | grep -q running; then
+                /etc/init.d/zapret2 restart >/dev/null 2>&1
+            fi
+        }
+        trap cleanup_subshell EXIT INT TERM
+
+        local timeout_sec=120
+        [ "$mode" != "turbo" ] && timeout_sec=300
+
+        local scan_args="-d $domain -p $protocols --dns auto --timeout $timeout_sec --auto"
         if [ "$mode" = "turbo" ]; then
             prepare_turbo_corpus "$target"
             if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
@@ -217,10 +413,76 @@ cmd_start() {
             fi
         fi
 
-        echo "[blockcheckw-helper] Starting scan for $domain (target=$target, mode=$mode, workers=$workers, auto_apply=$auto_apply)..." >> "$LOG_FILE"
-        write_status "running" 25 "Тестирование обхода DPI..."
+        echo "[blockcheckw-helper] Starting scan for $domain (target=$target, mode=$mode, workers=$workers, timeout=${timeout_sec}s, auto_apply=$auto_apply)..." >> "$LOG_FILE"
+        write_status "running" 15 "Подготовка к сканированию ($domain)..."
 
-        /usr/bin/blockcheckw -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1
+        if [ ! -x "/usr/bin/blockcheckw" ]; then
+            write_status "error" 0 "Ошибка: бинарный файл /usr/bin/blockcheckw не найден или нет прав на исполнение"
+            echo "[blockcheckw-helper] Error: /usr/bin/blockcheckw missing or not executable" >> "$LOG_FILE"
+            exit 1
+        fi
+
+        /usr/bin/blockcheckw -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" >> "$LOG_FILE" 2>&1 &
+        local bcw_child=$!
+        echo "$bcw_child" > "$PID_FILE"
+
+        local cur_pct=18
+        local cur_phase="Тестирование обхода DPI..."
+        while kill -0 "$bcw_child" 2>/dev/null; do
+            sleep 1.5
+
+            if [ -f "$LOG_FILE" ]; then
+                local tail_text=$(tail -n 30 "$LOG_FILE" 2>/dev/null)
+
+                if echo "$tail_text" | grep -qiE 'DNS resolve failed|no IPv4 addresses found|DNS resolution error'; then
+                    cur_pct=15
+                    cur_phase="DNS-резолв: ожидание ответа..."
+                elif echo "$tail_text" | grep -q '=== Summary'; then
+                    cur_pct=85
+                    cur_phase="Подведение итогов сканирования..."
+                elif echo "$tail_text" | grep -q '=== Scanning HTTPS/TLS1.3'; then
+                    if echo "$tail_text" | grep -q 'completed:'; then
+                        cur_pct=82
+                        cur_phase="Сканирование TLS 1.3 завершено..."
+                    else
+                        cur_pct=68
+                        cur_phase="Подбор стратегий для HTTPS / TLS 1.3..."
+                    fi
+                elif echo "$tail_text" | grep -q '=== Scanning HTTPS/TLS1.2'; then
+                    if echo "$tail_text" | grep -q 'completed:'; then
+                        cur_pct=62
+                        cur_phase="Сканирование TLS 1.2 завершено..."
+                    else
+                        cur_pct=45
+                        cur_phase="Подбор стратегий для HTTPS / TLS 1.2..."
+                    fi
+                elif echo "$tail_text" | grep -q '=== Scanning HTTP'; then
+                    if echo "$tail_text" | grep -q 'completed:'; then
+                        cur_pct=40
+                        cur_phase="Сканирование HTTP завершено..."
+                    else
+                        cur_pct=30
+                        cur_phase="Подбор стратегий для HTTP..."
+                    fi
+                elif echo "$tail_text" | grep -q '=== Baseline'; then
+                    cur_pct=22
+                    cur_phase="Проверка блокировки без обхода (Baseline)..."
+                elif echo "$tail_text" | grep -q '=== DNS resolve'; then
+                    cur_pct=18
+                    cur_phase="DNS-резолв для $domain..."
+                fi
+
+                local succ=$(echo "$tail_text" | grep -oE 'success: [0-9]+' | tail -n 1 | awk '{print $2}')
+                if [ -n "$succ" ] && [ "$succ" -gt 0 ]; then
+                    cur_phase="$cur_phase (найдено: $succ)"
+                fi
+
+                write_status "running" "$cur_pct" "$cur_phase"
+            fi
+        done
+
+        wait "$bcw_child"
+        local exit_code=$?
 
         # Locate latest scan report in /root if needed
         local latest_vanilla=$(ls -t /root/*_report_vanilla.txt 2>/dev/null | head -n 1)
@@ -248,7 +510,7 @@ cmd_start() {
 
         # Build circular strategy if requested
         if [ "$do_circular" = "1" ] && [ "$found_count" -gt 0 ]; then
-            write_status "running" 85 "Сборка отказоустойчивой Circular-стратегии..."
+            write_status "running" 88 "Сборка отказоустойчивой Circular-стратегии..."
             lua "$CIRCULAR_BUILDER" "$OUTPUT_SCAN" 3 20 4 loop > "$OUTPUT_CIRCULAR" 2>> "$LOG_FILE"
         fi
 
@@ -305,7 +567,7 @@ cmd_start() {
 
         rm -f "$PID_FILE"
 
-        local dns_err=$(grep -E 'DNS resolve failed|no IPv4 addresses found' "$LOG_FILE" 2>/dev/null | tail -n 1)
+        local dns_err=$(grep -E 'DNS resolve failed|no IPv4 addresses found|DNS resolution error' "$LOG_FILE" 2>/dev/null | tail -n 1)
         if [ -n "$dns_err" ]; then
             write_status "error" 0 "Ошибка DNS: $dns_err" ",\"strategies\":[]"
             echo "[blockcheckw-helper] Scan failed with DNS error: $dns_err" >> "$LOG_FILE"
@@ -315,8 +577,15 @@ cmd_start() {
             write_status "done" 100 "$final_msg" ",\"strategies\":$strats_json$apply_info"
             echo "[blockcheckw-helper] Finished successfully. Found $found_count working strategies." >> "$LOG_FILE"
         else
-            write_status "done" 100 "Поиск завершен. Ничего не подошло, попробуйте глубокий скан." ",\"strategies\":[]"
-            echo "[blockcheckw-helper] Scan completed with 0 matches." >> "$LOG_FILE"
+            if [ "$exit_code" -ne 0 ]; then
+                local last_err=$(tail -n 5 "$LOG_FILE" 2>/dev/null | grep -E 'error|Error|failed|FATAL' | tail -n 1)
+                [ -n "$last_err" ] || last_err="Код ошибки $exit_code"
+                write_status "error" 0 "Ошибка подбора: $last_err" ",\"strategies\":[]"
+                echo "[blockcheckw-helper] Scan failed with exit code $exit_code: $last_err" >> "$LOG_FILE"
+            else
+                write_status "done" 100 "Поиск завершен. Ничего не подошло, попробуйте глубокий скан." ",\"strategies\":[]"
+                echo "[blockcheckw-helper] Scan completed with 0 matches." >> "$LOG_FILE"
+            fi
         fi
     ) </dev/null >/dev/null 2>&1 &
 
@@ -327,27 +596,58 @@ cmd_start() {
 
 cmd_status() {
     ensure_json
-    local running=false
-    if [ -f "$PID_FILE" ]; then
-        local pid=$(cat "$PID_FILE" 2>/dev/null)
-        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-            running=true
-        else
-            rm -f "$PID_FILE"
-        fi
+    local is_running=false
+    if is_scanner_running; then
+        is_running=true
     fi
 
-    lua - "$STATUS_FILE" "$LOG_FILE" "$OUTPUT_SCAN" << 'EOF'
+    lua - "$STATUS_FILE" "$LOG_FILE" "$OUTPUT_SCAN" "$is_running" << 'EOF'
 local json = require("luci.jsonc")
 local status_file = arg[1]
 local log_file = arg[2]
 local scan_file = arg[3]
+local is_running = (arg[4] == "true")
 
 local st = {}
 local sf = io.open(status_file, "r")
 if sf then
     st = json.parse(sf:read("*a")) or {}
     sf:close()
+end
+
+if not st.status then
+    st.status = is_running and "running" or "idle"
+    st.percent = is_running and 25 or 0
+    st.phase = is_running and "Сканирование выполняется..." or "Готов к работе"
+    st.strategies = {}
+end
+
+-- Process death watchdog
+if not is_running and st.status == "running" then
+    local finished = false
+    local lf = io.open(log_file, "r")
+    if lf then
+        local content = lf:read("*a") or ""
+        lf:close()
+        if content:find("Summary for") or content:find("OK scan report") then
+            finished = true
+        end
+    end
+    if not finished then
+        st.status = "error"
+        st.phase = "Процесс сканера завершился неожиданно (нехватка RAM или сбой)."
+    else
+        st.status = "done"
+        st.percent = 100
+        st.phase = "Сканирование завершено"
+    end
+    local tmp = status_file .. ".tmp"
+    local out = io.open(tmp, "w")
+    if out then
+        out:write(json.stringify(st))
+        out:close()
+        os.rename(tmp, status_file)
+    end
 end
 
 -- Enrich with ISP from log if missing
@@ -357,7 +657,7 @@ if not st.isp or st.isp == "" then
         for line in lf:lines() do
             local isp_match = line:match("ISP:%s*(.+)")
             if isp_match then
-                st.isp = isp_match:gsub("[\r\n]", ""):gsub("^%s+", "")
+                st.isp = isp_match:gsub("^%s+", ""):gsub("%s+$", ""):gsub("^%s+", "")
                 break
             end
         end
@@ -420,7 +720,130 @@ cmd_apply() {
     local script_file=""
 
     while [ "$#" -gt 0 ]; do
-        case "$1" in
+        cmd_diag() {
+    local as_json=false
+    [ "$1" = "--json" ] && as_json=true
+
+    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local version_file = arg[3]
+local scan_file = arg[4]
+local as_json = (arg[5] == "true")
+
+local function run_cmd(cmd)
+    local p = io.popen(cmd .. " 2>/dev/null", "r")
+    if not p then return "" end
+    local s = p:read("*a") or ""
+    p:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return "" end
+    local s = f:read("*a") or ""
+    f:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
+local uname_str = run_cmd("uname -a")
+local model_str = read_file("/tmp/sysinfo/model")
+if model_str == "" then model_str = read_file("/proc/device-tree/model") end
+if model_str == "" then model_str = "OpenWrt Device" end
+
+local os_release = read_file("/etc/openwrt_release")
+local memory_str = run_cmd("free -m")
+local loadavg_str = read_file("/proc/loadavg")
+local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
+
+local app_version = "0.15.4"
+local vf = io.open(version_file, "r")
+if vf then
+    local d = json.parse(vf:read("*a"))
+    vf:close()
+    if d and d.version then app_version = d.version end
+end
+
+local bcw_bin = run_cmd("which blockcheckw")
+local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
+local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
+local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
+
+local zapret_status = run_cmd("/etc/init.d/zapret2 status")
+local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
+local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
+local nft_tables = run_cmd("nft list tables 2>/dev/null")
+
+local status_json = read_file(status_file)
+local status_tbl = json.parse(status_json) or {}
+
+local log_tail = ""
+local lf = io.open(log_file, "r")
+if lf then
+    local lines = {}
+    for line in lf:lines() do table.insert(lines, line) end
+    lf:close()
+    local start_idx = math.max(1, #lines - 80)
+    local sub = {}
+    for i = start_idx, #lines do table.insert(sub, lines[i]) end
+    log_tail = table.concat(sub, "\n")
+end
+
+local report_lines = {
+    "============================================================",
+    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
+    "============================================================",
+    "Date:        " .. date_str,
+    "Device:      " .. model_str,
+    "Kernel/Arch: " .. uname_str,
+    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
+    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
+    "",
+    "--- OpenWrt Release Info ---",
+    os_release ~= "" and os_release or "N/A",
+    "",
+    "--- Hardware Resources ---",
+    "Load Average: " .. loadavg_str,
+    memory_str,
+    disk_str,
+    "",
+    "--- Zapret2 & Services ---",
+    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "Running nfqws2 processes:",
+    nfqws_procs ~= "" and nfqws_procs or "  (none)",
+    "Active blockcheckw processes:",
+    bcw_procs ~= "" and bcw_procs or "  (none)",
+    "Nftables tables:",
+    nft_tables ~= "" and nft_tables or "  (none)",
+    "",
+    "--- Scanner State ---",
+    "Status:     " .. tostring(status_tbl.status or "unknown"),
+    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
+    "Phase:      " .. tostring(status_tbl.phase or "none"),
+    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
+    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
+    "",
+    "--- Recent Run Log (Last 80 lines) ---",
+    log_tail ~= "" and log_tail or "(log is empty)",
+    "============================================================",
+    "  END OF DIAGNOSTIC REPORT",
+    "============================================================"
+}
+
+local report_text = table.concat(report_lines, "\n")
+
+if as_json then
+    print(json.stringify({ success = true, report = report_text }))
+else
+    print(report_text)
+end
+EOF
+}
+
+case "$1" in
             --target) target="$2"; shift 2 ;;
             --script) script_text="$2"; shift 2 ;;
             --file) script_file="$2"; shift 2 ;;
@@ -584,7 +1007,130 @@ cmd_activate() {
     local section=""
 
     while [ "$#" -gt 0 ]; do
-        case "$1" in
+        cmd_diag() {
+    local as_json=false
+    [ "$1" = "--json" ] && as_json=true
+
+    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local version_file = arg[3]
+local scan_file = arg[4]
+local as_json = (arg[5] == "true")
+
+local function run_cmd(cmd)
+    local p = io.popen(cmd .. " 2>/dev/null", "r")
+    if not p then return "" end
+    local s = p:read("*a") or ""
+    p:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return "" end
+    local s = f:read("*a") or ""
+    f:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
+local uname_str = run_cmd("uname -a")
+local model_str = read_file("/tmp/sysinfo/model")
+if model_str == "" then model_str = read_file("/proc/device-tree/model") end
+if model_str == "" then model_str = "OpenWrt Device" end
+
+local os_release = read_file("/etc/openwrt_release")
+local memory_str = run_cmd("free -m")
+local loadavg_str = read_file("/proc/loadavg")
+local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
+
+local app_version = "0.15.4"
+local vf = io.open(version_file, "r")
+if vf then
+    local d = json.parse(vf:read("*a"))
+    vf:close()
+    if d and d.version then app_version = d.version end
+end
+
+local bcw_bin = run_cmd("which blockcheckw")
+local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
+local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
+local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
+
+local zapret_status = run_cmd("/etc/init.d/zapret2 status")
+local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
+local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
+local nft_tables = run_cmd("nft list tables 2>/dev/null")
+
+local status_json = read_file(status_file)
+local status_tbl = json.parse(status_json) or {}
+
+local log_tail = ""
+local lf = io.open(log_file, "r")
+if lf then
+    local lines = {}
+    for line in lf:lines() do table.insert(lines, line) end
+    lf:close()
+    local start_idx = math.max(1, #lines - 80)
+    local sub = {}
+    for i = start_idx, #lines do table.insert(sub, lines[i]) end
+    log_tail = table.concat(sub, "\n")
+end
+
+local report_lines = {
+    "============================================================",
+    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
+    "============================================================",
+    "Date:        " .. date_str,
+    "Device:      " .. model_str,
+    "Kernel/Arch: " .. uname_str,
+    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
+    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
+    "",
+    "--- OpenWrt Release Info ---",
+    os_release ~= "" and os_release or "N/A",
+    "",
+    "--- Hardware Resources ---",
+    "Load Average: " .. loadavg_str,
+    memory_str,
+    disk_str,
+    "",
+    "--- Zapret2 & Services ---",
+    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "Running nfqws2 processes:",
+    nfqws_procs ~= "" and nfqws_procs or "  (none)",
+    "Active blockcheckw processes:",
+    bcw_procs ~= "" and bcw_procs or "  (none)",
+    "Nftables tables:",
+    nft_tables ~= "" and nft_tables or "  (none)",
+    "",
+    "--- Scanner State ---",
+    "Status:     " .. tostring(status_tbl.status or "unknown"),
+    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
+    "Phase:      " .. tostring(status_tbl.phase or "none"),
+    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
+    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
+    "",
+    "--- Recent Run Log (Last 80 lines) ---",
+    log_tail ~= "" and log_tail or "(log is empty)",
+    "============================================================",
+    "  END OF DIAGNOSTIC REPORT",
+    "============================================================"
+}
+
+local report_text = table.concat(report_lines, "\n")
+
+if as_json then
+    print(json.stringify({ success = true, report = report_text }))
+else
+    print(report_text)
+end
+EOF
+}
+
+case "$1" in
             --target) target="$2"; shift 2 ;;
             --section) section="$2"; shift 2 ;;
             *) shift ;;
@@ -683,7 +1229,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.3" end
+        if not res.version then res.version = "0.15.4" end
 
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
@@ -812,9 +1358,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.3"
+    local cur_ver="0.15.4"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.3"); else print("0.15.3"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.4"); else print("0.15.4"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -823,7 +1369,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.3"
+local cur_ver = arg[1] or "0.15.4"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1006,6 +1552,129 @@ EOF
     echo '{"success":true,"message":"Служба BlockcheckW и веб-интерфейс LuCI успешно удалены с роутера"}'
 }
 
+cmd_diag() {
+    local as_json=false
+    [ "$1" = "--json" ] && as_json=true
+
+    lua - "$STATUS_FILE" "$LOG_FILE" "$VERSION_FILE" "$OUTPUT_SCAN" "$as_json" << 'EOF'
+local json = require("luci.jsonc")
+local status_file = arg[1]
+local log_file = arg[2]
+local version_file = arg[3]
+local scan_file = arg[4]
+local as_json = (arg[5] == "true")
+
+local function run_cmd(cmd)
+    local p = io.popen(cmd .. " 2>/dev/null", "r")
+    if not p then return "" end
+    local s = p:read("*a") or ""
+    p:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function read_file(path)
+    local f = io.open(path, "r")
+    if not f then return "" end
+    local s = f:read("*a") or ""
+    f:close()
+    return s:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local date_str = run_cmd("date '+%Y-%m-%d %H:%M:%S %Z'")
+local uname_str = run_cmd("uname -a")
+local model_str = read_file("/tmp/sysinfo/model")
+if model_str == "" then model_str = read_file("/proc/device-tree/model") end
+if model_str == "" then model_str = "OpenWrt Device" end
+
+local os_release = read_file("/etc/openwrt_release")
+local memory_str = run_cmd("free -m")
+local loadavg_str = read_file("/proc/loadavg")
+local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
+
+local app_version = "0.15.4"
+local vf = io.open(version_file, "r")
+if vf then
+    local d = json.parse(vf:read("*a"))
+    vf:close()
+    if d and d.version then app_version = d.version end
+end
+
+local bcw_bin = run_cmd("which blockcheckw")
+local bcw_ver = run_cmd("/usr/bin/blockcheckw --version")
+local bcw_size = run_cmd("ls -lh /usr/bin/blockcheckw 2>/dev/null | awk '{print $5}'")
+local bcw_md5 = run_cmd("md5sum /usr/bin/blockcheckw 2>/dev/null | awk '{print $1}'")
+
+local zapret_status = run_cmd("/etc/init.d/zapret2 status")
+local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
+local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
+local nft_tables = run_cmd("nft list tables 2>/dev/null")
+
+local status_json = read_file(status_file)
+local status_tbl = json.parse(status_json) or {}
+
+local log_tail = ""
+local lf = io.open(log_file, "r")
+if lf then
+    local lines = {}
+    for line in lf:lines() do table.insert(lines, line) end
+    lf:close()
+    local start_idx = math.max(1, #lines - 80)
+    local sub = {}
+    for i = start_idx, #lines do table.insert(sub, lines[i]) end
+    log_tail = table.concat(sub, "\n")
+end
+
+local report_lines = {
+    "============================================================",
+    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
+    "============================================================",
+    "Date:        " .. date_str,
+    "Device:      " .. model_str,
+    "Kernel/Arch: " .. uname_str,
+    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
+    "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
+    "",
+    "--- OpenWrt Release Info ---",
+    os_release ~= "" and os_release or "N/A",
+    "",
+    "--- Hardware Resources ---",
+    "Load Average: " .. loadavg_str,
+    memory_str,
+    disk_str,
+    "",
+    "--- Zapret2 & Services ---",
+    "Zapret2 status:  " .. (zapret_status ~= "" and zapret_status or "stopped"),
+    "Running nfqws2 processes:",
+    nfqws_procs ~= "" and nfqws_procs or "  (none)",
+    "Active blockcheckw processes:",
+    bcw_procs ~= "" and bcw_procs or "  (none)",
+    "Nftables tables:",
+    nft_tables ~= "" and nft_tables or "  (none)",
+    "",
+    "--- Scanner State ---",
+    "Status:     " .. tostring(status_tbl.status or "unknown"),
+    "Percent:    " .. tostring(status_tbl.percent or 0) .. "%",
+    "Phase:      " .. tostring(status_tbl.phase or "none"),
+    "ISP:        " .. tostring(status_tbl.isp or "not detected"),
+    "Block Type: " .. tostring(status_tbl.block_type or "not detected"),
+    "",
+    "--- Recent Run Log (Last 80 lines) ---",
+    log_tail ~= "" and log_tail or "(log is empty)",
+    "============================================================",
+    "  END OF DIAGNOSTIC REPORT",
+    "============================================================"
+}
+
+local report_text = table.concat(report_lines, "\n")
+
+if as_json then
+    print(json.stringify({ success = true, report = report_text }))
+else
+    print(report_text)
+end
+EOF
+}
+
 case "$1" in
     start) shift; cmd_start "$@" ;;
     status) cmd_status ;;
@@ -1019,8 +1688,9 @@ case "$1" in
     check_update) cmd_check_update ;;
     update) cmd_update ;;
     uninstall) shift; cmd_uninstall "$@" ;;
+    diag) shift; cmd_diag "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall|diag}"
         exit 1
         ;;
 esac

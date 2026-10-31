@@ -53,7 +53,7 @@ var PRESET_DEFS = {
 			summary: 'Специализированный режим для полного обхода троттлинга (замедления) и блокировки YouTube на смартфонах, Smart TV и ПК.',
 			details: [
 				{ title: '🎯 Что тестируется', text: 'googlevideo.com (CDN видеопотоков 1080p-4K), i.ytimg.com (обложки и аватары), youtube.com (веб-интерфейс и API).' },
-				{ title: '🛡️ Секция Zapret2', text: 'Создает или дополняет секцию zapret2.MyTube (список list_hosts_youtube). При нахождении новой стратегии создается отдельная версия (MyTube_v...) без затирания старой.' },
+				{ title: '🛡️ Секция Zapret2', text: 'Создает или дополняет секцию zapret2.BlockcheckW_YouTube (список list_hosts_youtube). При нахождении новой стратегии создается отдельная версия (BlockcheckW_YouTube_2...) без затирания старой.' },
 				{ title: '📱 Смартфоны и Smart TV', text: 'Приложения YouTube на смартфонах и ТВ по умолчанию используют протокол QUIC (UDP 443). Роутер автоматически блокирует QUIC (правило Reject-QUIC), принуждая плеер переключиться на TCP TLS, где стратегия Zapret2 успешно расщепляет пакеты.' },
 				{ title: '⚙️ Рекомендация', text: 'Используйте связку «Турбо» + «Circular авто-ротация». Circular объединит fake-split и disorder для надежной работы без буферизации.' }
 			]
@@ -357,7 +357,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = { scanner_log: 'Загрузка логов...', zapret2_log: 'Загрузка логов...', daemons: '' };
-		var curVer = zapretInfo.version || '0.15.10';
+		var curVer = zapretInfo.version || '0.15.11';
 		var versionInfo = {
 			current_version: curVer,
 			has_update: false,
@@ -830,7 +830,7 @@ return view.extend({
 			style: 'display: none; padding: 12px 16px; background: rgba(50, 115, 220, 0.12); border-left: 4px solid #3273dc; border-radius: 4px; margin-bottom: 14px; font-size: 13px; line-height: 1.5;'
 		}, [
 			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
-			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2 (например, MyTube). Нажмите кнопку '),
+			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2 (например, BlockcheckW_YouTube). Нажмите кнопку '),
 			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность (curl) ]'),
 			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ▶ Запустить поиск стратегий ] нужна только если вы хотите с нуля подобрать новую связку взамен этой.')
 		]);
@@ -1573,7 +1573,7 @@ return view.extend({
 			var currentService = zapretServicesData[currentTarget] || {};
 			var currentActive = currentService.active || {};
 
-			var defSec = (currentTarget === 'preset_youtube') ? 'MyTube' :
+			var defSec = (currentTarget === 'preset_youtube') ? 'BlockcheckW_YouTube' :
 			             (currentTarget === 'preset_discord') ? 'BlockcheckW_Discord' :
 			             (currentTarget === 'preset_x') ? 'BlockcheckW_X' :
 			             (currentTarget === 'preset_instagram') ? 'BlockcheckW_Instagram' :
@@ -1581,11 +1581,12 @@ return view.extend({
 			             (currentTarget === 'builtin') ? 'BlockcheckW_General' :
 			             ('BlockcheckW_' + currentTarget.replace(/[^a-zA-Z0-9_]/g, '_'));
 
-			var sectionName = (opts && opts.section) ||
-			                  (opts && opts.applyResult && opts.applyResult.section) ||
-			                  currentActive.section ||
-			                  (currentService && currentService.section) ||
-			                  defSec;
+			var candidateSec = (opts && opts.section) ||
+			                   (opts && opts.applyResult && opts.applyResult.section) ||
+			                   currentActive.section ||
+			                   (currentService && currentService.section) ||
+			                   defSec;
+			var sectionName = (candidateSec && candidateSec !== 'undefined' && candidateSec !== 'null') ? candidateSec : defSec;
 
 			var targetLabel = targetDef.name || targetDef.label || currentTarget;
 			if (currentTarget === 'domains') {

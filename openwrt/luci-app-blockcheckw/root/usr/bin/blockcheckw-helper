@@ -43,23 +43,23 @@ fetch_file() {
         /etc/init.d/dnsmasq reload >/dev/null 2>&1 || true
     fi
 
-    # 1. Direct GitHub Raw with --resolve to bypass any local DNS sinkhole
-    for gh_ip in 185.199.108.133 185.199.109.133 185.199.110.133 185.199.111.133; do
-        curl -fsSL -k --connect-timeout 4 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    # 1. jsDelivr Global CDN (Fastest, unblocked in Russia via Cloudflare edge)
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 2. Fastly jsDelivr CDN
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 3. GHProxy Mirror
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 4. Direct GitHub Raw fallback with --resolve
+    for gh_ip in 185.199.108.133 185.199.111.133; do
+        curl -fsSL -k --connect-timeout 2 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
         _save_download && return 0
     done
-
-    # 2. jsDelivr Global CDN with strict max-time
-    curl -fsSL -k --connect-timeout 4 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 3. Fastly jsDelivr CDN
-    curl -fsSL -k --connect-timeout 4 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 4. GHProxy Mirror
-    curl -fsSL -k --connect-timeout 4 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
 
     rm -f "$tmp_file"
     return 1
@@ -790,8 +790,6 @@ EOF
             fi
         fi
 
-        rm -f "$PID_FILE"
-
         local dns_err=$(grep -E 'DNS resolve failed|no IPv4 addresses found|DNS resolution error' "$LOG_FILE" 2>/dev/null | tail -n 1)
         if [ -n "$dns_err" ]; then
             write_status "error" 0 "Ошибка DNS: $dns_err" ",\"strategies\":[]"
@@ -812,6 +810,8 @@ EOF
                 echo "[blockcheckw-helper] Scan completed with 0 matches." >> "$LOG_FILE"
             fi
         fi
+
+        rm -f "$PID_FILE"
     ) </dev/null >/dev/null 2>&1 &
 
     local pid=$!
@@ -847,38 +847,47 @@ if not st.status then
     st.strategies = {}
 end
 
--- Process death watchdog: only trigger if really not running and status file is stale (>25s)
+-- Process death watchdog: only trigger if really not running and status is stuck in running
 if not is_running and st.status == "running" then
-    local nixio = require("nixio")
-    local attr = nixio.fs.stat(status_file)
-    local is_stale = true
-    if attr and attr.mtime and (os.time() - attr.mtime < 25) then
-        is_stale = false
-    end
-    if is_stale then
-        local finished = false
-        local lf = io.open(log_file, "r")
-        if lf then
-            local content = lf:read("*a") or ""
-            lf:close()
-            if content:find("Summary for") or content:find("OK scan report") then
-                finished = true
+    if (st.strategies and #st.strategies > 0) or st.auto_applied then
+        st.status = "done"
+        st.percent = 100
+        st.phase = "Сканирование завершено"
+    else
+        local nixio = require("nixio")
+        local attr = nixio.fs.stat(status_file)
+        local is_stale = true
+        if attr and attr.mtime and (os.time() - attr.mtime < 25) then
+            is_stale = false
+        end
+        if is_stale then
+            local finished = false
+            local lf = io.open(log_file, "r")
+            if lf then
+                local content = lf:read("*a") or ""
+                lf:close()
+                if content:find("Summary for") or content:find("OK scan report") or
+                   content:find("Finished successfully") or content:find("Auto%-applied strategy") or
+                   content:find("Restoring zapret2") or content:find("Scan completed") or
+                   content:find("успешно создана") or content:find("working strategies") then
+                    finished = true
+                end
             end
-        end
-        if not finished then
-            st.status = "error"
-            st.phase = "Процесс сканера завершился неожиданно (нехватка RAM или сбой)."
-        else
-            st.status = "done"
-            st.percent = 100
-            st.phase = "Сканирование завершено"
-        end
-        local tmp = status_file .. ".tmp"
-        local out = io.open(tmp, "w")
-        if out then
-            out:write(json.stringify(st))
-            out:close()
-            os.rename(tmp, status_file)
+            if not finished then
+                st.status = "error"
+                st.phase = "Процесс сканера завершился неожиданно (нехватка RAM или сбой)."
+            else
+                st.status = "done"
+                st.percent = 100
+                st.phase = "Сканирование завершено"
+            end
+            local tmp = status_file .. ".tmp"
+            local out = io.open(tmp, "w")
+            if out then
+                out:write(json.stringify(st))
+                out:close()
+                os.rename(tmp, status_file)
+            end
         end
     end
 end
@@ -998,7 +1007,7 @@ cmd_apply() {
 
     case "$target" in
         preset_youtube|youtube)
-            base_sec="MyTube"
+            base_sec="BlockcheckW_YouTube"
             port="443"
             l7="tls"
             hostlist="list_hosts_youtube"
@@ -1075,8 +1084,12 @@ cmd_apply() {
     for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.'"$base_sec"'_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
         uci -q set "zapret2.$s.enabled=0"
     done
-    if [ "$base_sec" = "MyTube" ]; then
+    if [ "$base_sec" = "BlockcheckW_YouTube" ] || [ "$base_sec" = "MyTube" ]; then
+        uci -q set "zapret2.MyTube.enabled=0"
         uci -q set "zapret2.Youtube_circular.enabled=0"
+        for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.(MyTube_|BlockcheckW_YouTube_)' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+            uci -q set "zapret2.$s.enabled=0"
+        done
     elif [ "$base_sec" = "BlockcheckW_Discord" ]; then
         uci -q set "zapret2.Discord_circular.enabled=0"
     elif [ "$base_sec" = "BlockcheckW_General" ]; then
@@ -1159,7 +1172,7 @@ cmd_activate() {
 
     local base_sec=""
     case "$target" in
-        preset_youtube|youtube) base_sec="MyTube" ;;
+        preset_youtube|youtube) base_sec="BlockcheckW_YouTube" ;;
         preset_discord|discord) base_sec="BlockcheckW_Discord" ;;
         preset_twitch|twitch) base_sec="BlockcheckW_Twitch" ;;
         preset_x|x) base_sec="BlockcheckW_X" ;;
@@ -1182,7 +1195,13 @@ cmd_activate() {
         for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.'"$base_sec"'_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
             uci -q set "zapret2.$s.enabled=0"
         done
-        [ "$base_sec" = "MyTube" ] && uci -q set "zapret2.Youtube_circular.enabled=0"
+        if [ "$base_sec" = "BlockcheckW_YouTube" ] || [ "$base_sec" = "MyTube" ]; then
+            uci -q set "zapret2.MyTube.enabled=0"
+            uci -q set "zapret2.Youtube_circular.enabled=0"
+            for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.(MyTube_|BlockcheckW_YouTube_)' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+                uci -q set "zapret2.$s.enabled=0"
+            done
+        fi
         [ "$base_sec" = "BlockcheckW_Discord" ] && uci -q set "zapret2.Discord_circular.enabled=0"
         [ "$base_sec" = "BlockcheckW_General" ] && uci -q set "zapret2.Routerich_circular.enabled=0"
     fi
@@ -1242,7 +1261,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.10" end
+        if not res.version then res.version = "0.15.11" end
 
         local hostlists_info = {
             { key = "youtube", name = "YouTube", file = "/opt/zapret2/ipset/zapret_hosts_youtube.txt", uci_sec = "list_hosts_youtube" },
@@ -1295,8 +1314,8 @@ cmd_info() {
         local targets = {
             builtin = { base = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
             general = { base = "BlockcheckW_General", fallback = "Routerich_circular", name = "Встроенные хосты (33)" },
-            preset_youtube = { base = "MyTube", fallback = "Youtube_circular", name = "Предустановленный список YouTube (3)" },
-            youtube = { base = "MyTube", fallback = "Youtube_circular", name = "YouTube" },
+            preset_youtube = { base = "BlockcheckW_YouTube", fallback = "MyTube", name = "Предустановленный список YouTube (3)" },
+            youtube = { base = "BlockcheckW_YouTube", fallback = "MyTube", name = "YouTube" },
             preset_discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Предустановленный список Discord (3)" },
             discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
             preset_twitch = { base = "BlockcheckW_Twitch", name = "Предустановленный список Twitch (3)" },
@@ -1404,9 +1423,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.10"
+    local cur_ver="0.15.11"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.10"); else print("0.15.10"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.11"); else print("0.15.11"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1415,7 +1434,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.10"
+local cur_ver = arg[1] or "0.15.11"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1640,7 +1659,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.10"
+local app_version = "0.15.11"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))

@@ -11,6 +11,7 @@ var currentTarget = 'preset_youtube';
 var currentMode = 'turbo';
 var doCircular = true;
 var autoApply = true;
+var activeScanInProgress = false;
 var activeLogTab = 'scanner';
 var autoLogScroll = true;
 var lastResults = [];
@@ -376,6 +377,10 @@ return view.extend({
 			'.bcw-modal-close-btn { background: transparent !important; border: none !important; color: #abb2bf !important; font-size: 20px !important; font-weight: bold !important; line-height: 1 !important; cursor: pointer !important; padding: 4px 10px !important; border-radius: 6px !important; margin-left: auto !important; transition: all 0.15s ease !important; outline: none !important; min-width: 36px !important; min-height: 36px !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; }\n' +
 			'.bcw-modal-close-btn:hover { color: #ffffff !important; background: rgba(255, 255, 255, 0.15) !important; }\n' +
 			'.bcw-modal-close-btn:active { background: rgba(255, 255, 255, 0.25) !important; transform: scale(0.95) !important; }\n' +
+			'@keyframes bcwPulseGlow { 0% { box-shadow: 0 0 0 0 rgba(0, 209, 178, 0.6); } 70% { box-shadow: 0 0 0 12px rgba(0, 209, 178, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 209, 178, 0); } }\n' +
+			'.bcw-highlight-pulse { animation: bcwPulseGlow 1.2s 2 ease-out !important; border-color: #00d1b2 !important; }\n' +
+			'.bcw-applied-banner { animation: bcwFadeIn 0.3s ease; }\n' +
+			'@keyframes bcwFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }\n' +
 			'.bcw-wrapper { width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; }\n' +
 			'.bcw-wrapper * { box-sizing: border-box; }\n' +
 			'.bcw-container { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
@@ -901,7 +906,7 @@ return view.extend({
 			])
 		]);
 
-		var activeStratCard = E('div', { class: 'bcw-card', style: 'border-left: 4px solid #3273dc;' }, [
+		var activeStratCard = E('div', { id: 'bcw-active-strat-card', class: 'bcw-card bcw-card-active-strat', style: 'border-left: 4px solid #3273dc;' }, [
 			E('div', { class: 'bcw-card-header', style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px;' }, [
 				E('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
 					E('h3', { class: 'bcw-card-title', style: 'margin: 0; font-size: 15px;' }, '🛡️ Активная стратегия в Zapret2:'),
@@ -954,6 +959,40 @@ return view.extend({
 			style: 'display: none; margin-top: 14px; height: 38px; padding: 0 16px; font-size: 13px; font-weight: bold; background: #3273dc; color: #fff; border-color: #3273dc; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border-radius: 6px;',
 			click: function() { copyDiagnosticReport(); }
 		}, '📋 Скопировать диагностический отчёт для Telegram');
+
+		
+		var monitorSuccessAlertEl = E('div', {
+			class: 'bcw-applied-banner',
+			style: 'display: none; margin: 12px 0 6px 0; background: rgba(0, 209, 178, 0.1); border: 1.5px solid #00d1b2; border-radius: 8px; padding: 14px 16px;'
+		}, [
+			E('div', { style: 'display: flex; align-items: flex-start; gap: 12px;' }, [
+				E('span', { style: 'font-size: 24px; line-height: 1;' }, '🚀'),
+				E('div', { style: 'flex: 1;' }, [
+					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;' }, [
+						E('strong', { style: 'color: #00d1b2; font-size: 14px;' }, 'Стратегия уже загружена в Zapret2 и активна!'),
+						E('span', { class: 'badge cbi-color-green', style: 'font-weight: bold;' }, '✓ Zapret2 перезапущен')
+					]),
+					E('p', { style: 'margin: 6px 0 0 0; font-size: 13px; color: #e5e9f0; line-height: 1.5;' },
+						'Вам не нужно ничего копировать или настраивать вручную: служба уже перезапущена и прямо сейчас применяет обход для всех устройств в сети. ' +
+						'Если видео или сайт не загружаются сразу — обновите вкладку в браузере (Ctrl+F5).'
+					),
+					E('div', { style: 'margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;' }, [
+						E('button', {
+							class: 'bcw-btn-sm cbi-button cbi-button-action',
+							style: 'font-size: 12px; font-weight: bold;',
+							click: function() { testActiveConnection(); }
+						}, '🌐 Проверить доступность (curl)'),
+						E('button', {
+							class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+							style: 'font-size: 12px;',
+							click: function() {
+								showStrategyAppliedModal({ isAuto: true });
+							}
+						}, 'ℹ️ Подробнее о связке')
+					])
+				])
+			])
+		]);
 
 		var monitorCard = E('div', { class: 'bcw-card', style: 'display: none; border-left: 4px solid #00d1b2;' }, [
 			E('div', { class: 'bcw-card-header', style: 'display: flex; align-items: center; justify-content: space-between;' }, [
@@ -1281,7 +1320,6 @@ return view.extend({
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
 				if (parsed && parsed.success) {
-					ui.addNotification(null, E('p', {}, '✓ Запись ' + chosenSec + ' успешно активирована в Zapret2!'), 'info');
 					getZapretInfo().then(function(info) {
 						zapretServicesData = info.services || {};
 						zapretAllStrategies = info.all_strategies || [];
@@ -1293,6 +1331,12 @@ return view.extend({
 						}
 					});
 					refreshLogs();
+
+					showStrategyAppliedModal({
+						section: chosenSec,
+						isAuto: false,
+						connected: true
+					});
 				} else {
 					ui.addNotification(null, E('p', {}, 'Ошибка активации: ' + (parsed ? parsed.error : res.stderr)), 'danger');
 				}
@@ -1506,6 +1550,140 @@ return view.extend({
 			}
 		}
 
+		
+		function showStrategyAppliedModal(opts) {
+			opts = opts || {};
+			var isAuto = opts.isAuto !== false;
+			var targetDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var currentService = zapretServicesData[currentTarget] || {};
+			var currentActive = currentService.active || {};
+			var sectionName = (opts && opts.section) || (opts.applyResult && opts.applyResult.section) || currentActive.section || targetDef.title;
+
+			var targetLabel = targetDef.title || currentTarget;
+			if (currentTarget === 'domains') {
+				var d = customDomainInput ? customDomainInput.value.trim() : '';
+				if (d) targetLabel = 'Домен ' + d;
+			}
+
+			var httpCode = (opts.applyResult && opts.applyResult.http_code) || opts.httpCode || null;
+			var isConnected = (opts.applyResult && opts.applyResult.connected) || opts.connected || (httpCode && parseInt(httpCode) > 0);
+
+			var body = [
+				E('div', {
+					style: 'background: rgba(0, 209, 178, 0.12); border: 1.5px solid #00d1b2; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;'
+				}, [
+					E('div', { style: 'display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; color: #00d1b2;' }, [
+						E('span', { style: 'font-size: 24px; line-height: 1;' }, '🚀'),
+						E('span', {}, 'Вам ничего не нужно настраивать — всё уже работает!')
+					]),
+					E('p', { style: 'margin: 8px 0 0 0; font-size: 13px; color: #e5e9f0; line-height: 1.5;' },
+						'Найденная стратегия уже ' + (isAuto ? 'автоматически' : 'успешно') + ' сохранена в конфигурацию роутера, а служба Zapret2 перезапущена. ' +
+						'Обход блокировок уже активен для всех подключенных устройств в домашней сети (телефоны, компьютеры, Smart TV).'
+					)
+				]),
+
+				E('div', {
+					style: 'background: #1c2027; border: 1px solid #282c34; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; display: flex; flex-direction: column; gap: 8px;'
+				}, [
+					E('div', { style: 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;' }, [
+						E('span', { style: 'color: #abb2bf;' }, '🎯 Направление:'),
+						E('strong', { style: 'color: #61afef;' }, targetLabel)
+					]),
+					E('div', { style: 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;' }, [
+						E('span', { style: 'color: #abb2bf;' }, '📁 Запись в Zapret2:'),
+						E('code', { style: 'background: #282c34; padding: 2px 6px; border-radius: 4px; color: #98c379; font-weight: bold; font-size: 12px;' }, 'zapret2.' + sectionName)
+					]),
+					E('div', { style: 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;' }, [
+						E('span', { style: 'color: #abb2bf;' }, '⚙️ Статус службы:'),
+						E('span', { style: 'color: #98c379; font-weight: bold;' }, '✓ Zapret2 перезапущен и активен')
+					]),
+					isConnected ? E('div', { style: 'display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px;' }, [
+						E('span', { style: 'color: #abb2bf;' }, '🌐 Проверка сети:'),
+						E('span', { style: 'color: #98c379; font-weight: bold;' }, '✓ Ресурс успешно отвечает' + (httpCode ? ' (HTTP ' + httpCode + ')' : ''))
+					]) : null
+				].filter(Boolean)),
+
+				E('div', { style: 'font-size: 13px; line-height: 1.5; color: #abb2bf;' }, [
+					E('strong', { style: 'color: #e5e9f0; display: block; margin-bottom: 6px;' }, '💡 Как проверить работу прямо сейчас:'),
+					E('div', { style: 'display: flex; flex-direction: column; gap: 4px; padding-left: 4px;' }, [
+						E('div', {}, '1. Откройте нужный сервис (например, видео на YouTube) на телефоне или ПК.'),
+						E('div', {}, '2. Если вкладка уже была открыта — обновите её (на ПК: Ctrl + F5).'),
+						E('div', {}, '3. Или нажмите кнопку проверки ниже, чтобы роутер сам выполнил проверочный сетевой запрос.')
+					])
+				])
+			];
+
+			var actions = [
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					style: 'background: #3273dc; color: #fff; font-weight: bold; padding: 6px 16px;',
+					click: function() {
+						ui.hideModal();
+						testActiveConnection();
+					}
+				}, '🌐 Проверить доступность (curl)'),
+				E('button', {
+					class: 'cbi-button cbi-button-positive',
+					style: 'background: #00d1b2; color: #000; font-weight: bold; padding: 6px 18px;',
+					click: function() {
+						ui.hideModal();
+						var activeCard = document.getElementById('bcw-active-strat-card') || document.querySelector('.bcw-card-active-strat');
+						if (activeCard) {
+							activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+							activeCard.classList.add('bcw-highlight-pulse');
+							setTimeout(function() { activeCard.classList.remove('bcw-highlight-pulse'); }, 2500);
+						}
+					}
+				}, '✓ Отлично, понятно!')
+			];
+
+			bcwShowModal('🎉 Стратегия успешно активирована в Zapret2!', body, actions);
+		}
+
+		function showManualStrategiesFoundModal(count) {
+			var body = [
+				E('div', {
+					style: 'background: rgba(255, 183, 77, 0.12); border: 1.5px solid #ffb74d; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px;'
+				}, [
+					E('div', { style: 'display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; color: #ffb74d;' }, [
+						E('span', { style: 'font-size: 24px; line-height: 1;' }, '⚠️'),
+						E('span', {}, 'Внимание: стратегия ещё НЕ загружена в Zapret2!')
+					]),
+					E('p', { style: 'margin: 8px 0 0 0; font-size: 13px; color: #e5e9f0; line-height: 1.5;' },
+						'Поиск успешно завершён, найдено рабочих стратегий: ' + count + '. ' +
+						'Так как включен ручной режим применения, стратегия пока не активирована на роутере.'
+					)
+				]),
+
+				E('div', { style: 'font-size: 13px; line-height: 1.5; color: #abb2bf;' }, [
+					E('strong', { style: 'color: #e5e9f0; display: block; margin-bottom: 6px;' }, '👉 Чтобы активировать обход:'),
+					E('p', {}, 'В таблице результатов ниже выберите нужную стратегию и нажмите зелёную кнопку:'),
+					E('div', { style: 'margin: 10px 0; display: flex; justify-content: center;' }, [
+						E('span', {
+							class: 'cbi-button cbi-button-positive',
+							style: 'pointer-events: none; padding: 4px 14px; font-weight: bold; font-size: 12px;'
+						}, '✓ Применить в Zapret2')
+					]),
+					E('p', { style: 'font-size: 12px; color: #98c379;' }, 'После нажатия роутер сам запишет её в Zapret2 и перезапустит службу.')
+				])
+			];
+
+			var actions = [
+				E('button', {
+					class: 'cbi-button cbi-button-action',
+					style: 'background: #3273dc; color: #fff; font-weight: bold; padding: 6px 18px;',
+					click: function() {
+						ui.hideModal();
+						if (resultsCard) {
+							resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+						}
+					}
+				}, '👇 Выбрать стратегию из списка')
+			];
+
+			bcwShowModal('🔍 Найдено рабочих стратегий: ' + count, body, actions);
+		}
+
 		function startScan() {
 			var domain = '';
 			if (currentTarget === 'domains') {
@@ -1523,6 +1701,8 @@ return view.extend({
 			circularCard.style.display = 'none';
 			resultsCard.style.display = 'none';
 			btnCopyDiagOnError.style.display = 'none';
+			monitorSuccessAlertEl.style.display = 'none';
+			activeScanInProgress = true;
 			ispValEl.textContent = 'Определение...';
 			blockTypeValEl.textContent = 'Определение...';
 
@@ -1577,6 +1757,7 @@ return view.extend({
 		}
 
 		function stopScan() {
+			activeScanInProgress = false;
 			fs.exec(HELPER_BIN, ['stop']).then(function() {
 				ui.addNotification(null, E('p', {}, 'Сканирование остановлено пользователем.'), 'info');
 				resetScanUI();
@@ -1604,19 +1785,53 @@ return view.extend({
 				checkHelperStatus().then(function(st) {
 					updateProgressUI(st);
 					if (st.status === 'done' || st.status === 'idle') {
+						var wasActive = activeScanInProgress;
+						activeScanInProgress = false;
 						resetScanUI();
 						getZapretInfo().then(function(info) {
 							zapretServicesData = info.services || {};
 							zapretAllStrategies = info.all_strategies || [];
 							updateSummaryBox();
 							updateActiveStrategyDisplay();
+							if (zapretBadgeEl) {
+								zapretBadgeEl.className = 'bcw-header-item ' + ((info.zapret2_running === 'running') ? 'badge cbi-color-green' : 'badge cbi-color-red');
+								zapretBadgeEl.textContent = (info.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен';
+							}
 						});
 						refreshLogs();
 
-						if (st.auto_applied) {
-							ui.addNotification(null, E('p', {}, '✓ Лучшая найденная стратегия автоматически применена в Zapret2 и проверена!'), 'info');
+						var stratsCount = (st.strategies && Array.isArray(st.strategies)) ? st.strategies.length : 0;
+						var hasStrategies = stratsCount > 0;
+
+						if (st.auto_applied || (autoApply && hasStrategies)) {
+							monitorSuccessAlertEl.style.display = 'block';
+						}
+
+						if (wasActive) {
+							if (st.auto_applied || (autoApply && hasStrategies)) {
+								showStrategyAppliedModal({
+									isAuto: true,
+									section: (st.apply_result && st.apply_result.section) || null,
+									applyResult: st.apply_result,
+									connected: st.apply_result ? st.apply_result.connected : true,
+									httpCode: st.apply_result ? st.apply_result.http_code : null
+								});
+							} else if (hasStrategies) {
+								showManualStrategiesFoundModal(stratsCount);
+							} else {
+								bcwShowModal('Результат поиска', [
+									E('p', { class: 'cbi-color-yellow', style: 'font-weight: bold; font-size: 14px;' }, '⚠️ Рабочих стратегий не найдено'),
+									E('p', { style: 'font-size: 13px; color: #abb2bf; margin-top: 8px;' }, 'Попробуйте запустить «Глубокий скан» для полного перебора или проверьте доступность интернета/домена.')
+								], [
+									E('button', {
+										class: 'cbi-button cbi-button-neutral',
+										click: function() { ui.hideModal(); }
+									}, 'Закрыть')
+								]);
+							}
 						}
 					} else if (st.status === 'error') {
+						activeScanInProgress = false;
 						resetScanUI();
 						ui.addNotification(null, E('p', {}, st.phase || 'Ошибка сканирования. Проверьте домен и логи.'), 'danger');
 						refreshLogs();
@@ -1641,6 +1856,9 @@ return view.extend({
 				progressPhaseEl.style.color = '#00d1b2';
 				progressBarEl.style.background = '#00d1b2';
 				btnCopyDiagOnError.style.display = 'none';
+				if (st.auto_applied || (autoApply && st.strategies && st.strategies.length > 0)) {
+					monitorSuccessAlertEl.style.display = 'block';
+				}
 			} else if (st.status === 'error') {
 				progressPhaseEl.textContent = 'Ошибка сканирования';
 				progressPhaseEl.style.color = '#ff3860';
@@ -1726,13 +1944,6 @@ return view.extend({
 
 				if (parsed && parsed.success) {
 					var secName = parsed.section || 'новая запись';
-					var msg = isCirc ?
-						('Circular-связка сохранена как ' + secName + ' и активирована в Zapret2!') :
-						('Стратегия сохранена как ' + secName + ' и активирована в Zapret2!');
-					if (parsed.connected) {
-						msg += ' Соединение с сервером подтверждено (HTTP ' + parsed.http_code + ').';
-					}
-					ui.addNotification(null, E('p', {}, msg), 'info');
 					getZapretInfo().then(function(info) {
 						zapretServicesData = info.services || {};
 						zapretAllStrategies = info.all_strategies || [];
@@ -1744,6 +1955,14 @@ return view.extend({
 						}
 					});
 					refreshLogs();
+
+					showStrategyAppliedModal({
+						section: secName,
+						isAuto: false,
+						applyResult: parsed,
+						connected: parsed.connected,
+						httpCode: parsed.http_code
+					});
 				} else {
 					ui.addNotification(null, E('p', {}, 'Ошибка применения: ' + (parsed ? parsed.error : res.stderr)), 'danger');
 				}
@@ -2178,6 +2397,7 @@ return view.extend({
 
 		// Initial check if background scan is already running or has previous diagnosis
 		if (statusData.status === 'running') {
+			activeScanInProgress = true;
 			monitorCard.style.display = 'block';
 			btnStartScan.style.display = 'none';
 			btnStopScan.style.display = 'inline-flex';

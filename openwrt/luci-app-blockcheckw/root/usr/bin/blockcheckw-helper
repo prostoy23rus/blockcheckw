@@ -683,7 +683,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.2" end
+        if not res.version then res.version = "0.15.3" end
 
         local all_strats = {}
         uci:foreach("zapret2", "strategy", function(s)
@@ -812,9 +812,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.2"
+    local cur_ver="0.15.3"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.2"); else print("0.15.2"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.3"); else print("0.15.3"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -823,7 +823,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.2"
+local cur_ver = arg[1] or "0.15.3"
 local file = arg[2]
 local local_file = arg[3]
 

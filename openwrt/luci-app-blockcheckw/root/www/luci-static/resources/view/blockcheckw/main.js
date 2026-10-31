@@ -411,18 +411,20 @@ return view.extend({
 			style: 'border: none;'
 		}, (zapretInfo.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен');
 
-		var versionBadgeEl = E('button', {
-			class: 'bcw-header-item bcw-header-btn bcw-header-badge',
-			title: 'Нажмите, чтобы посмотреть список изменений (Что нового)',
-			click: function() { showWhatsNewModal(versionInfo, false); }
-		}, 'v' + (versionInfo.current_version || '0.15.1'));
-
 		var btnCheckUpdate = E('button', {
 			class: 'bcw-header-item bcw-header-btn',
-			click: function() { doCheckUpdate(true); }
+			id: 'bcw-btn-check-update',
+			title: 'Автоматическая проверка обновлений...',
+			click: function() {
+				if (updateCheckStatus.checked && updateCheckStatus.has_update) {
+					confirmRunUpdate(updateCheckStatus.latest_version);
+				} else {
+					doCheckUpdate(true);
+				}
+			}
 		}, [
 			E('span', {}, '🔄'),
-			'Проверить обновление'
+			document.createTextNode(' Проверка обновлений (v' + curVer + ')...')
 		]);
 
 		var btnFeedback = E('a', {
@@ -449,11 +451,10 @@ return view.extend({
 			class: 'bcw-header-actions',
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
-			versionBadgeEl,
+			zapretBadgeEl,
 			btnCheckUpdate,
 			btnFeedback,
-			btnUninstall,
-			zapretBadgeEl
+			btnUninstall
 		]);
 
 		var headerCard = E('div', { class: 'bcw-card', style: 'padding: 16px 20px;' }, [
@@ -1637,66 +1638,63 @@ return view.extend({
 			]);
 		}
 
-		function showUpdateModal(info) {
-			var curVer = info.current_version || '0.15.1';
-			var nextVer = info.latest_version || '0.16';
-			var date = info.release_date || '';
-			var list = formatChangelogList(info.changelog);
+		var updateCheckStatus = {
+			checked: false,
+			has_update: false,
+			latest_version: curVer
+		};
 
-			ui.showModal('Доступно обновление BlockcheckW', [
-				E('div', { style: 'border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 14px;' }, [
-					E('div', { style: 'font-size: 17px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
-						'🚀 Доступна новая версия: v' + nextVer,
-						E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, 'v' + curVer + ' ➔ v' + nextVer)
+		function confirmRunUpdate(targetVer) {
+			ui.showModal('Обновление службы BlockcheckW', [
+				E('div', { style: 'margin-bottom: 14px;' }, [
+					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
+						'🚀 Доступна новая версия: v' + targetVer,
+						E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, 'v' + curVer + ' ➔ v' + targetVer)
 					]),
-					E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 4px;' }, (date ? 'Дата релиза: ' + date + ' • ' : '') + 'Репозиторий: ' + (info.repo || 'prostoy23rus/blockcheckw'))
-				]),
-				E('div', { style: 'font-size: 14px; font-weight: bold; color: #61afef; margin-bottom: 8px;' }, '✨ Что нового в версии v' + nextVer + ':'),
-				E('ul', { style: 'list-style: none; padding: 12px 14px; margin: 0 0 16px 0; max-height: 280px; overflow-y: auto; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid #383e4a;' }, list),
-				E('div', { style: 'background: rgba(97, 175, 239, 0.06); border-left: 4px solid #61afef; padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #abb2bf; line-height: 1.5;' }, [
-					E('strong', { style: 'color: #e5e9f0;' }, 'Что произойдёт при обновлении:'),
-					E('br'),
-					'Будут загружены обновлённые скрипты и база пресетов с GitHub, сброшен кэш LuCI и перезапущена служба rpcd. Все ваши настройки Zapret2 сохранятся.'
+					E('p', { style: 'margin-top: 10px; color: #e5e9f0; line-height: 1.5;' },
+						'Обновить службу BlockcheckW до версии v' + targetVer + ' прямо сейчас? Все настроенные стратегии в Zapret2 будут сохранены.'
+					)
 				]),
 				E('div', { class: 'right', style: 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;' }, [
 					E('button', {
-						class: 'cbi-button cbi-button-neutral',
-						style: 'padding: 6px 16px;',
+						class: 'cbi-button',
 						click: function() { ui.hideModal(); }
-					}, 'Напомнить позже'),
+					}, 'Отмена'),
 					E('button', {
-						class: 'bcw-btn-launch cbi-button-positive',
-						style: 'height: 38px; padding: 0 20px; font-size: 13px; font-weight: bold; cursor: pointer;',
+						class: 'cbi-button cbi-button-action',
+						style: 'font-weight: bold;',
 						click: function() {
-							doRunUpdate(nextVer);
+							ui.hideModal();
+							doRunUpdate(targetVer);
 						}
-					}, '🚀 Установить обновление v' + nextVer)
+					}, '🚀 Установить обновление v' + targetVer)
 				])
 			]);
 		}
 
 		function showUpdateBanner(info) {
 			updateBannerCard.innerHTML = '';
+			var nextVer = info.latest_version || 'новой версии';
 			var releaseDate = info.release_date ? ' (' + info.release_date + ')' : '';
 			var repoName = info.repo || 'prostoy23rus/blockcheckw';
 
 			updateBannerCard.appendChild(E('div', {
 				style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;'
 			}, [
-				E('div', { style: 'flex: 1 1 100%; min-width: 0;' }, [
+				E('div', { style: 'flex: 1 1 auto; min-width: 0;' }, [
 					E('div', { style: 'font-size: 15px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
-						'🎉 Доступна новая версия: v' + (info.latest_version || '0.15.1'),
+						'🎉 Доступна новая версия: v' + nextVer,
 						E('span', { style: 'font-size: 12px; font-weight: normal; color: #828997;' }, releaseDate)
 					]),
-					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, 'Нажмите «Что нового», чтобы ознакомиться с изменениями и обновить компоненты.'),
+					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, 'Обнаружена новая версия службы. Нажмите кнопку для автоматической установки.'),
 					E('div', { style: 'font-size: 11px; color: #abb2bf; margin-top: 3px;' }, 'Репозиторий: ' + repoName + ' (ветка main)')
 				]),
 				E('div', { style: 'display: flex; gap: 10px; align-items: center;' }, [
 					E('button', {
 						class: 'bcw-btn-launch',
 						style: 'padding: 8px 18px; font-size: 13px;',
-						click: function() { showUpdateModal(info); }
-					}, '📋 Что нового и обновить'),
+						click: function() { confirmRunUpdate(nextVer); }
+					}, '🚀 Установить обновление v' + nextVer),
 					E('button', {
 						class: 'bcw-btn-secondary',
 						style: 'padding: 8px 14px; font-size: 13px;',
@@ -1707,44 +1705,72 @@ return view.extend({
 			updateBannerCard.style.display = 'block';
 		}
 
+		function applyUpdateResult(parsed, isManual) {
+			updateCheckStatus.checked = true;
+			if (!parsed || !parsed.success) {
+				btnCheckUpdate.innerHTML = '';
+				btnCheckUpdate.appendChild(E('span', {}, '🔄'));
+				btnCheckUpdate.appendChild(document.createTextNode(' Проверить обновление (v' + curVer + ')'));
+				btnCheckUpdate.title = 'Не удалось проверить автоматически. Нажмите для повторной проверки';
+				btnCheckUpdate.style.borderColor = '#485060';
+				btnCheckUpdate.style.background = '#282c34';
+				btnCheckUpdate.style.color = '#abb2bf';
+				if (isManual) {
+					ui.addNotification(null, E('p', {}, 'Не удалось связаться с GitHub: ' + (parsed && parsed.error ? parsed.error : 'ошибка сети')), 'warning');
+				}
+				return;
+			}
+
+			if (parsed.has_update) {
+				updateCheckStatus.has_update = true;
+				updateCheckStatus.latest_version = parsed.latest_version;
+				btnCheckUpdate.innerHTML = '';
+				btnCheckUpdate.appendChild(E('span', { style: 'color: #61afef;' }, '🚀'));
+				btnCheckUpdate.appendChild(document.createTextNode(' Доступно обновление: v' + parsed.latest_version));
+				btnCheckUpdate.title = 'Доступна новая версия v' + parsed.latest_version + '. Нажмите для установки';
+				btnCheckUpdate.style.borderColor = '#3273dc';
+				btnCheckUpdate.style.background = 'rgba(50, 115, 220, 0.2)';
+				btnCheckUpdate.style.color = '#ffffff';
+
+				showUpdateBanner(parsed);
+
+				if (isManual) {
+					confirmRunUpdate(parsed.latest_version);
+				}
+			} else {
+				updateCheckStatus.has_update = false;
+				updateCheckStatus.latest_version = parsed.current_version || curVer;
+				btnCheckUpdate.innerHTML = '';
+				btnCheckUpdate.appendChild(E('span', { style: 'color: #00d1b2; font-weight: bold;' }, '✓'));
+				btnCheckUpdate.appendChild(document.createTextNode(' Стоит последняя версия (v' + (parsed.current_version || curVer) + ')'));
+				btnCheckUpdate.title = 'У вас установлена последняя актуальная версия. Нажмите для повторной проверки';
+				btnCheckUpdate.style.borderColor = 'rgba(0, 209, 178, 0.4)';
+				btnCheckUpdate.style.background = 'rgba(0, 209, 178, 0.08)';
+				btnCheckUpdate.style.color = '#e5e9f0';
+
+				updateBannerCard.style.display = 'none';
+
+				if (isManual) {
+					ui.addNotification(null, E('p', {}, '✓ У вас установлена последняя версия BlockcheckW (v' + (parsed.current_version || curVer) + '). Обновлений не требуется.'), 'info');
+				}
+			}
+		}
+
 		function doCheckUpdate(isManual) {
 			if (isManual) {
-				ui.showModal('Проверка обновлений', [
-					E('p', { class: 'spinning' }, 'Запрос к репозиторию GitHub prostoy23rus/blockcheckw...')
-				]);
+				btnCheckUpdate.innerHTML = '';
+				btnCheckUpdate.appendChild(E('span', {}, '🔄'));
+				btnCheckUpdate.appendChild(document.createTextNode(' Проверка...'));
 			}
 
 			fs.exec(HELPER_BIN, ['check_update']).then(function(res) {
-				if (isManual) ui.hideModal();
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
-
-				if (!parsed || !parsed.success) {
-					if (isManual) {
-						ui.addNotification(null, E('p', {}, 'Не удалось связаться с GitHub: ' + (parsed && parsed.error ? parsed.error : (res.stderr || 'ошибка сети'))), 'warning');
-					}
-					return;
-				}
-
-				if (parsed.has_update) {
-					showUpdateBanner(parsed);
-					if (isManual) {
-						showUpdateModal(parsed);
-					}
-				} else {
-					updateBannerCard.style.display = 'none';
-					if (isManual) {
-						showWhatsNewModal(parsed, false);
-					}
-				}
+				applyUpdateResult(parsed, isManual);
 			}).catch(function(err) {
-				if (isManual) {
-					ui.hideModal();
-					ui.addNotification(null, E('p', {}, 'Ошибка при проверке обновлений: ' + err), 'danger');
-				}
+				applyUpdateResult({ success: false, error: err }, isManual);
 			});
 		}
-
 		function doRunUpdate(targetVer) {
 			ui.showModal('Обновление службы BlockcheckW', [
 				E('p', { class: 'spinning', style: 'font-size: 14px; font-weight: bold;' }, 'Загрузка свежих файлов из GitHub и обновление...'),
@@ -1864,7 +1890,7 @@ return view.extend({
 		// Check for updates asynchronously without blocking page render
 		setTimeout(function() {
 			doCheckUpdate(false);
-		}, 1500);
+		}, 600);
 
 		// Initial In-Memory Render
 		updateSummaryBox();

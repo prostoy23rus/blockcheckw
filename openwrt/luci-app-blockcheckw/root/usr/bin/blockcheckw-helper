@@ -1298,6 +1298,8 @@ cmd_update() {
     [ -s "$tmp_dir/acl.json" ] && cp -f "$tmp_dir/acl.json" /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
 
     chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
+    chmod 644 /www/luci-static/resources/view/blockcheckw/main.js
+    chmod 644 /usr/share/blockcheckw/* /usr/share/luci/menu.d/luci-app-blockcheckw.json /usr/share/rpcd/acl.d/luci-app-blockcheckw.json 2>/dev/null || true
 
     local new_ver="0.15"
     if [ -f "/usr/share/blockcheckw/version.json" ]; then

@@ -258,6 +258,8 @@ fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-bloc
 fetch_file "openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" /www/luci-static/resources/view/blockcheckw/main.js 8
 
 chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
+chmod 644 /www/luci-static/resources/view/blockcheckw/main.js
+chmod 644 /usr/share/blockcheckw/* /usr/share/luci/menu.d/luci-app-blockcheckw.json /usr/share/rpcd/acl.d/luci-app-blockcheckw.json 2>/dev/null || true
 
 echo -e "${GREEN}✓${NC} Файлы LuCI интерфейса успешно скопированы."
 

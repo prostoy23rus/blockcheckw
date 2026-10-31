@@ -357,7 +357,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = { scanner_log: 'Загрузка логов...', zapret2_log: 'Загрузка логов...', daemons: '' };
-		var curVer = zapretInfo.version || '0.15.9';
+		var curVer = zapretInfo.version || '0.15.10';
 		var versionInfo = {
 			current_version: curVer,
 			has_update: false,
@@ -931,7 +931,7 @@ return view.extend({
 			versionsBarEl,
 			activeCodeEl
 		]);
-		mainLayout.appendChild(activeStratCard);
+		// Note: activeStratCard is appended below scanner results as requested by user
 
 		// Progress Monitor Card (Hidden when idle)
 		var progressBarEl = E('div', {
@@ -1019,6 +1019,7 @@ return view.extend({
 				progressTextEl,
 				progressPercentEl
 			]),
+			monitorSuccessAlertEl,
 			lineParamsBoxEl,
 			btnCopyDiagOnError
 		]);
@@ -1056,6 +1057,9 @@ return view.extend({
 			strategiesListEl
 		]);
 		mainLayout.appendChild(resultsCard);
+
+		// Active Strategy Inspector Card (Placed AFTER scanner as requested)
+		mainLayout.appendChild(activeStratCard);
 
 		// Live Logs and Diagnostics Monitor Card
 		var consoleLogEl = E('pre', {
@@ -1927,16 +1931,67 @@ return view.extend({
 			resultsCard.style.display = 'block';
 			strategiesListEl.innerHTML = '';
 
-			strategies.forEach(function(strat, idx) {
+			// Deduplicate strategies and collect supported protocols
+			var uniqueStrats = [];
+			var seen = {};
+
+			(strategies || []).forEach(function(strat) {
 				var sText = (typeof strat === 'string') ? strat : (strat.args || JSON.stringify(strat));
+				if (!sText || sText.trim() === '') return;
+				sText = sText.trim();
+
+				if (!seen[sText]) {
+					var item = {
+						args: sText,
+						protocols: []
+					};
+					if (typeof strat === 'object') {
+						if (Array.isArray(strat.protocols)) {
+							item.protocols = strat.protocols.slice();
+						} else if (strat.protocol) {
+							item.protocols.push(strat.protocol.replace(/^HTTPS\//, ''));
+						}
+					}
+					seen[sText] = item;
+					uniqueStrats.push(item);
+				} else {
+					if (typeof strat === 'object') {
+						var toAdd = [];
+						if (Array.isArray(strat.protocols)) {
+							toAdd = strat.protocols;
+						} else if (strat.protocol) {
+							toAdd = [strat.protocol.replace(/^HTTPS\//, '')];
+						}
+						toAdd.forEach(function(p) {
+							if (seen[sText].protocols.indexOf(p) === -1) {
+								seen[sText].protocols.push(p);
+							}
+						});
+					}
+				}
+			});
+
+			var resultsTitle = resultsCard.querySelector('.bcw-card-title');
+			if (resultsTitle) {
+				resultsTitle.textContent = 'Найденные рабочие стратегии (' + uniqueStrats.length + ' уникальных, 100% проверено)';
+			}
+
+			uniqueStrats.forEach(function(strat, idx) {
+				var sText = strat.args;
+				var protoBadgeText = '';
+				if (strat.protocols && strat.protocols.length > 0) {
+					protoBadgeText = strat.protocols.join(' + ');
+				}
+
 				var card = E('div', {
 					class: 'bcw-strat-item',
 					style: 'background: #282c34; padding: 14px; border-radius: 6px; border: 1px solid #3e4451; display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box;'
 				}, [
 					E('div', { class: 'bcw-strat-header', style: 'display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;' }, [
-						E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
+						E('div', { style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;' }, [
 							E('span', { class: 'badge cbi-color-green', style: 'font-weight: bold;' }, '#' + (idx + 1) + ' 100% Работает'),
-							E('strong', { style: 'color: #61afef;' }, 'Одиночная стратегия')
+							protoBadgeText ? E('span', { class: 'badge cbi-color-blue', style: 'font-weight: 600;' }, '🌐 ' + protoBadgeText) : '',
+							E('strong', { style: 'color: #61afef; font-size: 12.5px;' }, 'Одиночная стратегия')
 						]),
 						E('button', {
 							class: 'bcw-btn-sm cbi-button cbi-button-positive bcw-strat-apply-btn',

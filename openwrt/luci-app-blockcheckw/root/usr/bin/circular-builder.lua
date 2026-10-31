@@ -49,6 +49,7 @@ local function parse_strategies(file_path)
     f:close()
 
     local strats = {}
+    local seen_strats = {}
     -- Try JSON first
     local parsed = json.parse(content)
     if parsed and type(parsed) == "table" then
@@ -57,7 +58,10 @@ local function parse_strategies(file_path)
                 local s = (type(item) == "table" and item.args) or (type(item) == "string" and item)
                 if s then
                     local c = clean_strategy(s)
-                    if c then table.insert(strats, c) end
+                    if c and not seen_strats[c] then
+                        seen_strats[c] = true
+                        table.insert(strats, c)
+                    end
                 end
             end
         elseif type(parsed.protocols) == "table" then
@@ -65,7 +69,10 @@ local function parse_strategies(file_path)
                 if type(p.strategies) == "table" then
                     for _, s in ipairs(p.strategies) do
                         local c = clean_strategy(s)
-                        if c then table.insert(strats, c) end
+                        if c and not seen_strats[c] then
+                            seen_strats[c] = true
+                            table.insert(strats, c)
+                        end
                     end
                 end
             end

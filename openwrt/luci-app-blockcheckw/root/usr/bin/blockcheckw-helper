@@ -706,57 +706,70 @@ cmd_start() {
             cp -f "$latest_scan" "$OUTPUT_SCAN"
         fi
 
-        # Check for found strategies
+        # Deduplicate and extract strategy list for JSON output and circular builder
+        local strats_json="[]"
+        local top_strategy=""
         local found_count=0
         if [ -f "$OUTPUT_SCAN" ]; then
-            found_count=$(lua -e '
-                local json = require("luci.jsonc")
-                local f = io.open("'"$OUTPUT_SCAN"'", "r")
-                if f then
-                    local d = json.parse(f:read("*a"))
-                    f:close()
-                    if d and d.strategies then print(#d.strategies) else print(0) end
-                else print(0) end
-            ' 2>/dev/null)
+            strats_json=$(lua - "$OUTPUT_SCAN" << 'EOF' 2>/dev/null
+local json = require("luci.jsonc")
+local scan_file = arg[1]
+local f = io.open(scan_file, "r")
+if not f then print("[]") return end
+local d = json.parse(f:read("*a"))
+f:close()
+if not d or not d.strategies then print("[]") return end
+
+local list = {}
+local seen = {}
+for _, s in ipairs(d.strategies) do
+    local a = (type(s) == "table" and s.args) or s
+    if a and a ~= "" then
+        if not seen[a] then
+            local item = { args = a, protocols = {} }
+            if type(s) == "table" and s.protocol then
+                local p = (s.protocol:gsub("^HTTPS/", ""))
+                table.insert(item.protocols, p)
+            end
+            seen[a] = item
+            table.insert(list, item)
+        else
+            if type(s) == "table" and s.protocol then
+                local p = (s.protocol:gsub("^HTTPS/", ""))
+                local exists = false
+                for _, ex in ipairs(seen[a].protocols) do
+                    if ex == p then exists = true break end
+                end
+                if not exists then
+                    table.insert(seen[a].protocols, p)
+                end
+            end
+        end
+    end
+end
+print(json.stringify(list))
+EOF
+)
+            found_count=$(lua - "$strats_json" << 'EOF' 2>/dev/null
+local json = require("luci.jsonc")
+local d = json.parse(arg[1] or "[]")
+print(d and #d or 0)
+EOF
+)
+            top_strategy=$(lua - "$strats_json" << 'EOF' 2>/dev/null
+local json = require("luci.jsonc")
+local d = json.parse(arg[1] or "[]")
+if d and d[1] then
+    print(d[1].args or d[1])
+end
+EOF
+)
         fi
 
         # Build circular strategy if requested
         if [ "$do_circular" = "1" ] && [ "$found_count" -gt 0 ]; then
             write_status "running" 88 "Сборка отказоустойчивой Circular-стратегии..."
             lua "$CIRCULAR_BUILDER" "$OUTPUT_SCAN" 3 20 4 loop > "$OUTPUT_CIRCULAR" 2>> "$LOG_FILE"
-        fi
-
-        # Extract strategy list for JSON output
-        local strats_json="[]"
-        local top_strategy=""
-        if [ -f "$OUTPUT_SCAN" ]; then
-            strats_json=$(lua -e '
-                local json = require("luci.jsonc")
-                local f = io.open("'"$OUTPUT_SCAN"'", "r")
-                if f then
-                    local d = json.parse(f:read("*a"))
-                    f:close()
-                    if d and d.strategies then
-                        local list = {}
-                        for _, s in ipairs(d.strategies) do
-                            table.insert(list, s.args or s)
-                        end
-                        print(json.stringify(list))
-                    else print("[]") end
-                else print("[]") end
-            ' 2>/dev/null)
-            
-            top_strategy=$(lua -e '
-                local json = require("luci.jsonc")
-                local f = io.open("'"$OUTPUT_SCAN"'", "r")
-                if f then
-                    local d = json.parse(f:read("*a"))
-                    f:close()
-                    if d and d.strategies and d.strategies[1] then
-                        print(d.strategies[1].args or d.strategies[1])
-                    end
-                end
-            ' 2>/dev/null)
         fi
 
         local apply_info=""
@@ -1229,7 +1242,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.9" end
+        if not res.version then res.version = "0.15.10" end
 
         local hostlists_info = {
             { key = "youtube", name = "YouTube", file = "/opt/zapret2/ipset/zapret_hosts_youtube.txt", uci_sec = "list_hosts_youtube" },
@@ -1391,9 +1404,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.9"
+    local cur_ver="0.15.10"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.9"); else print("0.15.9"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.10"); else print("0.15.10"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1402,7 +1415,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.9"
+local cur_ver = arg[1] or "0.15.10"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1627,7 +1640,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.9"
+local app_version = "0.15.10"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))

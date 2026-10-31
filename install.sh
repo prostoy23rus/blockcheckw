@@ -261,6 +261,9 @@ chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
 chmod 644 /www/luci-static/resources/view/blockcheckw/main.js
 chmod 644 /usr/share/blockcheckw/* /usr/share/luci/menu.d/luci-app-blockcheckw.json /usr/share/rpcd/acl.d/luci-app-blockcheckw.json 2>/dev/null || true
 
+# Инициализация списков хостов для сервисов в Zapret2 (/opt/zapret2/ipset/)
+/usr/bin/blockcheckw-helper ensure_hostlists 2>/dev/null || true
+
 echo -e "${GREEN}✓${NC} Файлы LuCI интерфейса успешно скопированы."
 
 # 7. Настройка Firewall: блокировка QUIC (UDP 443)

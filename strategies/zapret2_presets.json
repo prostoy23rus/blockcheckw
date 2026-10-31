@@ -79,7 +79,7 @@
       "label": "Twitch (3)",
       "domain": "twitch.tv",
       "test_url": "https://twitch.tv",
-      "hostlist": "list_hosts_user",
+      "hostlist": "list_hosts_twitch",
       "port": "443",
       "protocols": [
         "tls12",
@@ -100,7 +100,7 @@
       "label": "X / Twitter (3)",
       "domain": "x.com",
       "test_url": "https://x.com",
-      "hostlist": "list_hosts_user",
+      "hostlist": "list_hosts_x",
       "port": "443",
       "protocols": [
         "tls12",
@@ -124,7 +124,7 @@
       "label": "Instagram (2)",
       "domain": "gateway.instagram.com",
       "test_url": "https://gateway.instagram.com",
-      "hostlist": "list_hosts_user",
+      "hostlist": "list_hosts_instagram",
       "port": "443",
       "protocols": [
         "tls12",

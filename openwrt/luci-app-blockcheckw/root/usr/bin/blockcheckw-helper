@@ -66,17 +66,24 @@ fetch_file() {
 }
 
 is_scanner_running() {
+    # 1. Exact match for compiled scanner binary
+    if pidof blockcheckw >/dev/null 2>&1 || pgrep -x blockcheckw >/dev/null 2>&1; then
+        return 0
+    fi
+
+    # 2. Check recorded child/background PID
     if [ -f "$PID_FILE" ]; then
         local pid=$(cat "$PID_FILE" 2>/dev/null | tr -d '[:space:]')
         if [ -n "$pid" ] && [ "$pid" != "$$" ] && [ -d "/proc/$pid" ]; then
             local cmd=$(cat "/proc/$pid/cmdline" 2>/dev/null | tr '\000' ' ')
-            case "$cmd" in
-                *blockcheckw\ *|*/blockcheckw\ *|*blockcheckw-helper*) return 0 ;;
-            esac
+            if echo "$cmd" | grep -q 'blockcheckw ' && ! echo "$cmd" | grep -q 'blockcheckw-hel'; then
+                return 0
+            fi
         fi
     fi
-    # Robust check: only consider scanner running if the binary itself is running
-    if ps | grep -v grep | grep -v 'blockcheckw-helper' | grep -qE 'blockcheckw'; then
+
+    # 3. Fallback: check process table excluding helper processes
+    if ps -w | grep -v grep | grep -v 'blockcheckw-hel' | grep -qE '/usr/bin/blockcheckw\b'; then
         return 0
     fi
     return 1
@@ -84,6 +91,185 @@ is_scanner_running() {
 
 ensure_json() {
     [ -f "$STATUS_FILE" ] || echo '{"status":"idle","percent":0,"phase":"Готов к работе","strategies":[],"log":""}' > "$STATUS_FILE"
+}
+
+ensure_preset_hostlist() {
+    local tgt="$1"
+    local custom_dom="$2"
+    local ipset_dir="/opt/zapret2/ipset"
+    mkdir -p "$ipset_dir" 2>/dev/null
+
+    case "$tgt" in
+        preset_x|x)
+            local x_file="$ipset_dir/zapret_hosts_x.txt"
+            if [ ! -f "$x_file" ] || [ ! -s "$x_file" ]; then
+                cat << 'EOF' > "$x_file"
+x.com
+twitter.com
+t.co
+twimg.com
+pbs.twimg.com
+abs.twimg.com
+api.x.com
+api.twitter.com
+video.twimg.com
+ton.twitter.com
+EOF
+                chmod 644 "$x_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_x >/dev/null; then
+                uci set zapret2.list_hosts_x=list
+                uci set zapret2.list_hosts_x.path="$x_file"
+            fi
+            ;;
+        preset_instagram|instagram)
+            local ig_file="$ipset_dir/zapret_hosts_instagram.txt"
+            if [ ! -f "$ig_file" ] || [ ! -s "$ig_file" ]; then
+                cat << 'EOF' > "$ig_file"
+instagram.com
+cdninstagram.com
+fbcdn.net
+facebook.com
+threads.net
+gateway.instagram.com
+static.cdninstagram.com
+EOF
+                chmod 644 "$ig_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_instagram >/dev/null; then
+                uci set zapret2.list_hosts_instagram=list
+                uci set zapret2.list_hosts_instagram.path="$ig_file"
+            fi
+            ;;
+        preset_twitch|twitch)
+            local tw_file="$ipset_dir/zapret_hosts_twitch.txt"
+            if [ ! -f "$tw_file" ] || [ ! -s "$tw_file" ]; then
+                cat << 'EOF' > "$tw_file"
+twitch.tv
+ttvnw.net
+jtvnw.net
+usher.ttvnw.net
+static-cdn.jtvnw.net
+EOF
+                chmod 644 "$tw_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_twitch >/dev/null; then
+                uci set zapret2.list_hosts_twitch=list
+                uci set zapret2.list_hosts_twitch.path="$tw_file"
+            fi
+            ;;
+        preset_youtube|youtube)
+            local yt_file="$ipset_dir/zapret_hosts_youtube.txt"
+            if [ ! -f "$yt_file" ] || [ ! -s "$yt_file" ]; then
+                if [ -f "$yt_file.default" ]; then
+                    cp -f "$yt_file.default" "$yt_file" 2>/dev/null
+                else
+                    cat << 'EOF' > "$yt_file"
+googlevideo.com
+youtube.com
+youtu.be
+ytimg.com
+ggpht.com
+gvt1.com
+youtubei.googleapis.com
+EOF
+                fi
+                chmod 644 "$yt_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_youtube >/dev/null; then
+                uci set zapret2.list_hosts_youtube=list
+                uci set zapret2.list_hosts_youtube.path="$yt_file"
+            fi
+            ;;
+        preset_discord|discord)
+            local dc_file="$ipset_dir/zapret_hosts_discord.txt"
+            if [ ! -f "$dc_file" ] || [ ! -s "$dc_file" ]; then
+                cat << 'EOF' > "$dc_file"
+discord.com
+discord.gg
+discord.media
+discordapp.com
+discordapp.net
+discordstatus.com
+gateway.discord.gg
+EOF
+                chmod 644 "$dc_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_discord >/dev/null; then
+                uci set zapret2.list_hosts_discord=list
+                uci set zapret2.list_hosts_discord.path="$dc_file"
+            fi
+            ;;
+        builtin|general)
+            local u_file="$ipset_dir/zapret_hosts_user.txt"
+            if [ ! -f "$u_file" ] || [ ! -s "$u_file" ]; then
+                cat << 'EOF' > "$u_file"
+rutracker.org
+rutracker.cc
+nnmclub.to
+kinozal.tv
+rutor.info
+lostfilm.tv
+hdrezka.ag
+flibusta.is
+pornhub.com
+xvideos.com
+redtube.com
+torproject.org
+bbc.com
+bbc.co.uk
+meduza.io
+dw.com
+svoboda.org
+currenttime.tv
+theins.ru
+novayagazeta.eu
+linkedin.com
+notion.so
+canva.com
+medium.com
+soundcloud.com
+spotify.com
+deezer.com
+openai.com
+chatgpt.com
+claude.ai
+proton.me
+protonmail.com
+t.me
+EOF
+                chmod 644 "$u_file" 2>/dev/null
+            fi
+            if ! uci -q get zapret2.list_hosts_user >/dev/null; then
+                uci set zapret2.list_hosts_user=list
+                uci set zapret2.list_hosts_user.path="$u_file"
+            fi
+            ;;
+        *)
+            local u_file="$ipset_dir/zapret_hosts_user.txt"
+            touch "$u_file" 2>/dev/null
+            if [ -n "$custom_dom" ]; then
+                local cd_clean=$(echo "$custom_dom" | tr 'A-Z' 'a-z' | sed -e 's|^https*://||' -e 's|/.*||' | tr -d '[:space:]')
+                if [ -n "$cd_clean" ] && ! grep -qFx "$cd_clean" "$u_file" 2>/dev/null; then
+                    echo "$cd_clean" >> "$u_file"
+                fi
+            fi
+            if ! uci -q get zapret2.list_hosts_user >/dev/null; then
+                uci set zapret2.list_hosts_user=list
+                uci set zapret2.list_hosts_user.path="$u_file"
+            fi
+            ;;
+    esac
+}
+
+ensure_all_hostlists() {
+    ensure_preset_hostlist "preset_youtube"
+    ensure_preset_hostlist "preset_discord"
+    ensure_preset_hostlist "preset_x"
+    ensure_preset_hostlist "preset_instagram"
+    ensure_preset_hostlist "preset_twitch"
+    ensure_preset_hostlist "builtin"
+    uci commit zapret2 2>/dev/null || true
 }
 
 write_status() {
@@ -170,6 +356,19 @@ if extra_raw and extra_raw:match("^%s*,") then
     if extra_parsed then
         for k, v in pairs(extra_parsed) do
             obj[k] = v
+        end
+    end
+end
+
+-- Read apply_result if saved by cmd_apply
+local arf = io.open("/tmp/blockcheckw_apply_result.json", "r")
+if arf then
+    local ar = json.parse(arf:read("*a"))
+    arf:close()
+    if ar then
+        obj.apply_result = ar
+        if obj.auto_applied == nil and ar.success then
+            obj.auto_applied = true
         end
     end
 end
@@ -329,8 +528,10 @@ cmd_start() {
             ;;
     esac
 
-    rm -f "$OUTPUT_VANILLA" "$OUTPUT_SCAN" "$OUTPUT_CIRCULAR" "$TURBO_FILE" "$LOG_FILE"
+    rm -f "$OUTPUT_VANILLA" "$OUTPUT_SCAN" "$OUTPUT_CIRCULAR" "$TURBO_FILE" "$LOG_FILE" /tmp/blockcheckw_apply_result.json
     echo "" > "$LOG_FILE"
+
+    ensure_preset_hostlist "$target" "$domain"
 
     write_status "running" 10 "Инициализация сканирования ($domain)"
 
@@ -744,6 +945,20 @@ if not st.block_type or st.block_type == "" then
     end
 end
 
+if not st.apply_result then
+    local arf = io.open("/tmp/blockcheckw_apply_result.json", "r")
+    if arf then
+        local ar = json.parse(arf:read("*a"))
+        arf:close()
+        if ar then
+            st.apply_result = ar
+            if st.auto_applied == nil and ar.success then
+                st.auto_applied = true
+            end
+        end
+    end
+end
+
 print(json.stringify(st))
 EOF
 }
@@ -819,21 +1034,21 @@ cmd_apply() {
             base_sec="BlockcheckW_Twitch"
             port="443"
             l7="tls"
-            hostlist="list_hosts_user"
+            hostlist="list_hosts_twitch"
             test_url="https://twitch.tv"
             ;;
         preset_x|x)
             base_sec="BlockcheckW_X"
             port="443"
             l7="tls"
-            hostlist="list_hosts_user"
+            hostlist="list_hosts_x"
             test_url="https://x.com"
             ;;
         preset_instagram|instagram)
             base_sec="BlockcheckW_Instagram"
             port="443"
             l7="tls"
-            hostlist="list_hosts_user"
+            hostlist="list_hosts_instagram"
             test_url="https://gateway.instagram.com"
             ;;
         tcp16)
@@ -887,6 +1102,9 @@ cmd_apply() {
         uci -q set "zapret2.Routerich_circular.enabled=0"
     fi
 
+    # Ensure target hostlist and domains are properly configured in Zapret2
+    ensure_preset_hostlist "$target"
+
     # Create new strategy section in zapret2
     uci set "zapret2.$sec_name=strategy"
     uci set "zapret2.$sec_name.enabled=1"
@@ -909,15 +1127,17 @@ cmd_apply() {
     sleep 1
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
 
-    # Test connectivity with curl
+    # Test connectivity with curl (strictly timed out to prevent hanging if DPI drops packets)
     local curl_status=0
     local http_code=0
     if [ -n "$test_url" ]; then
-        http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "$test_url" 2>/dev/null)
-        [ "$http_code" -gt 0 ] && curl_status=1
+        http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 -m 6 "$test_url" 2>/dev/null)
+        if [ -n "$http_code" ] && [ "$http_code" != "000" ] && [ "$http_code" -ge 200 ] 2>/dev/null && [ "$http_code" -lt 500 ] 2>/dev/null; then
+            curl_status=1
+        fi
     fi
 
-    cat <<EOF
+    local res_json=$(cat <<EOF
 {
   "success": true,
   "message": "Новая запись стратегии ($sec_name) успешно создана в Zapret2, активирована и проверена!",
@@ -929,6 +1149,9 @@ cmd_apply() {
   "connected": $([ "$curl_status" = "1" ] && echo "true" || echo "false")
 }
 EOF
+)
+    echo "$res_json" > /tmp/blockcheckw_apply_result.json
+    echo "$res_json"
 }
 
 cmd_activate() {
@@ -1008,9 +1231,11 @@ cmd_delete_strategy() {
 
 cmd_test() {
     local url="${1:-https://rutracker.org}"
-    local code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 "$url" 2>/dev/null)
+    local code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 -m 6 "$url" 2>/dev/null)
     local ok=false
-    [ "$code" -gt 0 ] && ok=true
+    if [ -n "$code" ] && [ "$code" != "000" ] && [ "$code" -ge 200 ] 2>/dev/null && [ "$code" -lt 500 ] 2>/dev/null; then
+        ok=true
+    fi
     echo '{"url":"'"$url"'","http_code":"'"$code"'","accessible":'"$ok"'}'
 }
 
@@ -1059,15 +1284,15 @@ cmd_info() {
             youtube = { base = "MyTube", fallback = "Youtube_circular", name = "YouTube" },
             preset_discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Предустановленный список Discord (3)" },
             discord = { base = "BlockcheckW_Discord", fallback = "Discord_circular", name = "Discord" },
-            preset_twitch = { base = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Предустановленный список Twitch (3)" },
-            twitch = { base = "BlockcheckW_Twitch", fallback = "BlockcheckW_General", name = "Twitch" },
-            preset_x = { base = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "Предустановленный список X (3)" },
-            x = { base = "BlockcheckW_X", fallback = "BlockcheckW_General", name = "X (Twitter)" },
-            preset_instagram = { base = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Предустановленный список Instagram (2)" },
-            instagram = { base = "BlockcheckW_Instagram", fallback = "BlockcheckW_General", name = "Instagram" },
-            tcp16 = { base = "BlockcheckW_TCP16", fallback = "BlockcheckW_General", name = "Кандидаты TCP 16-20 KB (110)" },
-            domains = { base = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
-            custom = { base = "BlockcheckW_Custom", fallback = "BlockcheckW_General", name = "Свои домены" },
+            preset_twitch = { base = "BlockcheckW_Twitch", name = "Предустановленный список Twitch (3)" },
+            twitch = { base = "BlockcheckW_Twitch", name = "Twitch" },
+            preset_x = { base = "BlockcheckW_X", name = "Предустановленный список X (3)" },
+            x = { base = "BlockcheckW_X", name = "X (Twitter)" },
+            preset_instagram = { base = "BlockcheckW_Instagram", name = "Предустановленный список Instagram (2)" },
+            instagram = { base = "BlockcheckW_Instagram", name = "Instagram" },
+            tcp16 = { base = "BlockcheckW_TCP16", name = "Кандидаты TCP 16-20 KB (110)" },
+            domains = { base = "BlockcheckW_Custom", name = "Свои домены" },
+            custom = { base = "BlockcheckW_Custom", name = "Свои домены" },
             test_strategy = { base = "BlockcheckW_General", name = "Тест стратегии" }
         }
 
@@ -1087,7 +1312,7 @@ cmd_info() {
             table.sort(matching, function(a, b)
                 local num_a = tonumber(a.section:match("_(%d+)$")) or (a.section == base and 1 or 0)
                 local num_b = tonumber(b.section:match("_(%d+)$")) or (b.section == base and 1 or 0)
-                return num_a < num_b
+                return num_a > num_b
             end)
 
             local active = nil
@@ -1098,7 +1323,7 @@ cmd_info() {
                 end
             end
             if not active and #matching > 0 then
-                active = matching[#matching]
+                active = matching[1]
             end
 
             local vers = {}
@@ -1309,6 +1534,7 @@ cmd_update() {
     # Clean caches and reload LuCI
     rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
     /etc/init.d/rpcd restart >/dev/null 2>&1
+    ensure_all_hostlists
     rm -rf "$tmp_dir"
 
     echo "[blockcheckw-helper] Successfully updated to version $new_ver" >> "$LOG_FILE"
@@ -1499,8 +1725,9 @@ case "$1" in
     update) cmd_update ;;
     uninstall) shift; cmd_uninstall "$@" ;;
     diag) shift; cmd_diag "$@" ;;
+    ensure_hostlists) shift; ensure_all_hostlists "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall|diag}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
         exit 1
         ;;
 esac

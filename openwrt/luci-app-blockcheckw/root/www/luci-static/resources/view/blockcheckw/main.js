@@ -1554,12 +1554,25 @@ return view.extend({
 		function showStrategyAppliedModal(opts) {
 			opts = opts || {};
 			var isAuto = opts.isAuto !== false;
-			var targetDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
+			var targetDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'] || {};
 			var currentService = zapretServicesData[currentTarget] || {};
 			var currentActive = currentService.active || {};
-			var sectionName = (opts && opts.section) || (opts.applyResult && opts.applyResult.section) || currentActive.section || targetDef.title;
 
-			var targetLabel = targetDef.title || currentTarget;
+			var defSec = (currentTarget === 'preset_youtube') ? 'MyTube' :
+			             (currentTarget === 'preset_discord') ? 'BlockcheckW_Discord' :
+			             (currentTarget === 'preset_x') ? 'BlockcheckW_X' :
+			             (currentTarget === 'preset_instagram') ? 'BlockcheckW_Instagram' :
+			             (currentTarget === 'preset_twitch') ? 'BlockcheckW_Twitch' :
+			             (currentTarget === 'builtin') ? 'BlockcheckW_General' :
+			             ('BlockcheckW_' + currentTarget.replace(/[^a-zA-Z0-9_]/g, '_'));
+
+			var sectionName = (opts && opts.section) ||
+			                  (opts && opts.applyResult && opts.applyResult.section) ||
+			                  currentActive.section ||
+			                  (currentService && currentService.section) ||
+			                  defSec;
+
+			var targetLabel = targetDef.name || targetDef.label || currentTarget;
 			if (currentTarget === 'domains') {
 				var d = customDomainInput ? customDomainInput.value.trim() : '';
 				if (d) targetLabel = 'Домен ' + d;
@@ -1803,12 +1816,13 @@ return view.extend({
 						var stratsCount = (st.strategies && Array.isArray(st.strategies)) ? st.strategies.length : 0;
 						var hasStrategies = stratsCount > 0;
 
-						if (st.auto_applied || (autoApply && hasStrategies)) {
+						var isAutoApplied = (st.auto_applied === true) || (st.apply_result && st.apply_result.success === true);
+						if (isAutoApplied) {
 							monitorSuccessAlertEl.style.display = 'block';
 						}
 
 						if (wasActive) {
-							if (st.auto_applied || (autoApply && hasStrategies)) {
+							if (isAutoApplied) {
 								showStrategyAppliedModal({
 									isAuto: true,
 									section: (st.apply_result && st.apply_result.section) || null,
@@ -1856,7 +1870,7 @@ return view.extend({
 				progressPhaseEl.style.color = '#00d1b2';
 				progressBarEl.style.background = '#00d1b2';
 				btnCopyDiagOnError.style.display = 'none';
-				if (st.auto_applied || (autoApply && st.strategies && st.strategies.length > 0)) {
+				if (st.auto_applied || (st.apply_result && st.apply_result.success)) {
 					monitorSuccessAlertEl.style.display = 'block';
 				}
 			} else if (st.status === 'error') {

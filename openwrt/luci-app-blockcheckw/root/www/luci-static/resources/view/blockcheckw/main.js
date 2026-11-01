@@ -386,6 +386,8 @@ return view.extend({
 			'.bcw-container { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
 			'.bcw-card { background: #20232a; border: 1px solid #323742; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); width: 100%; max-width: 100%; overflow-x: hidden; }\n' +
 			'.bcw-card-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.07); width: 100%; }\n' +
+			'.bcw-spoiler-header:hover { background: rgba(255, 255, 255, 0.03); border-radius: 6px; }\n' +
+			'.bcw-spoiler-btn:hover { background: #323742 !important; color: #fff !important; border-color: #3273dc !important; }\n' +
 			'.bcw-card-title { font-size: 15px; font-weight: bold; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: #e5e9f0; line-height: 1.4; word-break: break-word; }\n' +
 			'\n' +
 			'/* Header Action Elements */\n' +
@@ -1030,12 +1032,86 @@ return view.extend({
 		]);
 		mainLayout.appendChild(circularCard);
 
-		// Individual Working Strategies Section
-		var strategiesListEl = E('div', { style: 'display: flex; flex-direction: column; gap: 12px; margin-top: 10px;' });
-		var resultsCard = E('div', { class: 'bcw-card', style: 'display: none;' }, [
-			E('div', { class: 'bcw-card-header' }, [
-				E('h3', { class: 'bcw-card-title' }, 'Найденные рабочие стратегии (100% проверено)')
+		// Individual Working Strategies Section (Collapsible Spoiler)
+		var isStrategiesExpanded = false;
+		var uniqueStrategiesCount = 0;
+		var strategiesListEl = E('div', { style: 'display: none; flex-direction: column; gap: 12px; margin-top: 14px;' });
+
+		var btnToggleStrategies = E('button', {
+			type: 'button',
+			class: 'bcw-btn-sm cbi-button cbi-button-neutral bcw-spoiler-btn',
+			style: 'height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px; border: 1px solid #485060; background: #282c34; color: #abb2bf;'
+		}, [
+			E('span', { class: 'bcw-spoiler-icon' }, '▼'),
+			E('span', { class: 'bcw-spoiler-text' }, 'Развернуть')
+		]);
+
+		var resultsCardHeader = E('div', {
+			class: 'bcw-card-header bcw-spoiler-header',
+			style: 'cursor: pointer; user-select: none; margin-bottom: 0px; padding-bottom: 0px; border-bottom: none; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;'
+		}, [
+			E('div', { style: 'display: flex; align-items: center; gap: 10px; flex-wrap: wrap;' }, [
+				E('span', { class: 'bcw-spoiler-arrow', style: 'display: inline-block; transition: all 0.2s; font-size: 13px; color: #61afef;' }, '▶'),
+				E('h3', { class: 'bcw-card-title', style: 'margin: 0;' }, 'Найденные рабочие стратегии (100% проверено)'),
+				E('span', { class: 'badge cbi-color-blue bcw-strats-count-badge', style: 'font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: bold;' }, '0 шт.')
 			]),
+			E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
+				btnToggleStrategies
+			])
+		]);
+
+		function updateSpoilerUI() {
+			var arrowEl = resultsCardHeader.querySelector('.bcw-spoiler-arrow');
+			var btnTextEl = btnToggleStrategies.querySelector('.bcw-spoiler-text');
+			var btnIconEl = btnToggleStrategies.querySelector('.bcw-spoiler-icon');
+			var count = uniqueStrategiesCount || 0;
+
+			if (isStrategiesExpanded) {
+				strategiesListEl.style.display = 'flex';
+				resultsCardHeader.style.marginBottom = '14px';
+				resultsCardHeader.style.paddingBottom = '10px';
+				resultsCardHeader.style.borderBottom = '1px solid rgba(255,255,255,0.07)';
+				if (arrowEl) {
+					arrowEl.textContent = '▼';
+					arrowEl.style.color = '#98c379';
+				}
+				if (btnTextEl) btnTextEl.textContent = 'Свернуть';
+				if (btnIconEl) btnIconEl.textContent = '▲';
+			} else {
+				strategiesListEl.style.display = 'none';
+				resultsCardHeader.style.marginBottom = '0px';
+				resultsCardHeader.style.paddingBottom = '0px';
+				resultsCardHeader.style.borderBottom = 'none';
+				if (arrowEl) {
+					arrowEl.textContent = '▶';
+					arrowEl.style.color = '#61afef';
+				}
+				if (btnTextEl) btnTextEl.textContent = count > 0 ? ('Развернуть (' + count + ')') : 'Развернуть';
+				if (btnIconEl) btnIconEl.textContent = '▼';
+			}
+		}
+
+		function toggleStrategiesSpoiler() {
+			isStrategiesExpanded = !isStrategiesExpanded;
+			updateSpoilerUI();
+		}
+
+		function expandStrategiesSpoiler() {
+			isStrategiesExpanded = true;
+			updateSpoilerUI();
+		}
+
+		resultsCardHeader.addEventListener('click', function(e) {
+			toggleStrategiesSpoiler();
+		});
+
+		btnToggleStrategies.addEventListener('click', function(e) {
+			e.stopPropagation();
+			toggleStrategiesSpoiler();
+		});
+
+		var resultsCard = E('div', { class: 'bcw-card', style: 'display: none;' }, [
+			resultsCardHeader,
 			strategiesListEl
 		]);
 		mainLayout.appendChild(resultsCard);
@@ -1673,6 +1749,9 @@ return view.extend({
 					click: function() {
 						ui.hideModal();
 						if (resultsCard) {
+							if (typeof expandStrategiesSpoiler === 'function') {
+								expandStrategiesSpoiler();
+							}
 							resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 						}
 					}
@@ -1698,6 +1777,8 @@ return view.extend({
 			monitorCard.style.display = 'block';
 			circularCard.style.display = 'none';
 			resultsCard.style.display = 'none';
+			isStrategiesExpanded = false;
+			updateSpoilerUI();
 			btnCopyDiagOnError.style.display = 'none';
 			monitorSuccessAlertEl.style.display = 'none';
 			activeScanInProgress = true;
@@ -1941,10 +2022,16 @@ return view.extend({
 				}
 			});
 
+			uniqueStrategiesCount = uniqueStrats.length;
 			var resultsTitle = resultsCard.querySelector('.bcw-card-title');
 			if (resultsTitle) {
-				resultsTitle.textContent = 'Найденные рабочие стратегии (' + uniqueStrats.length + ' уникальных, 100% проверено)';
+				resultsTitle.textContent = 'Найденные рабочие стратегии (' + uniqueStrategiesCount + ' уникальных, 100% проверено)';
 			}
+			var badgeEl = resultsCard.querySelector('.bcw-strats-count-badge');
+			if (badgeEl) {
+				badgeEl.textContent = uniqueStrategiesCount + ' шт.';
+			}
+			updateSpoilerUI();
 
 			uniqueStrats.forEach(function(strat, idx) {
 				var sText = strat.args;

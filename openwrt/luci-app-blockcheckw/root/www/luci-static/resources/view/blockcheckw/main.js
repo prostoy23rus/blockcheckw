@@ -188,7 +188,7 @@ var PRESET_DEFS = {
 			details: [
 				{ title: '⚡ Как работает', text: 'Роутер отправляет реальный HTTP/HTTPS запрос (curl) с эмуляцией TLS ClientHello браузера и выводит точный код ответа (200 OK, 302 Redirect) и время отклика.' },
 				{ title: '🔍 Выбор адреса', text: 'Адрес автоматически подставляется под выбранную стратегию (для YouTube — googlevideo.com, для Discord — gateway.discord.gg), либо вы можете указать любой свой URL.' },
-				{ title: '🚀 Кнопки управления', text: 'Нажмите [ 🌐 Проверить доступность (curl) ] для моментальной проверки. Кнопку [ ▶ Запустить поиск стратегий ] нажимайте только если хотите заново подобрать стратегию с нуля.' }
+				{ title: '🚀 Кнопки управления', text: 'Нажмите [ 🌐 Проверить доступность ] для моментальной проверки. Кнопку [ ⚡ Запустить поиск ] нажимайте только если хотите заново подобрать стратегию с нуля.' }
 			]
 		}
 	}
@@ -349,7 +349,8 @@ return view.extend({
 	load: function() {
 		return Promise.all([
 			checkHelperStatus(),
-			getZapretInfo()
+			getZapretInfo(),
+			fs.exec(HELPER_BIN, ['ensure_hostlists']).catch(function() {})
 		]);
 	},
 
@@ -365,6 +366,7 @@ return view.extend({
 		};
 		zapretServicesData = zapretInfo.services || {};
 		zapretAllStrategies = zapretInfo.all_strategies || [];
+		var lastAppliedResult = (statusData && statusData.apply_result) ? statusData.apply_result : null;
 
 		var container = E('div', { class: 'cbi-map bcw-wrapper' });
 
@@ -396,14 +398,15 @@ return view.extend({
 			'.bcw-header-btn:hover { background: #323742; color: #fff; border-color: #3273dc; }\n' +
 			'.bcw-header-badge { background: #282c34; color: #abb2bf; }\n' +
 			'\n' +
-			'/* Finder Mode Dropdown & Chips */\n' +
-			'.bcw-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 12px; width: 100%; }\n' +
+			'/* Finder Mode Tiles Grid */\n' +
+			'.bcw-tiles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; width: 100%; margin-top: 4px; }\n' +
+			'.bcw-tile-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 6px; border-radius: 8px; background: #252830; border: 1.5px solid #383e4a; color: #abb2bf; cursor: pointer; transition: all 0.2s ease; user-select: none; text-align: center; min-height: 64px; box-sizing: border-box; }\n' +
+			'.bcw-tile-btn:hover { background: #2d313b; border-color: #61afef; color: #ffffff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.25); }\n' +
+			'.bcw-tile-btn.active { background: rgba(0, 209, 178, 0.12); border-color: #00d1b2; color: #00d1b2; font-weight: bold; box-shadow: 0 0 12px rgba(0, 209, 178, 0.25); }\n' +
+			'.bcw-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 5px; }\n' +
+			'.bcw-tile-name { font-size: 12px; line-height: 1.25; font-weight: 600; }\n' +
 			'.bcw-select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; height: 38px; padding: 0 12px; font-size: 13px; font-weight: 600; border-radius: 6px; background: #282c34; color: #fff; border: 1px solid #485060; outline: none; cursor: pointer; transition: all 0.2s; }\n' +
 			'.bcw-select:hover, .bcw-select:focus { border-color: #3273dc; box-shadow: 0 0 8px rgba(50, 115, 220, 0.3); }\n' +
-			'.bcw-chips-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; width: 100%; }\n' +
-			'.bcw-chip-btn { box-sizing: border-box; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 500; border-radius: 16px; cursor: pointer; background: #282c34; border: 1px solid #3e4451; color: #abb2bf; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; white-space: nowrap; }\n' +
-			'.bcw-chip-btn:hover { color: #fff; border-color: #3273dc; background: #323742; }\n' +
-			'.bcw-chip-btn.active { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; font-weight: bold; }\n' +
 			'.bcw-target-summary { margin-top: 14px; padding: 12px 14px; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid #383e4a; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; width: 100%; }\n' +
 			'\n' +
 			'/* Mode Hints Box */\n' +
@@ -415,19 +418,18 @@ return view.extend({
 			'.bcw-hint-item-title { font-weight: bold; font-size: 12px; color: #98c379; display: flex; align-items: center; gap: 6px; }\n' +
 			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; word-break: break-word; }\n' +
 			'\n' +
-			'/* Control & Parameters Bar */\n' +
-			'.bcw-control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 18px; width: 100%; }\n' +
-			'.bcw-param-box { background: #282c34; border: 1px solid #383e4a; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; min-height: 125px; box-sizing: border-box; width: 100%; }\n' +
-			'.bcw-param-label { font-size: 13px; font-weight: bold; color: #abb2bf; }\n' +
-			'/* Separate Option Buttons */\n' +
-			'.bcw-options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; box-sizing: border-box; }\n' +
-			'.bcw-opt-btn { height: 44px; padding: 0 8px; font-size: 12.5px; font-weight: 600; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; background: #1c2027; border: 1px solid #383e4a; border-radius: 8px; color: #828997; transition: all 0.2s ease; white-space: normal; line-height: 1.25; box-sizing: border-box; outline: none; user-select: none; -webkit-tap-highlight-color: transparent; }\n' +
-			'.bcw-opt-btn:hover { color: #e5e9f0; background: #252a34; border-color: #4e5565; }\n' +
-			'.bcw-opt-btn.active { background: #2458b8; border-color: #3b82f6; color: #ffffff; font-weight: bold; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35); }\n' +
-			'.bcw-opt-btn.active.teal { background: #00d1b2; border-color: #00d1b2; color: #0b1516; font-weight: bold; box-shadow: 0 2px 8px rgba(0, 209, 178, 0.35); }\n' +
+			'/* Unified Actions Grid (Equal Size) */\n' +
+			'.bcw-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; margin-top: 14px; }\n' +
+			'.bcw-action-btn { height: 44px; box-sizing: border-box; padding: 0 16px; font-size: 13.5px; font-weight: bold; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; line-height: 1.2; text-align: center; white-space: nowrap; border: 1px solid transparent; user-select: none; width: 100%; }\n' +
+			'.bcw-action-btn-primary { background: #00d1b2; color: #081a17; border-color: #00d1b2; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
+			'.bcw-action-btn-primary:hover { background: #00e6c4; box-shadow: 0 0 16px rgba(0,209,178,0.45); transform: translateY(-1px); }\n' +
+			'.bcw-action-btn-stop { background: #ff3860; color: #ffffff; border-color: #ff3860; box-shadow: 0 2px 8px rgba(255,56,96,0.25); }\n' +
+			'.bcw-action-btn-stop:hover { background: #ff4d73; box-shadow: 0 0 14px rgba(255,56,96,0.4); }\n' +
+			'.bcw-action-btn-secondary { background: #282c34; border-color: #485060; color: #e5e9f0; }\n' +
+			'.bcw-action-btn-secondary:hover { background: #323742; color: #ffffff; border-color: #3273dc; transform: translateY(-1px); }\n' +
 			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: #abb2bf; }\n' +
 			'\n' +
-			'/* Main Unified Action Bar */\n' +
+			'/* Legacy / General Action Buttons */\n' +
 			'.bcw-action-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 4px; width: 100%; }\n' +
 			'.bcw-btn-launch, .bcw-btn-stop, .bcw-btn-secondary { height: 44px; box-sizing: border-box; padding: 0 24px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; line-height: 1; white-space: nowrap; border: 1px solid transparent; }\n' +
 			'.bcw-btn-launch { background: #00d1b2; color: #000; border-color: #00d1b2; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
@@ -451,7 +453,7 @@ return view.extend({
 			'\n' +
 			'/* Responsive Overhaul */\n' +
 			'@media (max-width: 900px) {\n' +
-			'  .bcw-control-grid { grid-template-columns: 1fr; }\n' +
+			'  .bcw-actions-grid { grid-template-columns: 1fr; }\n' +
 			'  .bcw-action-bar { flex-direction: column; width: 100%; }\n' +
 			'  .bcw-action-bar button { width: 100%; justify-content: center; }\n' +
 			'}\n' +
@@ -464,12 +466,10 @@ return view.extend({
 			'  .bcw-header-sub { font-size: 11.5px !important; }\n' +
 			'  .bcw-header-actions { width: 100% !important; gap: 6px !important; margin-top: 10px !important; }\n' +
 			'  .bcw-header-actions .bcw-header-item { flex: 1 1 calc(50% - 6px); justify-content: center; font-size: 11px; padding: 0 6px; }\n' +
-			'  .bcw-mode-row { flex-direction: column; align-items: stretch; gap: 6px; }\n' +
-			'  .bcw-chips-row { gap: 6px; }\n' +
-			'  .bcw-chip-btn { height: 28px; padding: 0 10px; font-size: 11px; }\n' +
-			'  .bcw-param-box { padding: 12px 14px; min-height: auto; }\n' +
-			'  .bcw-options-grid { grid-template-columns: 1fr; gap: 8px; }\n' +
-			'  .bcw-opt-btn { width: 100%; height: 48px; font-size: 14px; padding: 0 14px; border-radius: 8px; white-space: normal; }\n' +
+			'  .bcw-tiles-grid { grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)); gap: 8px; }\n' +
+			'  .bcw-tile-btn { padding: 10px 4px; min-height: 58px; }\n' +
+			'  .bcw-tile-icon { font-size: 18px; }\n' +
+			'  .bcw-tile-name { font-size: 11px; }\n' +
 			'  .bcw-hint-box { padding: 10px 12px; }\n' +
 			'  .bcw-hint-grid { grid-template-columns: 1fr; gap: 8px; }\n' +
 			'  .bcw-target-summary { flex-direction: column; align-items: flex-start; gap: 8px; }\n' +
@@ -516,16 +516,6 @@ return view.extend({
 			document.createTextNode(' Проверка обновлений (v' + curVer + ')...')
 		]);
 
-		var btnHostlists = E('button', {
-			class: 'bcw-header-item bcw-header-btn',
-			style: 'cursor: pointer;',
-			title: 'Проверить состояние списков доменов для сервисов в Zapret2',
-			click: function() { showHostlistsModal(); }
-		}, [
-			E('span', {}, '📋'),
-			document.createTextNode(' Списки доменов')
-		]);
-
 		var btnFeedback = E('a', {
 			class: 'bcw-header-item bcw-header-btn',
 			href: 'https://github.com/prostoy23rus/blockcheckw/issues',
@@ -551,7 +541,6 @@ return view.extend({
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			zapretBadgeEl,
-			btnHostlists,
 			btnCheckUpdate,
 			btnFeedback,
 			btnUninstall
@@ -579,23 +568,7 @@ return view.extend({
 		});
 		mainLayout.appendChild(updateBannerCard);
 
-		// Target Selection Section (Zapret Finder Style Dropdown + Quick Chips)
-		var modeSelectEl = E('select', {
-			class: 'bcw-select',
-			change: function(e) { selectTarget(e.target.value); }
-		}, [
-			E('option', { value: 'builtin' }, 'Встроенные хосты (33)'),
-			E('option', { value: 'preset_youtube', selected: 'selected' }, 'Предустановленный список YouTube (3)'),
-			E('option', { value: 'preset_discord' }, 'Предустановленный список Discord (3)'),
-			E('option', { value: 'preset_twitch' }, 'Предустановленный список Twitch (3)'),
-			E('option', { value: 'preset_x' }, 'Предустановленный список X (3)'),
-			E('option', { value: 'preset_instagram' }, 'Предустановленный список Instagram (2)'),
-			E('option', { value: 'tcp16' }, 'Кандидаты TCP 16-20 KB (110)'),
-			E('option', { value: 'domains' }, 'Свои домены'),
-			E('option', { value: 'test_strategy' }, 'Тест стратегии')
-		]);
-
-		var chipButtonsMap = {};
+		// Target Selection Section (Tiles Grid)
 		var quickChipsList = [
 			{ id: 'preset_youtube', icon: '📺', name: 'YouTube' },
 			{ id: 'preset_discord', icon: '💬', name: 'Discord' },
@@ -608,20 +581,19 @@ return view.extend({
 			{ id: 'test_strategy', icon: '🧪', name: 'Тест стратегии' }
 		];
 
-		var chipsRowEl = E('div', { class: 'bcw-chips-row' }, [
-			E('span', { style: 'font-size: 12px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:')
-		]);
+		var chipButtonsMap = {};
+		var tilesGridEl = E('div', { class: 'bcw-tiles-grid' });
 
 		quickChipsList.forEach(function(ch) {
 			var btn = E('div', {
-				class: 'bcw-chip-btn' + (currentTarget === ch.id ? ' active' : ''),
+				class: 'bcw-tile-btn' + (currentTarget === ch.id ? ' active' : ''),
 				click: function() { selectTarget(ch.id); }
 			}, [
-				E('span', {}, ch.icon),
-				E('span', {}, ch.name)
+				E('div', { class: 'bcw-tile-icon' }, ch.icon),
+				E('div', { class: 'bcw-tile-name' }, ch.name)
 			]);
 			chipButtonsMap[ch.id] = btn;
-			chipsRowEl.appendChild(btn);
+			tilesGridEl.appendChild(btn);
 		});
 
 		var customDomainInput = E('input', {
@@ -751,11 +723,7 @@ return view.extend({
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, '1. Цель обхода (Пресеты Zapret Finder)')
 			]),
-			E('div', { class: 'bcw-mode-row' }, [
-				E('label', { style: 'font-weight: bold; font-size: 14px; color: #abb2bf;' }, 'Режим работы:'),
-				modeSelectEl
-			]),
-			chipsRowEl,
+			tilesGridEl,
 			customDomainRow,
 			testStrategyRow,
 			targetSummaryBox,
@@ -763,94 +731,109 @@ return view.extend({
 		]);
 		mainLayout.appendChild(targetSectionCard);
 
-		// Parameters and Launch Control Card
-		var btnApplyAuto = E('button', {
-			class: 'bcw-opt-btn' + (autoApply ? ' active teal' : ''),
-			click: function() { switchApplyMode(true); }
-		}, '⚡ Авто');
-
-		var btnApplyManual = E('button', {
-			class: 'bcw-opt-btn' + (!autoApply ? ' active' : ''),
-			click: function() { switchApplyMode(false); }
-		}, '✋ Вручную');
-
-		var paramApplyHintEl = E('div', { class: 'bcw-param-hint' },
-			autoApply
-				? '⚡ Авто: лучшая найденная связка сразу записывается в конфиг Zapret2 и перезапускает службу.'
-				: '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.'
+		// Circular Checkbox Setting
+		var paramCircularHintEl = E('div', {
+			class: 'bcw-param-hint',
+			style: 'margin-top: 4px; font-size: 12px; color: #abb2bf;'
+		}, doCircular
+			? '🔄 Circular: объединяет 2-3 независимые техники (Fake, Multisplit, Multidisorder) в ротацию. При сбое роутер на лету переключится на резервную.'
+			: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.'
 		);
 
-		var paramCircularHintEl = E('div', { class: 'bcw-param-hint' },
-			doCircular
-				? '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.'
-				: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.'
-		);
+		var chkCircular = E('input', {
+			type: 'checkbox',
+			id: 'bcw_chk_circular',
+			checked: doCircular,
+			style: 'width: 18px; height: 18px; cursor: pointer; accent-color: #00d1b2; margin: 0;',
+			change: function(e) {
+				doCircular = e.target.checked;
+				if (paramCircularHintEl) {
+					paramCircularHintEl.textContent = doCircular
+						? '🔄 Circular: объединяет 2-3 независимые техники (Fake, Multisplit, Multidisorder) в ротацию. При сбое роутер на лету переключится на резервную.'
+						: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
+				}
+			}
+		});
 
-		var btnCircularOn = E('button', {
-			class: 'bcw-opt-btn' + (doCircular ? ' active' : ''),
-			click: function() { switchCircularMode(true); }
-		}, '🔄 Circular (Связка)');
-
-		var btnCircularOff = E('button', {
-			class: 'bcw-opt-btn' + (!doCircular ? ' active' : ''),
-			click: function() { switchCircularMode(false); }
-		}, '⚡ Одиночная');
+		var circularToggleBox = E('div', {
+			style: 'display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; background: #252830; border: 1px solid #383e4a; border-radius: 8px;'
+		}, [
+			E('label', {
+				for: 'bcw_chk_circular',
+				style: 'display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; margin: 0;'
+			}, [
+				chkCircular,
+				E('span', { style: 'font-weight: 600; font-size: 13.5px; color: #e5e9f0;' }, 'Собрать отказоустойчивую Circular-связку (авто-ротация при сбое DPI)')
+			]),
+			paramCircularHintEl
+		]);
 
 		var btnStartScan = E('button', {
-			class: 'bcw-btn-launch',
+			class: 'bcw-action-btn bcw-action-btn-primary',
 			click: function() { startScan(); }
-		}, '⚡ Запустить поиск стратегий');
+		}, [
+			E('span', {}, '⚡'),
+			E('span', {}, 'Запустить поиск')
+		]);
 
 		var btnStopScan = E('button', {
-			class: 'bcw-btn-stop',
+			class: 'bcw-action-btn bcw-action-btn-stop',
 			style: 'display: none;',
 			click: function() { stopScan(); }
-		}, '⏹ Остановить сканирование');
+		}, [
+			E('span', {}, '⏹'),
+			E('span', {}, 'Остановить')
+		]);
 
 		var btnTestConn = E('button', {
-			class: 'bcw-btn-secondary',
+			class: 'bcw-action-btn bcw-action-btn-secondary',
 			click: function() { testActiveConnection(); }
-		}, '🌐 Проверить доступность (curl)');
+		}, [
+			E('span', {}, '🌐'),
+			E('span', {}, 'Проверить доступность')
+		]);
+
+		var btnDetails = E('button', {
+			class: 'bcw-action-btn bcw-action-btn-secondary',
+			click: function() {
+				var currentService = zapretServicesData[currentTarget] || {};
+				if (!lastAppliedResult && (!currentService || !currentService.enabled)) {
+					bcwShowModal('Подробнее о связке', [
+						E('p', { style: 'font-size: 14px; color: #abb2bf;' }, 'Для выбранного сервиса пока не подобрана активная стратегия.'),
+						E('p', { style: 'font-size: 13px; color: #61afef; margin-top: 8px;' }, 'Нажмите кнопку «⚡ Запустить поиск», чтобы автоматически подобрать и активировать рабочую связку.')
+					], [
+						E('button', {
+							class: 'cbi-button cbi-button-neutral',
+							click: function() { ui.hideModal(); }
+						}, 'Закрыть')
+					]);
+					return;
+				}
+				showStrategyAppliedModal({
+					isAuto: true,
+					applyResult: lastAppliedResult
+				});
+			}
+		}, [
+			E('span', {}, 'ℹ️'),
+			E('span', {}, 'Подробнее о связке')
+		]);
+
+		var actionsGridEl = E('div', { class: 'bcw-actions-grid' }, [
+			btnStartScan,
+			btnStopScan,
+			btnTestConn,
+			btnDetails
+		]);
 
 		var testStrategyHintBox = E('div', {
 			style: 'display: none; padding: 12px 16px; background: rgba(50, 115, 220, 0.12); border-left: 4px solid #3273dc; border-radius: 4px; margin-bottom: 14px; font-size: 13px; line-height: 1.5;'
 		}, [
 			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
-			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2 (например, BlockcheckW_YouTube). Нажмите кнопку '),
-			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность (curl) ]'),
-			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ⚡ Запустить поиск стратегий ] нужна только если вы хотите с нуля подобрать новую связку взамен этой.')
+			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2. Нажмите кнопку '),
+			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность ]'),
+			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ⚡ Запустить поиск ] нужна только если вы хотите с нуля подобрать новую связку.')
 		]);
-
-		var controlCard = E('div', { class: 'bcw-card' }, [
-			E('div', { class: 'bcw-card-header' }, [
-				E('h3', { class: 'bcw-card-title' }, '2. Параметры поиска и запуск')
-			]),
-			testStrategyHintBox,
-			E('div', { class: 'bcw-control-grid' }, [
-				// Box 1: Auto-apply
-				E('div', { class: 'bcw-param-box' }, [
-					E('div', { class: 'bcw-param-label' }, 'Режим применения:'),
-					E('div', { class: 'bcw-options-grid' }, [ btnApplyAuto, btnApplyManual ]),
-					paramApplyHintEl
-				]),
-				// Box 2: Circular
-				E('div', { class: 'bcw-param-box' }, [
-					E('div', { class: 'bcw-param-label' }, 'Отказоустойчивость:'),
-					E('div', { class: 'bcw-options-grid' }, [ btnCircularOn, btnCircularOff ]),
-					paramCircularHintEl
-				])
-			]),
-			E('div', { class: 'bcw-action-bar' }, [
-				btnStartScan,
-				btnStopScan,
-				btnTestConn
-			]),
-			E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; display: flex; align-items: center; gap: 6px; padding: 4px 2px;' }, [
-				E('span', { style: 'color: #00d1b2; font-weight: bold;' }, '⚡'),
-				E('span', {}, 'Умный точный поиск: мгновенный экспресс-зонд DPI провайдера с авто-калибровкой лучших связок 2026 года под вашу сеть.')
-			])
-		]);
-		mainLayout.appendChild(controlCard);
 
 		// Active Strategy Inspector Card
 		var activeTargetTitleEl = E('span', { style: 'color: #3273dc; font-weight: bold;' }, 'YouTube');
@@ -968,29 +951,18 @@ return view.extend({
 						E('span', { class: 'badge cbi-color-green', style: 'font-weight: bold;' }, '✓ Zapret2 перезапущен')
 					]),
 					E('p', { style: 'margin: 6px 0 0 0; font-size: 13px; color: #e5e9f0; line-height: 1.5;' },
-						'Вам не нужно ничего копировать или настраивать вручную: служба уже перезапущена и прямо сейчас применяет обход для всех устройств в сети. ' +
-						'Если видео или сайт не загружаются сразу — обновите вкладку в браузере (Ctrl+F5).'
-					),
-					E('div', { style: 'margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;' }, [
-						E('button', {
-							class: 'bcw-btn-sm cbi-button cbi-button-action',
-							style: 'font-size: 12px; font-weight: bold;',
-							click: function() { testActiveConnection(); }
-						}, '🌐 Проверить доступность (curl)'),
-						E('button', {
-							class: 'bcw-btn-sm cbi-button cbi-button-neutral',
-							style: 'font-size: 12px;',
-							click: function() {
-								showStrategyAppliedModal({ isAuto: true });
-							}
-						}, 'ℹ️ Подробнее о связке')
-					])
+						'Служба уже перезапущена и прямо сейчас применяет обход для всех устройств в сети. ' +
+						'Для моментальной проверки нажмите кнопку «Проверить доступность» выше.'
+					)
 				])
 			])
 		]);
 
-		var monitorCard = E('div', { class: 'bcw-card', style: 'display: none; border-left: 4px solid #00d1b2;' }, [
-			E('div', { class: 'bcw-card-header', style: 'display: flex; align-items: center; justify-content: space-between;' }, [
+		var monitorCard = E('div', {
+			class: 'bcw-monitor-section',
+			style: 'display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08);'
+		}, [
+			E('div', { class: 'bcw-card-header', style: 'display: flex; align-items: center; justify-content: space-between; border-bottom: none; margin-bottom: 8px; padding-bottom: 0;' }, [
 				E('div', { style: 'display: flex; align-items: center; flex-wrap: wrap; gap: 6px;' }, [
 					progressPhaseEl,
 					progressTimerEl
@@ -1007,30 +979,23 @@ return view.extend({
 			lineParamsBoxEl,
 			btnCopyDiagOnError
 		]);
-		mainLayout.appendChild(monitorCard);
 
-		// Circular Strategy Result Card
-		var circularCodeEl = E('pre', { class: 'bcw-code-box', style: 'color: #98c379; max-height: 220px;' }, '');
-		var btnApplyCircular = E('button', {
-			class: 'cbi-button cbi-button-positive',
-			style: 'height: 34px; padding: 0 16px; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
-			click: function() { applyStrategy(lastCircular, true); }
-		}, '✓ Применить Circular-связку в Zapret2');
-
-		var circularCard = E('div', { class: 'bcw-card', style: 'display: none; border: 2px solid #00d1b2; background: rgba(0, 209, 178, 0.04);' }, [
+		var unifiedScanCard = E('div', { class: 'bcw-card' }, [
 			E('div', { class: 'bcw-card-header' }, [
-				E('h3', { class: 'bcw-card-title', style: 'color: #00d1b2;' }, [
-					'🛡️ Собрана Circular-связка Zapret2',
-					E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px; margin-left: 8px;' }, 'Авто-ротация')
-				]),
-				btnApplyCircular
+				E('h3', { class: 'bcw-card-title' }, '2. Подбор стратегий и сканирование')
 			]),
-			E('div', { style: 'font-size: 13px; margin-bottom: 10px; opacity: 0.9;' }, [
-				'Связка объединяет независимые техники обхода (Fake ClientHello, Multisplit, Multidisorder). При сбое одной стратегии Zapret2 автоматически переключается на следующую за 20 секунд!'
+			testStrategyHintBox,
+			circularToggleBox,
+			actionsGridEl,
+			E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; display: flex; align-items: center; gap: 6px; padding: 4px 2px;' }, [
+				E('span', { style: 'color: #00d1b2; font-weight: bold;' }, '⚡'),
+				E('span', {}, 'Умный точный поиск: мгновенный экспресс-зонд DPI провайдера с авто-калибровкой лучших связок 2026 года под вашу сеть.')
 			]),
-			circularCodeEl
+			monitorCard
 		]);
-		mainLayout.appendChild(circularCard);
+		mainLayout.appendChild(unifiedScanCard);
+
+		var circularCard = { style: {} };
 
 		// Individual Working Strategies Section (Collapsible Spoiler)
 		var isStrategiesExpanded = false;
@@ -1114,10 +1079,10 @@ return view.extend({
 			resultsCardHeader,
 			strategiesListEl
 		]);
-		mainLayout.appendChild(resultsCard);
 
-		// Active Strategy Inspector Card (Placed AFTER scanner as requested)
+		// Active Strategy in Zapret2 (Placed right below scanner controls/progress)
 		mainLayout.appendChild(activeStratCard);
+		mainLayout.appendChild(resultsCard);
 
 		// Live Logs and Diagnostics Monitor Card
 		var consoleLogEl = E('pre', {
@@ -1404,6 +1369,7 @@ return view.extend({
 						}
 					});
 					refreshLogs();
+					lastAppliedResult = parsed;
 
 					showStrategyAppliedModal({
 						section: chosenSec,
@@ -1516,7 +1482,6 @@ return view.extend({
 
 		function selectTarget(targetId) {
 			currentTarget = targetId;
-			modeSelectEl.value = targetId;
 
 			// Update chips
 			quickChipsList.forEach(function(ch) {
@@ -1547,27 +1512,15 @@ return view.extend({
 
 		function switchApplyMode(isAuto) {
 			autoApply = isAuto;
-			if (isAuto) {
-				btnApplyAuto.classList.add('active', 'teal');
-				btnApplyManual.classList.remove('active');
-				paramApplyHintEl.textContent = '⚡ Авто: лучшая найденная связка сразу записывается в конфиг Zapret2 и перезапускает службу.';
-			} else {
-				btnApplyManual.classList.add('active');
-				btnApplyAuto.classList.remove('active', 'teal');
-				paramApplyHintEl.textContent = '✋ Вручную: стратегия отобразится в результатах, вы сможете проверить ее и применить кнопкой.';
-			}
 		}
 
 		function switchCircularMode(isCirc) {
 			doCircular = isCirc;
-			if (isCirc) {
-				btnCircularOn.classList.add('active');
-				btnCircularOff.classList.remove('active');
-				paramCircularHintEl.textContent = '🔄 Circular: объединяет 2-3 разные техники в связку (circular:fails=3). При адаптации DPI роутер на лету переключится на резервную.';
-			} else {
-				btnCircularOff.classList.add('active');
-				btnCircularOn.classList.remove('active');
-				paramCircularHintEl.textContent = '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
+			if (chkCircular) chkCircular.checked = isCirc;
+			if (paramCircularHintEl) {
+				paramCircularHintEl.textContent = isCirc
+					? '🔄 Circular: объединяет 2-3 независимые техники (Fake, Multisplit, Multidisorder) в ротацию. При сбое роутер на лету переключится на резервную.'
+					: '⚡ Одиночная: применяется только одна лучшая техника обхода без резервной ротации.';
 			}
 		}
 
@@ -1695,7 +1648,7 @@ return view.extend({
 						ui.hideModal();
 						testActiveConnection();
 					}
-				}, '🌐 Проверить доступность (curl)'),
+				}, '🌐 Проверить доступность'),
 				E('button', {
 					class: 'cbi-button cbi-button-positive',
 					style: 'background: #00d1b2; color: #000; font-weight: bold; padding: 6px 18px;',
@@ -1883,6 +1836,9 @@ return view.extend({
 						var hasStrategies = stratsCount > 0;
 
 						var isAutoApplied = (st.auto_applied === true) || (st.apply_result && st.apply_result.success === true);
+						if (st.apply_result) {
+							lastAppliedResult = st.apply_result;
+						}
 						if (isAutoApplied) {
 							monitorSuccessAlertEl.style.display = 'block';
 						}
@@ -2092,6 +2048,7 @@ return view.extend({
 						}
 					});
 					refreshLogs();
+					lastAppliedResult = parsed;
 
 					showStrategyAppliedModal({
 						section: secName,

@@ -418,6 +418,15 @@ return view.extend({
 			'.bcw-hint-item-title { font-weight: bold; font-size: 12px; color: #98c379; display: flex; align-items: center; gap: 6px; }\n' +
 			'.bcw-hint-item-text { font-size: 12px; color: #abb2bf; line-height: 1.45; word-break: break-word; }\n' +
 			'\n' +
+			'/* Custom Bulletproof Checkbox (Immune to theme cascade conflicts) */\n' +
+			'.bcw-chk-wrap { display: inline-flex !important; align-items: center !important; gap: 10px !important; cursor: pointer !important; user-select: none !important; position: relative !important; }\n' +
+			'.bcw-chk-input { position: absolute !important; opacity: 0 !important; width: 0 !important; height: 0 !important; margin: 0 !important; pointer-events: none !important; appearance: none !important; -webkit-appearance: none !important; border: none !important; background: none !important; }\n' +
+			'.bcw-chk-input::before, .bcw-chk-input::after { content: none !important; display: none !important; width: 0 !important; height: 0 !important; border: none !important; }\n' +
+			'.bcw-chk-box { width: 20px !important; height: 20px !important; min-width: 20px !important; min-height: 20px !important; border-radius: 6px !important; border: 1.5px solid #485060 !important; background: #1c2027 !important; display: inline-flex !important; align-items: center !important; justify-content: center !important; transition: all 0.2s ease !important; box-sizing: border-box !important; position: relative !important; }\n' +
+			'.bcw-chk-wrap:hover .bcw-chk-box { border-color: #00d1b2 !important; background: #252a34 !important; }\n' +
+			'.bcw-chk-input:checked + .bcw-chk-box { background: #00d1b2 !important; border-color: #00d1b2 !important; box-shadow: 0 0 10px rgba(0, 209, 178, 0.4) !important; }\n' +
+			'.bcw-chk-input:checked + .bcw-chk-box::after { content: \"\" !important; display: block !important; width: 5px !important; height: 9px !important; border: solid #091a18 !important; border-width: 0 2.5px 2.5px 0 !important; transform: rotate(45deg) translate(-1px, -1px) !important; }\n' +
+			'\n' +
 			'/* Unified Actions Grid (Equal Size) */\n' +
 			'.bcw-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; margin-top: 14px; }\n' +
 			'.bcw-action-btn { height: 44px; box-sizing: border-box; padding: 0 16px; font-size: 13.5px; font-weight: bold; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; line-height: 1.2; text-align: center; white-space: nowrap; border: 1px solid transparent; user-select: none; width: 100%; }\n' +
@@ -743,8 +752,8 @@ return view.extend({
 		var chkCircular = E('input', {
 			type: 'checkbox',
 			id: 'bcw_chk_circular',
+			class: 'bcw-chk-input',
 			checked: doCircular,
-			style: 'width: 18px; height: 18px; cursor: pointer; accent-color: #00d1b2; margin: 0;',
 			change: function(e) {
 				doCircular = e.target.checked;
 				if (paramCircularHintEl) {
@@ -760,9 +769,11 @@ return view.extend({
 		}, [
 			E('label', {
 				for: 'bcw_chk_circular',
-				style: 'display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; margin: 0;'
+				class: 'bcw-chk-wrap',
+				style: 'margin: 0;'
 			}, [
 				chkCircular,
+				E('span', { class: 'bcw-chk-box' }),
 				E('span', { style: 'font-weight: 600; font-size: 13.5px; color: #e5e9f0;' }, 'Собрать отказоустойчивую Circular-связку (авто-ротация при сбое DPI)')
 			]),
 			paramCircularHintEl

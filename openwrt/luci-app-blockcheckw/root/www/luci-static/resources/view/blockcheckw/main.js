@@ -357,7 +357,7 @@ return view.extend({
 		var statusData = data[0] || {};
 		var zapretInfo = data[1] || {};
 		var logsData = { scanner_log: 'Загрузка логов...', zapret2_log: 'Загрузка логов...', daemons: '' };
-		var curVer = zapretInfo.version || '0.15.11';
+		var curVer = zapretInfo.version || '0.15.12';
 		var versionInfo = {
 			current_version: curVer,
 			has_update: false,
@@ -2073,32 +2073,95 @@ return view.extend({
 			var chosenStratName = (currentTarget === 'test_strategy') ? testStrategySelectEl.value : null;
 			var stratObj = chosenStratName ? zapretAllStrategies.find(function(s) { return s.section === chosenStratName; }) : null;
 
-			bcwShowModal('Проверка доступности', [
-				E('p', { class: 'spinning' }, 'Отправка проверочного сетевого запроса к ' + url + '...')
+			bcwShowModal('Комплексная проверка доступности', [
+				E('p', { class: 'spinning' }, 'Отправка проверочных сетевых запросов и замер передачи данных к ' + (pDef.label || currentTarget) + '...')
 			]);
 
-			fs.exec(HELPER_BIN, ['test', url]).then(function(res) {
+			fs.exec(HELPER_BIN, ['test', currentTarget, url]).then(function(res) {
 				ui.hideModal();
 				var parsed = null;
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
-				if (parsed && parsed.accessible) {
-					var msg = '✓ Ресурс (' + url + ') доступен! Код ответа: HTTP ' + parsed.http_code;
-					if (stratObj && !stratObj.enabled) {
-						msg += ' (Внимание: стратегия zapret2.' + stratObj.section + ' сейчас отключена в Zapret2, трафик идет без неё)';
-					}
-					ui.addNotification(null, E('p', {}, msg), 'info');
-				} else {
-					var errMsg = '✗ Ресурс (' + url + ') не отвечает (код ' + (parsed ? parsed.http_code : 0) + ').';
-					if (stratObj && !stratObj.enabled) {
-						errMsg += ' Стратегия zapret2.' + stratObj.section + ' сейчас отключена в Zapret2! Нажмите [ ⚡ Активировать ] ниже, чтобы включить её.';
-					} else {
-						errMsg += ' Проверьте правильность адреса или запустите поиск новой стратегии.';
-					}
-					ui.addNotification(null, E('p', {}, errMsg), 'warning');
+				if (!parsed) {
+					ui.addNotification(null, E('p', {}, 'Не удалось проанализировать ответ проверки.'), 'danger');
+					return;
 				}
+
+				var isAllOk = parsed.all_ok === true;
+				var isAccessible = parsed.accessible === true;
+				var statusType = parsed.overall_status || (isAllOk ? 'optimal' : isAccessible ? 'degraded' : 'blocked');
+
+				var bannerColor = (statusType === 'optimal') ? '#00d1b2' :
+				                  (statusType === 'degraded') ? '#f59e0b' : '#ef4444';
+				var bannerBg = (statusType === 'optimal') ? 'rgba(0, 209, 178, 0.12)' :
+				               (statusType === 'degraded') ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+				var bannerIcon = (statusType === 'optimal') ? '🟢' :
+				                 (statusType === 'degraded') ? '🟡' : '🔴';
+				var bannerTitle = (statusType === 'optimal') ? '100% сервиса доступно (Данные передаются без помех)' :
+				                  (statusType === 'degraded') ? 'Частичная доступность (Основной сайт отвечает, но часть потоков блокируется)' :
+				                  'Сервис заблокирован ТСПУ или недоступен';
+
+				var rows = [];
+				if (parsed.endpoints && Array.isArray(parsed.endpoints)) {
+					parsed.endpoints.forEach(function(ep) {
+						var epOk = ep.accessible === true;
+						var speedText = ep.speed_kbs > 1024 ? ((ep.speed_kbs / 1024).toFixed(1) + ' МБ/с') : (ep.speed_kbs + ' КБ/с');
+						rows.push(E('div', {
+							style: 'display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 6px; font-size: 13px; flex-wrap: wrap; gap: 8px;'
+						}, [
+							E('div', { style: 'display: flex; flex-direction: column; gap: 2px;' }, [
+								E('strong', { style: 'color: #e5e9f0;' }, ep.name),
+								E('span', { style: 'font-size: 11px; color: #abb2bf;' }, ep.url)
+							]),
+							E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
+								epOk ? E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ HTTP ' + ep.http_code) :
+								       E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Код ' + ep.http_code),
+								ep.size_bytes > 0 ? E('span', { style: 'font-size: 11px; color: #61afef; font-weight: bold;' }, '⚡ ' + speedText) : null,
+								ep.time_sec ? E('span', { style: 'font-size: 11px; color: #5c6370;' }, ep.time_sec + 'с') : null
+							].filter(Boolean))
+						]));
+					});
+				}
+
+				var modalBody = [
+					E('div', {
+						style: 'background: ' + bannerBg + '; border: 1.5px solid ' + bannerColor + '; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px;'
+					}, [
+						E('div', { style: 'display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; color: ' + bannerColor + ';' }, [
+							E('span', { style: 'font-size: 20px;' }, bannerIcon),
+							E('span', {}, bannerTitle)
+						]),
+						E('p', { style: 'margin: 6px 0 0 0; font-size: 12px; color: #e5e9f0; line-height: 1.4;' }, parsed.message)
+					]),
+					E('div', { style: 'margin-bottom: 12px; font-weight: bold; color: #61afef; font-size: 13px;' }, '🌐 Проверенные эндпоинты и передача данных:'),
+					E('div', { style: 'max-height: 240px; overflow-y: auto; margin-bottom: 14px;' }, rows),
+					stratObj && !stratObj.enabled ? E('div', {
+						style: 'padding: 8px 12px; background: rgba(229, 192, 123, 0.15); border-left: 3px solid #e5c07b; border-radius: 4px; font-size: 12px; color: #e5c07b; margin-bottom: 10px;'
+					}, '⚠️ Внимание: стратегия zapret2.' + stratObj.section + ' сейчас отключена в Zapret2, трафик идет без неё.') : null
+				].filter(Boolean);
+
+				var modalButtons = [
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						style: 'padding: 6px 16px; font-size: 13px;',
+						click: function() { ui.hideModal(); }
+					}, 'Закрыть')
+				];
+
+				if (!isAllOk) {
+					modalButtons.push(E('button', {
+						class: 'cbi-button cbi-button-action',
+						style: 'padding: 6px 16px; font-size: 13px; font-weight: bold;',
+						click: function() {
+							ui.hideModal();
+							startScan();
+						}
+					}, '⚡ Запустить поиск рабочей стратегии'));
+				}
+
+				bcwShowModal('Результаты проверки: ' + (pDef.label || currentTarget), modalBody, modalButtons);
 			}).catch(function() {
 				ui.hideModal();
-				ui.addNotification(null, E('p', {}, 'Не удалось выполнить сетевую проверку.'), 'danger');
+				ui.addNotification(null, E('p', {}, 'Не удалось выполнить комплексную сетевую проверку.'), 'danger');
 			});
 		}
 

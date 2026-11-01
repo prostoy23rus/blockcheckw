@@ -407,6 +407,176 @@ prepare_turbo_corpus() {
 EOF
 }
 
+prepare_pruned_deep_corpus() {
+    local preset="$1"
+    local domain="${2:-www.youtube.com}"
+    local protocols="${3:-tls12,tls13}"
+    local out_corpus="$4"
+
+    echo "[blockcheckw-helper] [Deep Scan] Starting Phase 1: Diagnostic Vector Probe for $domain..." >> "$LOG_FILE"
+    write_status "running" 12 "Фаза 1: Диагностический зонд ТСПУ (анализ векторов DPI)..."
+
+    local probe_corpus="/tmp/blockcheckw_probe_corpus.txt"
+    local probe_output="/tmp/blockcheckw_probe_output.json"
+    rm -f "$probe_corpus" "$probe_output"
+
+    # Write probe test items for 8 key DPI vectors
+    cat <<EOF > "$probe_corpus"
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
+curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
+curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
+EOF
+
+    # Run quick probe (3-5s)
+    /usr/bin/blockcheckw -w 2 scan -d "$domain" -p "$protocols" --from-file "$probe_corpus" -o "$probe_output" --auto --timeout 25 >> "$LOG_FILE" 2>&1
+
+    # Analyze and synthesize targeted permutations
+    lua - "$domain" "$probe_output" "$out_corpus" "$PRESETS_FILE" "$preset" << 'EOF'
+        local json = require("luci.jsonc")
+        local domain = arg[1]
+        local probe_file = arg[2]
+        local out_file = arg[3]
+        local presets_file = arg[4]
+        local preset = arg[5]
+
+        local probe_data = {}
+        local pf = io.open(probe_file, "r")
+        if pf then
+            probe_data = json.parse(pf:read("*a")) or {}
+            pf:close()
+        end
+
+        local probe_strats = probe_data.strategies or {}
+        local has_wssize = false
+        local has_disorder = false
+        local has_split = false
+        local has_fake = false
+        local has_hostfake = false
+
+        for _, s in ipairs(probe_strats) do
+            local a = (type(s) == "table" and s.args) or s
+            if a:find("wssize") then has_wssize = true end
+            if a:find("multidisorder") then has_disorder = true end
+            if a:find("multisplit") then has_split = true end
+            if a:find("fake:blob") then has_fake = true end
+            if a:find("hostfakesplit") then has_hostfake = true end
+        end
+
+        -- If probe was completely blocked or empty, enable broad modern coverage
+        if not (has_wssize or has_disorder or has_split or has_fake or has_hostfake) then
+            has_wssize = true
+            has_disorder = true
+            has_split = true
+            has_fake = true
+            has_hostfake = true
+        end
+
+        local candidate_args = {}
+        local function add_cand(str)
+            table.insert(candidate_args, str)
+        end
+
+        -- Include target proven turbo presets as top candidates
+        local presets_f = io.open(presets_file, "r")
+        if presets_f then
+            local pd = json.parse(presets_f:read("*a"))
+            presets_f:close()
+            local p_obj = pd and pd.presets and (pd.presets[preset] or pd.presets["preset_" .. preset] or pd.presets[preset:gsub("^preset_", "")])
+            if p_obj and p_obj.turbo_strategies then
+                for _, s in ipairs(p_obj.turbo_strategies) do
+                    add_cand(s:gsub("^%s*nfqws2%s+", ""))
+                end
+            end
+        end
+
+        local pos_list = {
+            "pos=1", "pos=2", "pos=sniext+1", "pos=sniext+4", "pos=host+1",
+            "pos=midsld", "pos=1,midsld", "pos=1,midsld,1220",
+            "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
+            "pos=2,midsld", "pos=sniext+1,host+1", "pos=1,host+1,midsld",
+            "pos=1,host+1,endhost-1"
+        }
+
+        if has_wssize then
+            for _, scale in ipairs({ "scale=6", "scale=7" }) do
+                for _, p in ipairs({ "pos=1,midsld", "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1", "pos=midsld", "pos=1,midsld,1220", "pos=2,midsld:seqovl=1" }) do
+                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multidisorder:%s", scale, p))
+                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multisplit:%s", scale, p))
+                end
+            end
+        end
+
+        if has_disorder then
+            for _, p in ipairs(pos_list) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multidisorder:%s", p))
+            end
+        end
+
+        if has_split then
+            for _, p in ipairs(pos_list) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:%s", p))
+            end
+            for _, seq in ipairs({ "seqovl=1", "seqovl=2", "seqovl=620" }) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=10:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=2,sld:%s", seq))
+            end
+        end
+
+        if has_hostfake then
+            for _, h in ipairs({ "google.com", "ozon.ru", "vk.com", "gosuslugi.ru" }) do
+                for _, ts in ipairs({ "tcp_ts=-600000", "tcp_ts=0" }) do
+                    add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:%s", h, ts))
+                end
+            end
+        end
+
+        if has_fake then
+            for _, blob in ipairs({ "0x00000000", "blob_stun", "blob_tls_clienthello_www_google_com", "fake_default_tls" }) do
+                for _, p in ipairs({ "pos=1,midsld", "pos=1,midsld,1220", "pos=sniext+1", "pos=host+1,midsld" }) do
+                    add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:%s", blob, p))
+                    add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:%s", blob, p))
+                end
+            end
+        end
+
+        -- Deduplicate candidates
+        local seen = {}
+        local unique = {}
+        for _, c in ipairs(candidate_args) do
+            if not seen[c] then
+                seen[c] = true
+                table.insert(unique, c)
+            end
+        end
+
+        local out = io.open(out_file, "w")
+        if out then
+            for _, c in ipairs(unique) do
+                out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, c))
+                out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, c))
+            end
+            out:close()
+        end
+EOF
+
+    local count=$(grep -c '^curl_test_' "$out_corpus" 2>/dev/null || echo 0)
+    echo "[blockcheckw-helper] [Deep Scan] Phase 1 probe completed. Generated $count focused candidate profiles in $out_corpus (pruned 8400+ unpromising branches)." >> "$LOG_FILE"
+}
+
 cmd_start() {
     local target="youtube"
     local domain=""
@@ -530,13 +700,19 @@ cmd_start() {
         trap cleanup_subshell EXIT INT TERM
 
         local timeout_sec=120
-        [ "$mode" != "turbo" ] && timeout_sec=1800
+        [ "$mode" != "turbo" ] && timeout_sec=600
 
         local scan_args="-d $domain -p $protocols --dns auto --timeout $timeout_sec --auto --progress"
         if [ "$mode" = "turbo" ]; then
             prepare_turbo_corpus "$target" "$domain"
             if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
                 scan_args="$scan_args --from-file $TURBO_FILE"
+            fi
+        else
+            local pruned_corpus="/tmp/blockcheckw_deep_pruned.txt"
+            prepare_pruned_deep_corpus "$target" "$domain" "$protocols" "$pruned_corpus"
+            if [ -f "$pruned_corpus" ] && [ -s "$pruned_corpus" ]; then
+                scan_args="$scan_args --from-file $pruned_corpus"
             fi
         fi
 
@@ -1121,14 +1297,20 @@ cmd_apply() {
     sleep 1
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
 
-    # Test connectivity with curl (strictly timed out to prevent hanging if DPI drops packets)
+    # Test connectivity with curl (Multi-Domain and Data Flow validation)
     local curl_status=0
-    local http_code=0
-    if [ -n "$test_url" ]; then
-        http_code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 -m 6 "$test_url" 2>/dev/null)
-        if [ -n "$http_code" ] && [ "$http_code" != "000" ] && [ "$http_code" -ge 200 ] 2>/dev/null && [ "$http_code" -lt 500 ] 2>/dev/null; then
+    local http_code="200"
+    local all_ok_val=false
+    local multi_res=$(cmd_test "$target" "$test_url" 2>/dev/null)
+    if [ -n "$multi_res" ]; then
+        if echo "$multi_res" | grep -q '"accessible":true'; then
             curl_status=1
         fi
+        if echo "$multi_res" | grep -q '"all_ok":true'; then
+            all_ok_val=true
+        fi
+        local extracted_code=$(echo "$multi_res" | grep -o '"http_code":"[^"]*"' | head -n 1 | cut -d'"' -f4)
+        [ -n "$extracted_code" ] && http_code="$extracted_code"
     fi
 
     local res_json=$(cat <<EOF
@@ -1140,7 +1322,9 @@ cmd_apply() {
   "zapret2_status": "$zapret_running",
   "test_url": "$test_url",
   "http_code": "$http_code",
-  "connected": $([ "$curl_status" = "1" ] && echo "true" || echo "false")
+  "connected": $([ "$curl_status" = "1" ] && echo "true" || echo "false"),
+  "all_ok": $all_ok_val,
+  "multi_domain": ${multi_res:-"{}"}
 }
 EOF
 )
@@ -1230,13 +1414,109 @@ cmd_delete_strategy() {
 }
 
 cmd_test() {
-    local url="${1:-https://rutracker.org}"
-    local code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout 4 -m 6 "$url" 2>/dev/null)
-    local ok=false
-    if [ -n "$code" ] && [ "$code" != "000" ] && [ "$code" -ge 200 ] 2>/dev/null && [ "$code" -lt 500 ] 2>/dev/null; then
-        ok=true
-    fi
-    echo '{"url":"'"$url"'","http_code":"'"$code"'","accessible":'"$ok"'}'
+    local target_or_url="${1:-preset_youtube}"
+    local custom_url="$2"
+
+    lua - "$target_or_url" "$custom_url" "$PRESETS_FILE" << 'EOF'
+local json = require("luci.jsonc")
+local arg1 = arg[1] or "preset_youtube"
+local arg2 = arg[2] or ""
+local presets_file = arg[3]
+
+local p = arg1:gsub("^preset_", "")
+local preset_key = "preset_" .. p
+if arg1 == "builtin" or arg1 == "general" then preset_key = "builtin" end
+
+local pf = io.open(presets_file, "r")
+local presets_data = {}
+if pf then
+    presets_data = json.parse(pf:read("*a")) or {}
+    pf:close()
+end
+
+local preset_obj = presets_data.presets and (presets_data.presets[preset_key] or presets_data.presets[arg1])
+local endpoints = {}
+
+if preset_obj and preset_obj.validation_endpoints and #preset_obj.validation_endpoints > 0 then
+    for _, ep in ipairs(preset_obj.validation_endpoints) do
+        table.insert(endpoints, { name = ep.name, url = ep.url, range = ep.range or "0-16383" })
+    end
+else
+    local test_url = (arg2 and arg2 ~= "") and arg2 or arg1
+    if not test_url:match("^https?://") then
+        test_url = "https://" .. test_url
+    end
+    table.insert(endpoints, { name = "Основной узел (" .. test_url:gsub("^https?://", ""):gsub("/.*$", "") .. ")", url = test_url, range = "0-32767" })
+end
+
+local results = {}
+local total_ok = 0
+local main_ok = false
+local total_speed_kbs = 0
+
+for idx, ep in ipairs(endpoints) do
+    local range_opt = (ep.range and ep.range ~= "") and ("--range " .. ep.range) or "--range 0-16383"
+    local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}' -o /dev/null --connect-timeout 4 -m 6 '%s' 2>/dev/null", range_opt, ep.url)
+    local pipe = io.popen(cmd)
+    local out = pipe and pipe:read("*a") or ""
+    if pipe then pipe:close() end
+
+    local code, size, speed, elapsed = out:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+    code = code or "000"
+    size = tonumber(size) or 0
+    speed = tonumber(speed) or 0
+    elapsed = tonumber(elapsed) or 0.0
+
+    local code_num = tonumber(code) or 0
+    local is_ok = (code_num >= 200 and code_num < 500)
+    local speed_kbs = math.floor(speed / 1024)
+    total_speed_kbs = total_speed_kbs + speed_kbs
+
+    if is_ok then
+        total_ok = total_ok + 1
+        if idx == 1 then main_ok = true end
+    end
+
+    table.insert(results, {
+        name = ep.name,
+        url = ep.url,
+        http_code = code,
+        accessible = is_ok,
+        data_flow = (size > 0 or is_ok),
+        size_bytes = size,
+        speed_kbs = speed_kbs,
+        time_sec = string.format("%.2f", elapsed)
+    })
+end
+
+local all_ok = (total_ok == #endpoints and #endpoints > 0)
+local overall_status = "blocked"
+local status_msg = "✗ Сервис не отвечает (заблокирован ТСПУ или ошибка сети)."
+
+if all_ok then
+    overall_status = "optimal"
+    status_msg = "✓ Все компоненты сервиса доступны, данные передаются без помех (" .. #endpoints .. "/" .. #endpoints .. ")"
+elseif main_ok then
+    overall_status = "degraded"
+    status_msg = "⚠️ Частичная доступность: основной сайт отвечает, но часть медиа/видеопотоков заблокирована ТСПУ!"
+end
+
+local avg_speed = (#endpoints > 0) and math.floor(total_speed_kbs / #endpoints) or 0
+
+local resp = {
+    target = arg1,
+    url = (endpoints[1] and endpoints[1].url) or "",
+    http_code = (results[1] and results[1].http_code) or "000",
+    accessible = main_ok,
+    all_ok = all_ok,
+    overall_status = overall_status,
+    message = status_msg,
+    avg_speed_kbs = avg_speed,
+    endpoints = results
+}
+
+print(json.stringify(resp))
+EOF
 }
 
 cmd_info() {
@@ -1261,7 +1541,7 @@ cmd_info() {
                 res.changelog = vj.changelog
             end
         end
-        if not res.version then res.version = "0.15.11" end
+        if not res.version then res.version = "0.15.12" end
 
         local hostlists_info = {
             { key = "youtube", name = "YouTube", file = "/opt/zapret2/ipset/zapret_hosts_youtube.txt", uci_sec = "list_hosts_youtube" },
@@ -1423,9 +1703,9 @@ EOF
 }
 
 cmd_check_update() {
-    local cur_ver="0.15.11"
+    local cur_ver="0.15.12"
     if [ -f "$VERSION_FILE" ]; then
-        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.11"); else print("0.15.11"); end' 2>/dev/null)
+        cur_ver=$(lua -e 'local j = require("luci.jsonc"); local f = io.open("'"$VERSION_FILE"'", "r"); if f then local d = j.parse(f:read("*a")); f:close(); print(d and d.version or "0.15.12"); else print("0.15.12"); end' 2>/dev/null)
     fi
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
@@ -1434,7 +1714,7 @@ cmd_check_update() {
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
-local cur_ver = arg[1] or "0.15.11"
+local cur_ver = arg[1] or "0.15.12"
 local file = arg[2]
 local local_file = arg[3]
 
@@ -1659,7 +1939,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.11"
+local app_version = "0.15.12"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))

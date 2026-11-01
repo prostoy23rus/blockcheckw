@@ -511,7 +511,7 @@ return view.extend({
 			'.bcw-chk-input:checked + .bcw-chk-box::after { content: \"\" !important; display: block !important; width: 5px !important; height: 9px !important; border: solid #091a18 !important; border-width: 0 2.5px 2.5px 0 !important; transform: rotate(45deg) translate(-1px, -1px) !important; }\n' +
 			'\n' +
 			'/* Unified Actions Grid (Equal Size) */\n' +
-			'.bcw-actions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; margin-top: 14px; }\n' +
+			'.bcw-actions-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; width: 100%; margin-top: 14px; }\n' +
 			'.bcw-action-btn { height: 44px; box-sizing: border-box; padding: 0 16px; font-size: 13.5px; font-weight: bold; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; line-height: 1.2; text-align: center; white-space: nowrap; border: 1px solid transparent; user-select: none; width: 100%; }\n' +
 			'.bcw-action-btn-primary { background: #00d1b2; color: #081a17; border-color: #00d1b2; box-shadow: 0 2px 8px rgba(0,209,178,0.25); }\n' +
 			'.bcw-action-btn-primary:hover { background: #00e6c4; box-shadow: 0 0 16px rgba(0,209,178,0.45); transform: translateY(-1px); }\n' +
@@ -519,6 +519,8 @@ return view.extend({
 			'.bcw-action-btn-stop:hover { background: #ff4d73; box-shadow: 0 0 14px rgba(255,56,96,0.4); }\n' +
 			'.bcw-action-btn-secondary { background: var(--bcw-btn-bg); border-color: var(--bcw-btn-border); color: var(--bcw-btn-color); }\n' +
 			'.bcw-action-btn-secondary:hover { background: var(--bcw-btn-hover-bg); color: var(--bcw-btn-hover-color); border-color: #3273dc; transform: translateY(-1px); }\n' +
+			'.bcw-action-btn-speed { background: var(--bcw-btn-bg); border-color: var(--bcw-btn-border); color: #61afef; }\n' +
+			'.bcw-action-btn-speed:hover { background: rgba(97, 175, 239, 0.15); border-color: #61afef; color: #61afef; transform: translateY(-1px); box-shadow: 0 0 12px rgba(97, 175, 239, 0.25); }\n' +
 			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: var(--bcw-text-muted); }\n' +
 			'\n' +
 			'/* Legacy / General Action Buttons */\n' +
@@ -565,7 +567,10 @@ return view.extend({
 			'body[data-bcw-theme="light"] #modal_overlay [style*="background: #1c2027"] { background: #eaeef2 !important; color: #0969da !important; }\n' +
 			'\n' +
 			'/* Responsive Overhaul */\n' +
-			'@media (max-width: 900px) {\n' +
+			'@media (max-width: 1050px) {\n' +
+			'  .bcw-actions-grid { grid-template-columns: repeat(2, 1fr); }\n' +
+			'}\n' +
+			'@media (max-width: 600px) {\n' +
 			'  .bcw-actions-grid { grid-template-columns: 1fr; }\n' +
 			'  .bcw-action-bar { flex-direction: column; width: 100%; }\n' +
 			'  .bcw-action-bar button { width: 100%; justify-content: center; }\n' +
@@ -693,11 +698,23 @@ return view.extend({
 			'Удалить службу'
 		]);
 
+		var btnWatchdogHeader = E('button', {
+			class: 'bcw-header-item bcw-header-btn',
+			id: 'bcw-btn-watchdog',
+			title: 'Авто-сторож Zapret2: фоновый мониторинг доступности и авто-лечение сбоев DPI',
+			style: 'color: #00d1b2; font-weight: bold;',
+			click: function() { showWatchdogModal(); }
+		}, [
+			E('span', {}, '🛡️'),
+			document.createTextNode(' Авто-сторож')
+		]);
+
 		var headerRightActions = E('div', {
 			class: 'bcw-header-actions',
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			zapretBadgeEl,
+			btnWatchdogHeader,
 			themeSelectEl,
 			btnCheckUpdate,
 			btnFeedback,
@@ -971,10 +988,20 @@ return view.extend({
 			E('span', {}, 'Подробнее о связке')
 		]);
 
+		var btnSpeedTest = E('button', {
+			class: 'bcw-action-btn bcw-action-btn-speed',
+			title: 'Замер реальной скорости потокового видео и выявление DPI-троттлинга',
+			click: function() { runSpeedTest(); }
+		}, [
+			E('span', {}, '⚡'),
+			E('span', {}, 'Замер скорости')
+		]);
+
 		var actionsGridEl = E('div', { class: 'bcw-actions-grid' }, [
 			btnStartScan,
 			btnStopScan,
 			btnTestConn,
+			btnSpeedTest,
 			btnDetails
 		]);
 
@@ -2394,6 +2421,253 @@ return view.extend({
 			});
 		}
 
+		function runSpeedTest() {
+			var pDef = presetsConfig[currentTarget] || {};
+			var url = '';
+			if (currentTarget === 'domains' || currentTarget === 'tcp16') {
+				url = customDomainInput.value.trim();
+				if (!url) url = pDef.domain || '';
+			} else if (currentTarget === 'test_strategy') {
+				url = testStrategyUrlInput.value.trim() || 'https://www.youtube.com';
+			}
+
+			bcwShowModal('⚡ Замер реальной скорости видео и проверка DPI', [
+				E('div', { style: 'text-align: center; padding: 18px 10px;' }, [
+					E('p', { class: 'spinning', style: 'font-size: 15px; font-weight: bold; color: #61afef;' },
+						'Тестирование пропускной способности видеопотока к ' + (pDef.label || currentTarget) + '...'),
+					E('p', { style: 'font-size: 12px; color: #abb2bf; margin-top: 6px;' },
+						'Загрузка тестового 2 МБ медиа-сегмента через активную стратегию Zapret2, вычисление задержки и анализ DPI-троттлинга...')
+				])
+			]);
+
+			fs.exec(HELPER_BIN, ['speedtest', currentTarget, url]).then(function(res) {
+				ui.hideModal();
+				var parsed = null;
+				try { parsed = JSON.parse(res.stdout); } catch(e) {}
+				if (!parsed) {
+					ui.addNotification(null, E('p', {}, 'Не удалось проанализировать ответ замера скорости.'), 'danger');
+					return;
+				}
+
+				var isThrottled = parsed.throttled === true;
+				var isSuccess = parsed.success === true;
+				var badgeColor = isThrottled ? '#ef4444' : (parsed.rating_badge === 'cbi-color-green' ? '#00d1b2' : '#f59e0b');
+				var bannerBg = isThrottled ? 'rgba(239, 68, 68, 0.12)' : (parsed.rating_badge === 'cbi-color-green' ? 'rgba(0, 209, 178, 0.12)' : 'rgba(245, 158, 11, 0.12)');
+				var icon = isThrottled ? '🔴' : (parsed.rating === '4k' ? '🚀' : parsed.rating === '2k' ? '🟢' : '🟡');
+
+				var speedVal = parsed.speed_mbs > 0 ? (parsed.speed_mbs + ' МБ/с') : (parsed.speed_kbs + ' КБ/с');
+				var speedMbps = parsed.speed_mbps ? (parsed.speed_mbps + ' Мбит/с') : '';
+
+				var modalBody = [
+					E('div', {
+						style: 'background: ' + bannerBg + '; border: 1.5px solid ' + badgeColor + '; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;'
+					}, [
+						E('div', { style: 'font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #abb2bf; font-weight: 600;' }, 'Реальная скорость видеопотока'),
+						E('div', { style: 'font-size: 32px; font-weight: 900; color: ' + badgeColor + '; margin: 6px 0;' }, speedVal),
+						speedMbps ? E('div', { style: 'font-size: 14px; color: #abb2bf; font-weight: 600;' }, '≈ ' + speedMbps) : null,
+						E('div', { style: 'display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 14px; border-radius: 20px; background: rgba(0,0,0,0.25); font-weight: bold; font-size: 13px; color: ' + badgeColor + ';' }, [
+							E('span', {}, icon),
+							E('span', {}, parsed.rating_title || parsed.rating)
+						])
+					]),
+
+					E('div', {
+						style: 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;'
+					}, [
+						E('div', { style: 'background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;' }, [
+							E('div', { style: 'font-size: 11px; color: #abb2bf;' }, 'Пинг до CDN'),
+							E('div', { style: 'font-size: 15px; font-weight: bold; color: #e5e9f0; margin-top: 4px;' }, (parsed.latency_ms || 0) + ' мс')
+						]),
+						E('div', { style: 'background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;' }, [
+							E('div', { style: 'font-size: 11px; color: #abb2bf;' }, 'Время отклика (TTFB)'),
+							E('div', { style: 'font-size: 15px; font-weight: bold; color: #e5e9f0; margin-top: 4px;' }, (parsed.ttfb_ms || 0) + ' мс')
+						]),
+						E('div', { style: 'background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;' }, [
+							E('div', { style: 'font-size: 11px; color: #abb2bf;' }, 'Объем теста'),
+							E('div', { style: 'font-size: 15px; font-weight: bold; color: #e5e9f0; margin-top: 4px;' }, (parsed.size_mb || '0') + ' МБ за ' + (parsed.total_time_sec || '0') + 'с')
+						])
+					]),
+
+					E('div', {
+						style: 'padding: 12px 14px; background: rgba(0,0,0,0.2); border-left: 3px solid ' + badgeColor + '; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #e5e9f0; margin-bottom: 14px;'
+					}, [
+						E('strong', { style: 'display: block; margin-bottom: 4px; color: ' + badgeColor + ';' },
+							isThrottled ? '⚠️ Анализ троттлинга ТСПУ:' : '✓ Анализ качества:'),
+						E('span', {}, parsed.verdict || '')
+					]),
+
+					E('div', { style: 'font-size: 11px; color: #5c6370; text-align: center;' },
+						'Тестовый узел: ' + (parsed.test_name || '') + ' (' + (parsed.test_endpoint || '') + ')')
+				].filter(Boolean);
+
+				var modalButtons = [
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						style: 'padding: 6px 16px;',
+						click: function() { ui.hideModal(); }
+					}, 'Закрыть')
+				];
+
+				if (isThrottled || !isSuccess) {
+					modalButtons.push(E('button', {
+						class: 'cbi-button cbi-button-action',
+						style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 18px;',
+						click: function() {
+							ui.hideModal();
+							startScan();
+						}
+					}, '⚡ Запустить подбор рабочей стратегии'));
+				}
+
+				bcwShowModal('Результаты замера скорости: ' + (pDef.label || currentTarget), modalBody, modalButtons);
+			}).catch(function(err) {
+				ui.hideModal();
+				ui.addNotification(null, E('p', {}, 'Ошибка при выполнении замера скорости: ' + err), 'danger');
+			});
+		}
+
+		var watchdogStatusData = { enabled: false, interval_hours: 4, last_run: 'Никогда', last_status: 'unknown', log: '' };
+
+		function refreshWatchdogStatus() {
+			return fs.exec(HELPER_BIN, ['watchdog', 'status']).then(function(res) {
+				if (res && res.code === 0 && res.stdout) {
+					try {
+						var p = JSON.parse(res.stdout);
+						if (p && p.success) {
+							watchdogStatusData = p;
+							updateWatchdogUI();
+						}
+					} catch(e) {}
+				}
+			}).catch(function() {});
+		}
+
+		function updateWatchdogUI() {
+			if (btnWatchdogHeader) {
+				var isEn = watchdogStatusData.enabled === true;
+				var icon = isEn ? '🛡️' : '⚪';
+				var text = isEn ? (' Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : ' Авто-сторож (Выкл)';
+				var col = isEn ? '#00d1b2' : '#abb2bf';
+				btnWatchdogHeader.innerHTML = '<span>' + icon + '</span>' + text;
+				btnWatchdogHeader.style.color = col;
+			}
+		}
+
+		function showWatchdogModal() {
+			var isEn = watchdogStatusData.enabled === true;
+			var curInterval = watchdogStatusData.interval_hours || 4;
+
+			var chkEnable = E('input', {
+				type: 'checkbox',
+				class: 'bcw-chk-input',
+				id: 'bcw-watchdog-chk'
+			});
+			chkEnable.checked = isEn;
+
+			var intervalSelect = E('select', {
+				class: 'bcw-select',
+				style: 'padding: 4px 10px; font-size: 13px; max-width: 240px;'
+			}, [
+				E('option', { value: '1', selected: curInterval == 1 }, 'Каждый 1 час'),
+				E('option', { value: '2', selected: curInterval == 2 }, 'Каждые 2 часа'),
+				E('option', { value: '4', selected: curInterval == 4 }, 'Каждые 4 часа (рекомендуется)'),
+				E('option', { value: '6', selected: curInterval == 6 }, 'Каждые 6 часов'),
+				E('option', { value: '12', selected: curInterval == 12 }, 'Каждые 12 часов'),
+				E('option', { value: '24', selected: curInterval == 24 }, 'Раз в сутки (24 ч)')
+			]);
+
+			var statusPill = E('span', {
+				class: 'badge ' + (isEn ? 'cbi-color-green' : 'cbi-color-neutral'),
+				style: 'font-weight: bold; font-size: 12px;'
+			}, isEn ? '🟢 Активен' : '⚪ Отключен');
+
+			var logBox = E('pre', {
+				class: 'bcw-code-box',
+				style: 'max-height: 180px; font-size: 11.5px; background: rgba(0,0,0,0.3); margin-top: 8px;'
+			}, watchdogStatusData.log || '(Журнал проверок пуст. Запустите ручную проверку)');
+
+			var modalBody = [
+				E('div', { style: 'margin-bottom: 14px; font-size: 13px; color: #abb2bf; line-height: 1.5;' }, [
+					'Авто-сторож Zapret2 работает в фоне роутера, периодически проверяет доступность YouTube и Discord, ',
+					'и при обнаружении сбоя DPI автоматически запускает бесшумный Smart-Scan для поиска и применения рабочей стратегии.'
+				]),
+
+				E('div', {
+					style: 'display: flex; flex-direction: column; gap: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.06);'
+				}, [
+					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;' }, [
+						E('label', { for: 'bcw-watchdog-chk', style: 'display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: bold; color: #e5e9f0;' }, [
+							chkEnable,
+							E('span', {}, 'Включить автономного сторожа (Watchdog & Auto-Heal)')
+						]),
+						statusPill
+					]),
+
+					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;' }, [
+						E('span', { style: 'font-size: 13px; color: #abb2bf;' }, 'Интервал авто-проверки:'),
+						intervalSelect
+					]),
+
+					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; font-size: 12px;' }, [
+						E('span', { style: 'color: #abb2bf;' }, 'Последняя проверка: ' + (watchdogStatusData.last_run || 'Никогда')),
+						E('span', { style: 'color: ' + (watchdogStatusData.last_status === 'ok' ? '#00d1b2' : '#f59e0b') + '; font-weight: bold;' },
+							'Статус: ' + (watchdogStatusData.last_status === 'ok' ? '✓ В норме' : watchdogStatusData.last_status === 'alert' ? '⚠️ Сбой DPI' : 'Не проверялся'))
+					])
+				]),
+
+				E('div', { style: 'margin-bottom: 6px; font-weight: bold; color: #61afef; font-size: 12px;' }, '📜 Журнал работы сторожа (/var/log/blockcheckw_watchdog.log):'),
+				logBox
+			];
+
+			var btnRunNow = E('button', {
+				class: 'cbi-button cbi-button-action',
+				style: 'padding: 6px 14px; font-size: 12px;',
+				click: function() {
+					var self = this;
+					self.disabled = true;
+					self.textContent = '⏳ Проверка...';
+					fs.exec(HELPER_BIN, ['watchdog', 'run']).then(function(res) {
+						return refreshWatchdogStatus();
+					}).then(function() {
+						self.disabled = false;
+						self.textContent = '🚀 Проверить прямо сейчас';
+						logBox.textContent = watchdogStatusData.log || '(Журнал пуст)';
+						ui.addNotification(null, E('p', {}, '✓ Проверка сторожем успешно завершена!'), 'info');
+					}).catch(function(err) {
+						self.disabled = false;
+						self.textContent = '🚀 Проверить прямо сейчас';
+						ui.addNotification(null, E('p', {}, 'Ошибка запуска проверки: ' + err), 'danger');
+					});
+				}
+			}, '🚀 Проверить прямо сейчас');
+
+			var btnSaveWatchdog = E('button', {
+				class: 'cbi-button cbi-button-positive',
+				style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 18px;',
+				click: function() {
+					var enable = chkEnable.checked;
+					var inter = intervalSelect.value;
+					var cmdArgs = enable ? ['watchdog', 'enable', inter] : ['watchdog', 'disable'];
+
+					fs.exec(HELPER_BIN, cmdArgs).then(function(res) {
+						ui.hideModal();
+						refreshWatchdogStatus();
+						ui.addNotification(null, E('p', {}, enable ? ('✓ Авто-сторож включен (проверка каждые ' + inter + ' ч.)!') : 'Авто-сторож отключен.'), 'info');
+					}).catch(function(err) {
+						ui.addNotification(null, E('p', {}, 'Ошибка настройки сторожа: ' + err), 'danger');
+					});
+				}
+			}, '💾 Сохранить');
+
+			var btnClose = E('button', {
+				class: 'cbi-button cbi-button-neutral',
+				style: 'padding: 6px 16px;',
+				click: function() { ui.hideModal(); }
+			}, 'Закрыть');
+
+			bcwShowModal('🛡️ Авто-сторож Zapret2', modalBody, [ btnRunNow, btnSaveWatchdog, btnClose ]);
+		}
+
 		function formatChangelogList(changelog) {
 			var items = [];
 			if (Array.isArray(changelog)) {
@@ -2825,6 +3099,7 @@ return view.extend({
 		// Initial In-Memory Render
 		updateSummaryBox();
 		updateActiveStrategyDisplay();
+		refreshWatchdogStatus();
 
 		// Periodic background log refresher
 		logPollInterval = setInterval(function() {

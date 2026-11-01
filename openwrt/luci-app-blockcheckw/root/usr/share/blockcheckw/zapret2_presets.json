@@ -31,6 +31,11 @@
       "label": "YouTube (3)",
       "domain": "www.youtube.com",
       "test_url": "https://www.youtube.com",
+      "validation_endpoints": [
+        { "name": "Веб-интерфейс (youtube.com)", "url": "https://www.youtube.com", "range": "0-32767" },
+        { "name": "Превью и медиа (i.ytimg.com)", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "range": "0-16383" },
+        { "name": "Видеопотоки CDN (googlevideo.com)", "url": "https://googlevideo.com", "range": "0-4096" }
+      ],
       "hostlist": "list_hosts_youtube",
       "port": "443",
       "protocols": [
@@ -85,6 +90,10 @@
       "label": "Twitch (3)",
       "domain": "twitch.tv",
       "test_url": "https://twitch.tv",
+      "validation_endpoints": [
+        { "name": "Веб-интерфейс (twitch.tv)", "url": "https://twitch.tv", "range": "0-32767" },
+        { "name": "Видео-шлюз и CDN (usher.ttvnw.net)", "url": "https://usher.ttvnw.net", "range": "0-4096" }
+      ],
       "hostlist": "list_hosts_twitch",
       "port": "443",
       "protocols": [
@@ -106,6 +115,10 @@
       "label": "X / Twitter (3)",
       "domain": "x.com",
       "test_url": "https://x.com",
+      "validation_endpoints": [
+        { "name": "Портал X (x.com)", "url": "https://x.com", "range": "0-32767" },
+        { "name": "Медиа CDN (pbs.twimg.com)", "url": "https://pbs.twimg.com", "range": "0-4096" }
+      ],
       "hostlist": "list_hosts_x",
       "port": "443",
       "protocols": [
@@ -130,6 +143,10 @@
       "label": "Instagram (2)",
       "domain": "gateway.instagram.com",
       "test_url": "https://gateway.instagram.com",
+      "validation_endpoints": [
+        { "name": "Шлюз Instagram (gateway.instagram.com)", "url": "https://gateway.instagram.com", "range": "0-32767" },
+        { "name": "Медиа CDN (static.cdninstagram.com)", "url": "https://static.cdninstagram.com", "range": "0-4096" }
+      ],
       "hostlist": "list_hosts_instagram",
       "port": "443",
       "protocols": [

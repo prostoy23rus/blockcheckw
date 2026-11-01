@@ -1519,11 +1519,12 @@ if preset_obj and preset_obj.validation_endpoints and #preset_obj.validation_end
         table.insert(endpoints, { name = ep.name, url = ep.url, range = ep.range or "0-16383" })
     end
 else
-    local test_url = (arg2 and arg2 ~= "") and arg2 or arg1
+    local test_url = (arg2 and arg2 ~= "") and arg2 or (preset_obj and (preset_obj.test_url or preset_obj.domain)) or arg1
     if not test_url:match("^https?://") then
         test_url = "https://" .. test_url
     end
-    table.insert(endpoints, { name = "Основной узел (" .. test_url:gsub("^https?://", ""):gsub("/.*$", "") .. ")", url = test_url, range = "0-32767" })
+    local host_label = test_url:gsub("^https?://", ""):gsub("/.*$", "")
+    table.insert(endpoints, { name = "Основной узел (" .. host_label .. ")", url = test_url, range = "0-32767" })
 end
 
 local results = {}
@@ -1545,7 +1546,7 @@ for idx, ep in ipairs(endpoints) do
     elapsed = tonumber(elapsed) or 0.0
 
     local code_num = tonumber(code) or 0
-    local is_ok = (code_num >= 200 and code_num < 400 and elapsed < 5.5)
+    local is_ok = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and elapsed < 5.5
     local speed_kbs = math.floor(speed / 1024)
     total_speed_kbs = total_speed_kbs + speed_kbs
 
@@ -1559,7 +1560,7 @@ for idx, ep in ipairs(endpoints) do
         url = ep.url,
         http_code = code,
         accessible = is_ok,
-        data_flow = (size > 0 and is_ok),
+        data_flow = ((size > 0 or code_num == 200 or code_num == 204 or code_num == 206 or code_num == 403 or code_num == 404) and is_ok),
         size_bytes = size,
         speed_kbs = speed_kbs,
         time_sec = string.format("%.2f", elapsed)
@@ -1594,6 +1595,322 @@ local resp = {
 
 print(json.stringify(resp))
 EOF
+}
+
+cmd_speedtest() {
+    local target_or_url="${1:-preset_youtube}"
+    local custom_url="$2"
+
+    lua - "$target_or_url" "$custom_url" "$PRESETS_FILE" << 'EOF'
+local json = require("luci.jsonc")
+local arg1 = arg[1] or "preset_youtube"
+local arg2 = arg[2] or ""
+local presets_file = arg[3]
+
+local p = arg1:gsub("^preset_", "")
+local preset_key = "preset_" .. p
+if arg1 == "builtin" or arg1 == "general" then preset_key = "builtin" end
+
+local pf = io.open(presets_file, "r")
+local presets_data = {}
+if pf then
+    presets_data = json.parse(pf:read("*a")) or {}
+    pf:close()
+end
+
+local preset_obj = presets_data.presets and (presets_data.presets[preset_key] or presets_data.presets[arg1])
+
+local test_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
+local test_range = "0-2097151" -- 2 MB chunk from Google Edge CDN
+local test_name = "Google Video & Media CDN (2 МБ чанк)"
+
+if preset_key == "preset_youtube" then
+    test_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
+    test_range = "0-2097151"
+    test_name = "Google Video & Media CDN (2 МБ чанк)"
+elseif preset_key == "preset_discord" then
+    test_endpoint = "https://discord.com"
+    test_range = ""
+    test_name = "Discord Web & API (170 КБ поток)"
+elseif preset_key == "preset_twitch" then
+    test_endpoint = "https://www.twitch.tv"
+    test_range = ""
+    test_name = "Twitch Portal & Streams (300 КБ поток)"
+elseif preset_key == "preset_x" then
+    test_endpoint = "https://x.com"
+    test_range = ""
+    test_name = "Портал X / Twitter"
+elseif preset_key == "preset_instagram" then
+    test_endpoint = "https://gateway.instagram.com"
+    test_range = ""
+    test_name = "Шлюз Instagram"
+else
+    local custom = (arg2 and arg2 ~= "") and arg2 or (preset_obj and (preset_obj.test_url or preset_obj.domain)) or arg1
+    if not custom:match("^https?://") then custom = "https://" .. custom end
+    test_endpoint = custom
+    test_range = "0-1048575"
+    test_name = "Пользовательский узел (" .. custom:gsub("^https?://", ""):gsub("/.*$", "") .. ")"
+end
+
+local range_opt = (test_range ~= "") and ("--range " .. test_range) or ""
+local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}|%%{time_connect}|%%{time_starttransfer}' -o /dev/null --connect-timeout 6 -m 12 '%s' 2>/dev/null", range_opt, test_endpoint)
+
+local pipe = io.popen(cmd)
+local out = pipe and pipe:read("*a") or ""
+if pipe then pipe:close() end
+
+local code, size, speed, total_time, time_connect, time_start = out:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+code = code or "000"
+size = tonumber(size) or 0
+speed = tonumber(speed) or 0
+total_time = tonumber(total_time) or 0.0
+time_connect = tonumber(time_connect) or 0.0
+time_start = tonumber(time_start) or 0.0
+
+local code_num = tonumber(code) or 0
+local is_success = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and (size > 0 or total_time < 5.0)
+
+local speed_kbs = math.floor(speed / 1024)
+if speed_kbs == 0 and size > 0 and is_success then
+    speed_kbs = math.max(1, math.floor(size / math.max(0.1, total_time) / 1024))
+end
+
+local speed_mbs = math.floor((speed_kbs / 1024) * 100) / 100
+local speed_mbps = math.floor(((speed_kbs * 8) / 1000) * 10) / 10
+local latency_ms = math.floor(time_connect * 1000)
+local ttfb_ms = math.floor(time_start * 1000)
+
+local rating = "unknown"
+local rating_badge = "neutral"
+local rating_title = "Не определено"
+local throttled = false
+local verdict = ""
+
+if not is_success or speed_kbs == 0 then
+    rating = "blocked"
+    rating_badge = "cbi-color-red"
+    rating_title = "Заблокировано ТСПУ"
+    throttled = true
+    verdict = "ТСПУ блокирует передачу данных или соединение сброшено. Требуется запустить подбор стратегии в Zapret2."
+elseif speed_kbs < 250 then
+    rating = "throttled"
+    rating_badge = "cbi-color-red"
+    rating_title = "144p - 240p (Троттлинг)"
+    throttled = true
+    verdict = "Обнаружен жесткий DPI-троттлинг ТСПУ! Скорость искусственно занижена до " .. speed_kbs .. " КБ/с. Видео будет застревать на буферизации."
+elseif speed_kbs < 1000 then
+    rating = "480p"
+    rating_badge = "cbi-color-yellow"
+    rating_title = "360p - 480p SD"
+    throttled = false
+    verdict = "Базовая скорость передачи. Достаточно для невысокого качества (SD), возможны паузы при переключении на HD."
+elseif speed_kbs < 3000 then
+    rating = "720p"
+    rating_badge = "cbi-color-yellow"
+    rating_title = "720p HD"
+    throttled = false
+    verdict = "Стабильная скорость для 720p HD видео. Плавный просмотр без зависаний."
+elseif speed_kbs < 10000 then
+    rating = "1080p"
+    rating_badge = "cbi-color-green"
+    rating_title = "1080p Full HD"
+    throttled = false
+    verdict = "Отличная скорость! Видео 1080p Full HD (60fps) загружается моментально без задержек и буферизации."
+elseif speed_kbs < 25000 then
+    rating = "2k"
+    rating_badge = "cbi-color-green"
+    rating_title = "1440p / 2K QHD"
+    throttled = false
+    verdict = "Высокая пропускная способность! Потоки 2K QHD и 60fps воспроизводятся плавно."
+else
+    rating = "4k"
+    rating_badge = "cbi-color-green"
+    rating_title = "4K Ultra HD"
+    throttled = false
+    verdict = "Максимальная скорость CDN (" .. speed_mbps .. " Мбит/с)! Потоки 4K UHD и многопоточный просмотр без малейших задержек."
+end
+
+local result = {
+    success = is_success,
+    target = arg1,
+    test_endpoint = test_endpoint,
+    test_name = test_name,
+    http_code = code,
+    size_bytes = size,
+    size_mb = string.format("%.2f", size / (1024 * 1024)),
+    speed_kbs = speed_kbs,
+    speed_mbs = speed_mbs,
+    speed_mbps = speed_mbps,
+    total_time_sec = string.format("%.2f", total_time),
+    latency_ms = latency_ms,
+    ttfb_ms = ttfb_ms,
+    rating = rating,
+    rating_badge = rating_badge,
+    rating_title = rating_title,
+    throttled = throttled,
+    verdict = verdict
+}
+
+print(json.stringify(result))
+EOF
+}
+
+cmd_watchdog() {
+    local action="${1:-status}"
+    local arg2="$2"
+    local cron_file="/etc/crontabs/root"
+    local watchdog_log="/var/log/blockcheckw_watchdog.log"
+    local config_file="/etc/blockcheckw_watchdog.json"
+
+    case "$action" in
+        status)
+            local is_enabled=false
+            if [ -f "$cron_file" ] && grep -q 'blockcheckw-helper watchdog run' "$cron_file" 2>/dev/null; then
+                is_enabled=true
+            fi
+
+            local log_tail=""
+            if [ -f "$watchdog_log" ]; then
+                log_tail=$(tail -n 30 "$watchdog_log")
+            fi
+
+            lua - "$is_enabled" "$config_file" "$log_tail" << 'EOF'
+local json = require("luci.jsonc")
+local is_en = (arg[1] == "true")
+local cfg_path = arg[2]
+local l_tail = arg[3] or ""
+
+local int_h = 4
+local l_run = "Никогда"
+local l_stat = "unknown"
+
+local f = io.open(cfg_path, "r")
+if f then
+    local d = json.parse(f:read("*a"))
+    f:close()
+    if d then
+        int_h = tonumber(d.interval_hours) or 4
+        l_run = d.last_run or "Никогда"
+        l_stat = d.last_status or "unknown"
+    end
+end
+
+local res = {
+    success = true,
+    enabled = is_en,
+    interval_hours = int_h,
+    last_run = l_run,
+    last_status = l_stat,
+    log = l_tail
+}
+print(json.stringify(res))
+EOF
+            ;;
+
+        enable)
+            local interval="${arg2:-4}"
+            mkdir -p /etc/crontabs
+            touch "$cron_file"
+            sed -i '/blockcheckw-helper watchdog/d' "$cron_file"
+            echo "0 */$interval * * * /usr/bin/blockcheckw-helper watchdog run >/dev/null 2>&1" >> "$cron_file"
+            /etc/init.d/cron enable >/dev/null 2>&1
+            /etc/init.d/cron restart >/dev/null 2>&1
+
+            local now=$(date '+%Y-%m-%d %H:%M:%S')
+            cat <<EOF > "$config_file"
+{
+  "enabled": true,
+  "interval_hours": $interval,
+  "last_update": "$now",
+  "last_run": "Ожидание",
+  "last_status": "ok"
+}
+EOF
+            echo "[$now] [WATCHDOG] Авто-сторож Zapret2 активирован (интервал: каждые $interval ч.)." >> "$watchdog_log"
+            echo "{\"success\":true,\"enabled\":true,\"interval_hours\":$interval,\"message\":\"Авто-сторож успешно активирован (проверка каждые $interval ч.).\"}"
+            ;;
+
+        disable)
+            if [ -f "$cron_file" ]; then
+                sed -i '/blockcheckw-helper watchdog/d' "$cron_file"
+                /etc/init.d/cron restart >/dev/null 2>&1
+            fi
+
+            local now=$(date '+%Y-%m-%d %H:%M:%S')
+            if [ -f "$config_file" ]; then
+                sed -i 's/"enabled":\s*true/"enabled": false/' "$config_file"
+            fi
+            echo "[$now] [WATCHDOG] Авто-сторож Zapret2 отключен пользователем." >> "$watchdog_log"
+            echo "{\"success\":true,\"enabled\":false,\"message\":\"Авто-сторож отключен.\"}"
+            ;;
+
+        run)
+            local now=$(date '+%Y-%m-%d %H:%M:%S')
+            echo "[$now] [WATCHDOG] Начало плановой проверки доступности сервисов..." >> "$watchdog_log"
+
+            local zap_status=$(/etc/init.d/zapret2 status 2>/dev/null)
+            if [ -z "$zap_status" ] || [ "$zap_status" = "stopped" ]; then
+                echo "[$now] [ALERT] Служба Zapret2 остановлена! Запуск..." >> "$watchdog_log"
+                /etc/init.d/zapret2 start >/dev/null 2>&1
+                sleep 3
+            fi
+
+            local targets_to_check="preset_youtube preset_discord"
+            local overall_result="ok"
+
+            for t in $targets_to_check; do
+                local t_now=$(date '+%Y-%m-%d %H:%M:%S')
+                local test_out=$(cmd_test "$t" "" 2>/dev/null)
+                local is_ok=false
+                if echo "$test_out" | grep -q '"all_ok":true' || echo "$test_out" | grep -q '"accessible":true'; then
+                    is_ok=true
+                fi
+
+                local spd=$(echo "$test_out" | grep -o '"avg_speed_kbs":[0-9]*' | cut -d: -f2)
+                spd=${spd:-0}
+
+                if [ "$is_ok" = "true" ]; then
+                    echo "[$t_now] [OK] $t: доступен (скорость: ${spd} КБ/с)" >> "$watchdog_log"
+                else
+                    echo "[$t_now] [ALERT] $t: сервис ЗАБЛОКИРОВАН ТСПУ или недоступен!" >> "$watchdog_log"
+                    overall_result="alert"
+
+                    if is_scanner_running; then
+                        echo "[$t_now] [SKIP] Сканер уже выполняется, пропуск повторного запуска." >> "$watchdog_log"
+                    else
+                        echo "[$t_now] [HEAL] Запуск авто-подбора стратегии (Smart-Scan) для $t..." >> "$watchdog_log"
+                        /usr/bin/blockcheckw-helper start --target "$t" --smart --auto-apply >/dev/null 2>&1 &
+                        echo "[$t_now] [HEAL] Фоновый подбор для $t успешно запущен." >> "$watchdog_log"
+                    fi
+                fi
+            done
+
+            local end_now=$(date '+%Y-%m-%d %H:%M:%S')
+            echo "[$end_now] [WATCHDOG] Плановая проверка завершена (статус: $overall_result)." >> "$watchdog_log"
+
+            local cur_interval=4
+            if [ -f "$config_file" ]; then
+                local ci=$(grep -o '"interval_hours":[0-9]*' "$config_file" | cut -d: -f2)
+                [ -n "$ci" ] && cur_interval="$ci"
+            fi
+
+            cat <<EOF > "$config_file"
+{
+  "enabled": true,
+  "interval_hours": $cur_interval,
+  "last_run": "$end_now",
+  "last_status": "$overall_result"
+}
+EOF
+
+            echo "{\"success\":true,\"status\":\"$overall_result\",\"last_run\":\"$end_now\"}"
+            ;;
+
+        *)
+            echo "Usage: $0 watchdog {status|enable [hours]|disable|run}"
+            exit 1
+            ;;
+    esac
 }
 
 cmd_info() {
@@ -2122,6 +2439,8 @@ case "$1" in
     activate) shift; cmd_activate "$@" ;;
     delete_strategy) shift; cmd_delete_strategy "$@" ;;
     test) shift; cmd_test "$@" ;;
+    speedtest) shift; cmd_speedtest "$@" ;;
+    watchdog) shift; cmd_watchdog "$@" ;;
     info) cmd_info ;;
     logs) shift; cmd_logs "$@" ;;
     check_update) cmd_check_update ;;
@@ -2130,7 +2449,7 @@ case "$1" in
     diag) shift; cmd_diag "$@" ;;
     ensure_hostlists) shift; cmd_ensure_hostlists "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|speedtest|watchdog|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
         exit 1
         ;;
 esac

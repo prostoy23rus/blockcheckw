@@ -7,10 +7,6 @@
       "label": "Встроенные хосты (33)",
       "domain": "rutracker.org",
       "test_url": "https://rutracker.org",
-      "validation_endpoints": [
-        { "name": "RuTracker (rutracker.org)", "url": "https://rutracker.org", "range": "0-16383" },
-        { "name": "Tor Project (torproject.org)", "url": "https://www.torproject.org", "range": "0-16383" }
-      ],
       "hostlist": "list_hosts_user",
       "port": "80,443",
       "protocols": [
@@ -36,9 +32,9 @@
       "domain": "www.youtube.com",
       "test_url": "https://www.youtube.com",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (www.youtube.com)", "url": "https://www.youtube.com", "range": "0-32767" },
-        { "name": "Видеопотоки (googlevideo.com)", "url": "https://googlevideo.com", "range": "0-16383" },
-        { "name": "Медиа и превью (i.ytimg.com)", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg", "range": "0-8191" }
+        { "name": "Веб-интерфейс (youtube.com)", "url": "https://www.youtube.com", "range": "0-32767" },
+        { "name": "Превью и медиа (i.ytimg.com)", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "range": "0-16383" },
+        { "name": "Видеопотоки CDN (googlevideo.com)", "url": "https://googlevideo.com", "range": "0-4096" }
       ],
       "hostlist": "list_hosts_youtube",
       "port": "443",
@@ -95,9 +91,8 @@
       "domain": "twitch.tv",
       "test_url": "https://twitch.tv",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (twitch.tv)", "url": "https://www.twitch.tv", "range": "0-32767" },
-        { "name": "Видеостримы (usher.ttvnw.net)", "url": "https://usher.ttvnw.net", "range": "0-8191" },
-        { "name": "Медиа и чат (static-cdn.jtvnw.net)", "url": "https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_5/default/dark/1.0", "range": "0-8191" }
+        { "name": "Веб-интерфейс (twitch.tv)", "url": "https://twitch.tv", "range": "0-32767" },
+        { "name": "Видео-шлюз и CDN (usher.ttvnw.net)", "url": "https://usher.ttvnw.net", "range": "0-4096" }
       ],
       "hostlist": "list_hosts_twitch",
       "port": "443",
@@ -121,9 +116,8 @@
       "domain": "x.com",
       "test_url": "https://x.com",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (x.com)", "url": "https://x.com", "range": "0-16383" },
-        { "name": "Фото и видео (pbs.twimg.com)", "url": "https://pbs.twimg.com/media/favicon.ico", "range": "0-8191" },
-        { "name": "API авторизации (api.x.com)", "url": "https://api.x.com", "range": "0-8191" }
+        { "name": "Портал X (x.com)", "url": "https://x.com", "range": "0-32767" },
+        { "name": "Медиа CDN (pbs.twimg.com)", "url": "https://pbs.twimg.com", "range": "0-4096" }
       ],
       "hostlist": "list_hosts_x",
       "port": "443",
@@ -150,9 +144,8 @@
       "domain": "gateway.instagram.com",
       "test_url": "https://gateway.instagram.com",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (instagram.com)", "url": "https://www.instagram.com", "range": "0-16383" },
-        { "name": "Медиа CDN (static.cdninstagram.com)", "url": "https://static.cdninstagram.com/rsrc.php/v3/y4/r/DuDa6rPwbSr.png", "range": "0-8191" },
-        { "name": "API шлюз (gateway.instagram.com)", "url": "https://gateway.instagram.com", "range": "0-8191" }
+        { "name": "Шлюз Instagram (gateway.instagram.com)", "url": "https://gateway.instagram.com", "range": "0-32767" },
+        { "name": "Медиа CDN (static.cdninstagram.com)", "url": "https://static.cdninstagram.com", "range": "0-4096" }
       ],
       "hostlist": "list_hosts_instagram",
       "port": "443",

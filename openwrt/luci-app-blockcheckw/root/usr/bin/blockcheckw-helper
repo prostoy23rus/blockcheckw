@@ -1826,8 +1826,15 @@ cmd_update() {
     fi
 
     mkdir -p /usr/bin /usr/share/blockcheckw /usr/share/luci/menu.d /usr/share/rpcd/acl.d /www/luci-static/resources/view/blockcheckw
+    chmod 755 /www/luci-static/resources/view/blockcheckw /usr/share/blockcheckw 2>/dev/null || true
 
-    # Install files
+    # Prepare file permissions before moving into place to prevent 403 in uhttpd
+    chmod +x "$tmp_dir/blockcheckw-helper" "$tmp_dir/circular-builder.lua" 2>/dev/null || true
+    chmod 644 "$tmp_dir/main.js" "$tmp_dir/zapret2_presets.json" "$tmp_dir/version.json" 2>/dev/null || true
+    [ -f "$tmp_dir/menu.json" ] && chmod 644 "$tmp_dir/menu.json" 2>/dev/null || true
+    [ -f "$tmp_dir/acl.json" ] && chmod 644 "$tmp_dir/acl.json" 2>/dev/null || true
+
+    # Install files atomically
     cp -f "$tmp_dir/blockcheckw-helper" /usr/bin/blockcheckw-helper
     cp -f "$tmp_dir/circular-builder.lua" /usr/bin/circular-builder.lua
     cp -f "$tmp_dir/main.js" /www/luci-static/resources/view/blockcheckw/main.js

@@ -248,6 +248,7 @@ echo -e "${GREEN}✓${NC} Бинарник установлен: ${BOLD}/usr/bin
 echo -e "${BLUE}ℹ${NC} Скачивание модулей LuCI приложения BlockcheckW..."
 
 mkdir -p /usr/bin /usr/share/blockcheckw /usr/share/luci/menu.d /usr/share/rpcd/acl.d /www/luci-static/resources/view/blockcheckw
+chmod 755 /www/luci-static/resources/view/blockcheckw /usr/share/blockcheckw 2>/dev/null || true
 
 fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/blockcheckw-helper" /usr/bin/blockcheckw-helper 8
 fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/circular-builder.lua" /usr/bin/circular-builder.lua 8

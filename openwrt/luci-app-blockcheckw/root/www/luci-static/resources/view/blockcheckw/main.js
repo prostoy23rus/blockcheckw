@@ -2422,19 +2422,26 @@ return view.extend({
 		}
 
 		function runSpeedTest() {
-			var pDef = presetsConfig[currentTarget] || {};
-			var url = '';
-			if (currentTarget === 'domains' || currentTarget === 'tcp16') {
-				url = customDomainInput.value.trim();
-				if (!url) url = pDef.domain || '';
+			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'] || {};
+			var url = pDef.test_url || 'https://www.youtube.com';
+			if (currentTarget === 'domains') {
+				var d = customDomainInput.value.trim();
+				if (d) {
+					if (!/^https?:\/\//i.test(d)) d = 'https://' + d;
+					url = d;
+				}
 			} else if (currentTarget === 'test_strategy') {
-				url = testStrategyUrlInput.value.trim() || 'https://www.youtube.com';
+				var u = testUrlInput.value.trim();
+				if (u) {
+					if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+					url = u;
+				}
 			}
 
 			bcwShowModal('⚡ Замер реальной скорости видео и проверка DPI', [
 				E('div', { style: 'text-align: center; padding: 18px 10px;' }, [
 					E('p', { class: 'spinning', style: 'font-size: 15px; font-weight: bold; color: #61afef;' },
-						'Тестирование пропускной способности видеопотока к ' + (pDef.label || currentTarget) + '...'),
+						'Тестирование пропускной способности видеопотока к ' + (pDef.name || currentTarget) + '...'),
 					E('p', { style: 'font-size: 12px; color: #abb2bf; margin-top: 6px;' },
 						'Загрузка тестового 2 МБ медиа-сегмента через активную стратегию Zapret2, вычисление задержки и анализ DPI-троттлинга...')
 				])
@@ -2519,7 +2526,7 @@ return view.extend({
 					}, '⚡ Запустить подбор рабочей стратегии'));
 				}
 
-				bcwShowModal('Результаты замера скорости: ' + (pDef.label || currentTarget), modalBody, modalButtons);
+				bcwShowModal('Результаты замера скорости: ' + (pDef.name || currentTarget), modalBody, modalButtons);
 			}).catch(function(err) {
 				ui.hideModal();
 				ui.addNotification(null, E('p', {}, 'Ошибка при выполнении замера скорости: ' + err), 'danger');

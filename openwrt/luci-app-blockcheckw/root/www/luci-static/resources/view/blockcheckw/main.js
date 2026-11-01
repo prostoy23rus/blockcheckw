@@ -8,7 +8,7 @@ var isRunning = false;
 var pollInterval = null;
 var logPollInterval = null;
 var currentTarget = 'preset_youtube';
-var currentMode = 'turbo';
+var currentMode = 'smart';
 var doCircular = true;
 var autoApply = true;
 var activeScanInProgress = false;
@@ -504,7 +504,7 @@ return view.extend({
 			title: 'Автоматическая проверка обновлений...',
 			click: function() {
 				if (updateCheckStatus.checked && updateCheckStatus.has_update) {
-					confirmRunUpdate(updateCheckStatus.latest_version);
+					doRunUpdate(updateCheckStatus.latest_version);
 				} else {
 					doCheckUpdate(true);
 				}
@@ -762,16 +762,6 @@ return view.extend({
 		mainLayout.appendChild(targetSectionCard);
 
 		// Parameters and Launch Control Card
-		var btnModeTurbo = E('button', {
-			class: 'bcw-opt-btn' + (currentMode === 'turbo' ? ' active' : ''),
-			click: function() { switchMode('turbo'); }
-		}, '⚡ Турбо (10-15 сек)');
-
-		var btnModeFull = E('button', {
-			class: 'bcw-opt-btn' + (currentMode === 'full' ? ' active' : ''),
-			click: function() { switchMode('full'); }
-		}, '🔬 Глубокий скан');
-
 		var btnApplyAuto = E('button', {
 			class: 'bcw-opt-btn' + (autoApply ? ' active teal' : ''),
 			click: function() { switchApplyMode(true); }
@@ -781,12 +771,6 @@ return view.extend({
 			class: 'bcw-opt-btn' + (!autoApply ? ' active' : ''),
 			click: function() { switchApplyMode(false); }
 		}, '✋ Вручную');
-
-		var paramSpeedHintEl = E('div', { class: 'bcw-param-hint' },
-			currentMode === 'turbo'
-				? '⚡ Турбо: молниеносный перебор проверенных топ-стратегий 2026 года (multisplit, fake, disorder). Рекомендуется в 95% случаев.'
-				: '🔬 Глубокий скан: полный перебор комбинаций параметров Zapret (ack/ts смещения, fool/disorder, fake payloads). Для жестких блокировок.'
-		);
 
 		var paramApplyHintEl = E('div', { class: 'bcw-param-hint' },
 			autoApply
@@ -813,7 +797,7 @@ return view.extend({
 		var btnStartScan = E('button', {
 			class: 'bcw-btn-launch',
 			click: function() { startScan(); }
-		}, '▶ Запустить поиск стратегий');
+		}, '⚡ Запустить поиск стратегий');
 
 		var btnStopScan = E('button', {
 			class: 'bcw-btn-stop',
@@ -832,7 +816,7 @@ return view.extend({
 			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
 			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2 (например, BlockcheckW_YouTube). Нажмите кнопку '),
 			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность (curl) ]'),
-			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ▶ Запустить поиск стратегий ] нужна только если вы хотите с нуля подобрать новую связку взамен этой.')
+			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ⚡ Запустить поиск стратегий ] нужна только если вы хотите с нуля подобрать новую связку взамен этой.')
 		]);
 
 		var controlCard = E('div', { class: 'bcw-card' }, [
@@ -841,19 +825,13 @@ return view.extend({
 			]),
 			testStrategyHintBox,
 			E('div', { class: 'bcw-control-grid' }, [
-				// Box 1: Mode
-				E('div', { class: 'bcw-param-box' }, [
-					E('div', { class: 'bcw-param-label' }, 'Скорость подбора:'),
-					E('div', { class: 'bcw-options-grid' }, [ btnModeTurbo, btnModeFull ]),
-					paramSpeedHintEl
-				]),
-				// Box 2: Auto-apply
+				// Box 1: Auto-apply
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Режим применения:'),
 					E('div', { class: 'bcw-options-grid' }, [ btnApplyAuto, btnApplyManual ]),
 					paramApplyHintEl
 				]),
-				// Box 3: Circular
+				// Box 2: Circular
 				E('div', { class: 'bcw-param-box' }, [
 					E('div', { class: 'bcw-param-label' }, 'Отказоустойчивость:'),
 					E('div', { class: 'bcw-options-grid' }, [ btnCircularOn, btnCircularOff ]),
@@ -864,6 +842,10 @@ return view.extend({
 				btnStartScan,
 				btnStopScan,
 				btnTestConn
+			]),
+			E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; display: flex; align-items: center; gap: 6px; padding: 4px 2px;' }, [
+				E('span', { style: 'color: #00d1b2; font-weight: bold;' }, '⚡'),
+				E('span', {}, 'Умный точный поиск: мгновенный экспресс-зонд DPI провайдера с авто-калибровкой лучших связок 2026 года под вашу сеть.')
 			])
 		]);
 		mainLayout.appendChild(controlCard);
@@ -1485,19 +1467,6 @@ return view.extend({
 
 			updateSummaryBox();
 			updateActiveStrategyDisplay();
-		}
-
-		function switchMode(mode) {
-			currentMode = mode;
-			if (mode === 'turbo') {
-				btnModeTurbo.classList.add('active');
-				btnModeFull.classList.remove('active');
-				paramSpeedHintEl.textContent = '⚡ Турбо: молниеносный перебор проверенных топ-стратегий 2026 года (multisplit, fake, disorder). Рекомендуется в 95% случаев.';
-			} else {
-				btnModeFull.classList.add('active');
-				btnModeTurbo.classList.remove('active');
-				paramSpeedHintEl.textContent = '🔬 Глубокий скан: полный перебор комбинаций параметров Zapret (ack/ts смещения, fool/disorder, fake payloads). Для жестких блокировок.';
-			}
 		}
 
 		function switchApplyMode(isAuto) {
@@ -2208,7 +2177,6 @@ return view.extend({
 			var title = isPostUpdate ? ('🎉 Служба успешно обновлена до v' + ver + '!') : ('Что нового в BlockcheckW v' + ver);
 
 			bcwShowModal(title, [
-
 				E('div', { style: 'border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 14px;' }, [
 					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
 						isPostUpdate ? '🚀 Обновление успешно установлено' : ('🎉 Релиз v' + ver),
@@ -2221,15 +2189,7 @@ return view.extend({
 				E('div', { style: 'background: rgba(0, 209, 178, 0.06); border: 1px solid rgba(0, 209, 178, 0.2); border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #abb2bf;' }, [
 					E('strong', { style: 'color: #00d1b2;' }, '🛡️ Защита настроек: '),
 					'Все ваши настроенные стратегии в Zapret2 сохранены и продолжают работать в штатном режиме.'
-				]),
-				E('div', { class: 'right', style: 'display: flex; justify-content: flex-end; margin-top: 18px;' }, [
-					E('button', {
-						class: 'cbi-button cbi-button-action',
-						style: 'padding: 6px 18px; font-size: 13px; font-weight: bold;',
-						click: function() { ui.hideModal(); }
-					}, '👍 Отлично, понятно')
 				])
-			
 			], [
 				E('button', {
 					class: 'cbi-button cbi-button-action',
@@ -2247,7 +2207,6 @@ return view.extend({
 
 		function confirmRunUpdate(targetVer) {
 			bcwShowModal('Обновление службы BlockcheckW', [
-
 				E('div', { style: 'margin-bottom: 14px;' }, [
 					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
 						'🚀 Доступна новая версия: v' + targetVer,
@@ -2256,22 +2215,7 @@ return view.extend({
 					E('p', { style: 'margin-top: 10px; color: #e5e9f0; line-height: 1.5;' },
 						'Обновить службу BlockcheckW до версии v' + targetVer + ' прямо сейчас? Все настроенные стратегии в Zapret2 будут сохранены.'
 					)
-				]),
-				E('div', { class: 'right', style: 'display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;' }, [
-					E('button', {
-						class: 'cbi-button',
-						click: function() { ui.hideModal(); }
-					}, 'Отмена'),
-					E('button', {
-						class: 'cbi-button cbi-button-action',
-						style: 'font-weight: bold;',
-						click: function() {
-							ui.hideModal();
-							doRunUpdate(targetVer);
-						}
-					}, '🚀 Установить обновление v' + targetVer)
 				])
-			
 			], [
 				E('button', {
 					class: 'cbi-button',
@@ -2294,6 +2238,23 @@ return view.extend({
 			var releaseDate = info.release_date ? ' (' + info.release_date + ')' : '';
 			var repoName = info.repo || 'prostoy23rus/blockcheckw';
 
+			var changelogNodes = [];
+			var rawList = info.changelog || [];
+			if (Array.isArray(rawList) && rawList.length > 0) {
+				var displayItems = rawList.slice(0, 3);
+				var ul = E('ul', { style: 'list-style: none; padding: 6px 0 0 0; margin: 8px 0 0 0; font-size: 12.5px; color: #abb2bf; display: flex; flex-direction: column; gap: 4px;' });
+				displayItems.forEach(function(item) {
+					ul.appendChild(E('li', { style: 'display: flex; gap: 6px; align-items: flex-start;' }, [
+						E('span', { style: 'color: #00d1b2; font-weight: bold;' }, '•'),
+						E('span', {}, item)
+					]));
+				});
+				if (rawList.length > 3) {
+					ul.appendChild(E('li', { style: 'color: #61afef; font-size: 11px; margin-top: 2px;' }, '+ ещё ' + (rawList.length - 3) + ' улучшений...'));
+				}
+				changelogNodes.push(ul);
+			}
+
 			updateBannerCard.appendChild(E('div', {
 				style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;'
 			}, [
@@ -2302,15 +2263,16 @@ return view.extend({
 						'🎉 Доступна новая версия: v' + nextVer,
 						E('span', { style: 'font-size: 12px; font-weight: normal; color: #828997;' }, releaseDate)
 					]),
-					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, 'Обнаружена новая версия службы. Нажмите кнопку для автоматической установки.'),
-					E('div', { style: 'font-size: 11px; color: #abb2bf; margin-top: 3px;' }, 'Репозиторий: ' + repoName + ' (ветка main)')
-				]),
+					E('div', { style: 'font-size: 13px; color: #e5e9f0; margin-top: 4px;' }, 'Обнаружена новая версия службы с оптимизацией обхода и точным поиском:'),
+					changelogNodes.length > 0 ? E('div', {}, changelogNodes) : null,
+					E('div', { style: 'font-size: 11px; color: #abb2bf; margin-top: 6px;' }, 'Репозиторий: ' + repoName + ' (ветка main)')
+				].filter(Boolean)),
 				E('div', { style: 'display: flex; gap: 10px; align-items: center;' }, [
 					E('button', {
 						class: 'bcw-btn-launch',
 						style: 'padding: 8px 18px; font-size: 13px;',
-						click: function() { confirmRunUpdate(nextVer); }
-					}, '🚀 Установить обновление v' + nextVer),
+						click: function() { doRunUpdate(nextVer); }
+					}, '🚀 Обновить до v' + nextVer),
 					E('button', {
 						class: 'bcw-btn-secondary',
 						style: 'padding: 8px 14px; font-size: 13px;',
@@ -2343,16 +2305,12 @@ return view.extend({
 				btnCheckUpdate.innerHTML = '';
 				btnCheckUpdate.appendChild(E('span', { style: 'color: #61afef;' }, '🚀'));
 				btnCheckUpdate.appendChild(document.createTextNode(' Доступно обновление: v' + parsed.latest_version));
-				btnCheckUpdate.title = 'Доступна новая версия v' + parsed.latest_version + '. Нажмите для установки';
+				btnCheckUpdate.title = 'Доступна новая версия v' + parsed.latest_version + '. Нажмите для установки в 1 клик';
 				btnCheckUpdate.style.borderColor = '#3273dc';
 				btnCheckUpdate.style.background = 'rgba(50, 115, 220, 0.2)';
 				btnCheckUpdate.style.color = '#ffffff';
 
 				showUpdateBanner(parsed);
-
-				if (isManual) {
-					confirmRunUpdate(parsed.latest_version);
-				}
 			} else {
 				updateCheckStatus.has_update = false;
 				updateCheckStatus.latest_version = parsed.current_version || curVer;
@@ -2581,13 +2539,11 @@ return view.extend({
 			});
 		}
 
-		// Check if the service was just updated and show welcome What's New modal
+		// Check if the service was just updated and show friendly notification
 		try {
 			if (localStorage.getItem('bcw_just_updated') === '1') {
 				localStorage.removeItem('bcw_just_updated');
-				setTimeout(function() {
-					showWhatsNewModal(versionInfo, true);
-				}, 400);
+				ui.addNotification(null, E('p', {}, '✓ Служба BlockcheckW успешно обновлена до актуальной версии!'), 'info');
 			}
 		} catch(e) {}
 

@@ -373,77 +373,70 @@ get_preset_param() {
     ' 2>/dev/null
 }
 
-prepare_turbo_corpus() {
+generate_smart_probe_corpus() {
     local preset="$1"
-    local dom="${2:-www.youtube.com}"
-    lua - "$preset" "$dom" "$PRESETS_FILE" "$TURBO_FILE" << 'EOF' 2>/dev/null
-        local json = require("luci.jsonc")
-        local p = arg[1]
-        local domain = arg[2] or "www.youtube.com"
-        local presets_file = arg[3]
-        local turbo_file = arg[4]
+    local domain="$2"
+    local probe_file="$3"
 
-        local f = io.open(presets_file, "r")
-        if not f then os.exit(1) end
-        local d = json.parse(f:read("*a"))
-        f:close()
-
-        local obj = d and d.presets and (d.presets[p] or d.presets["preset_" .. p] or d.presets[p:gsub("^preset_", "")])
-        local strats = obj and obj.turbo_strategies
-        if not strats or #strats == 0 then
-            strats = d and d.presets and d.presets["builtin"] and d.presets["builtin"].turbo_strategies
-        end
-        if strats and #strats > 0 then
-            local out = io.open(turbo_file, "w")
-            for _, s in ipairs(strats) do
-                local clean = s:gsub("^%s*nfqws2%s+", "")
-                out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, clean))
-                out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, clean))
-            end
-            out:close()
-        else
-            os.exit(1)
-        end
-EOF
-}
-
-prepare_pruned_deep_corpus() {
-    local preset="$1"
-    local domain="${2:-www.youtube.com}"
-    local protocols="${3:-tls12,tls13}"
-    local out_corpus="$4"
-
-    echo "[blockcheckw-helper] [Deep Scan] Starting Phase 1: Diagnostic Vector Probe for $domain..." >> "$LOG_FILE"
-    write_status "running" 12 "Фаза 1: Диагностический зонд ТСПУ (анализ векторов DPI)..."
-
-    local probe_corpus="/tmp/blockcheckw_probe_corpus.txt"
-    local probe_output="/tmp/blockcheckw_probe_output.json"
-    rm -f "$probe_corpus" "$probe_output"
-
-    # Write probe test items for 8 key DPI vectors
-    cat <<EOF > "$probe_corpus"
+    cat <<EOF > "$probe_file"
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
 curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
 curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=7 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=7 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-600000
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
 curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
 curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
 EOF
 
-    # Run quick probe (3-5s)
-    /usr/bin/blockcheckw -w 2 scan -d "$domain" -p "$protocols" --from-file "$probe_corpus" -o "$probe_output" --auto --timeout 25 >> "$LOG_FILE" 2>&1
+    # Also append preset-specific top strategies
+    lua - "$preset" "$domain" "$PRESETS_FILE" "$probe_file" << 'EOF' 2>/dev/null
+        local json = require("luci.jsonc")
+        local p = arg[1]
+        local domain = arg[2]
+        local presets_file = arg[3]
+        local probe_file = arg[4]
 
-    # Analyze and synthesize targeted permutations
+        local f = io.open(presets_file, "r")
+        if not f then return end
+        local d = json.parse(f:read("*a"))
+        f:close()
+
+        local obj = d and d.presets and (d.presets[p] or d.presets["preset_" .. p] or d.presets[p:gsub("^preset_", "")])
+        local strats = obj and obj.turbo_strategies
+        if strats and #strats > 0 then
+            local out = io.open(probe_file, "a")
+            if out then
+                for _, s in ipairs(strats) do
+                    local clean = s:gsub("^%s*nfqws2%s+", "")
+                    out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, clean))
+                    out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, clean))
+                end
+                out:close()
+            end
+        end
+EOF
+}
+
+generate_adaptive_corpus() {
+    local preset="$1"
+    local domain="$2"
+    local protocols="$3"
+    local probe_output="$4"
+    local out_corpus="$5"
+
     lua - "$domain" "$probe_output" "$out_corpus" "$PRESETS_FILE" "$preset" << 'EOF'
         local json = require("luci.jsonc")
         local domain = arg[1]
@@ -489,19 +482,6 @@ EOF
             table.insert(candidate_args, str)
         end
 
-        -- Include target proven turbo presets as top candidates
-        local presets_f = io.open(presets_file, "r")
-        if presets_f then
-            local pd = json.parse(presets_f:read("*a"))
-            presets_f:close()
-            local p_obj = pd and pd.presets and (pd.presets[preset] or pd.presets["preset_" .. preset] or pd.presets[preset:gsub("^preset_", "")])
-            if p_obj and p_obj.turbo_strategies then
-                for _, s in ipairs(p_obj.turbo_strategies) do
-                    add_cand(s:gsub("^%s*nfqws2%s+", ""))
-                end
-            end
-        end
-
         local pos_list = {
             "pos=1", "pos=2", "pos=sniext+1", "pos=sniext+4", "pos=host+1",
             "pos=midsld", "pos=1,midsld", "pos=1,midsld,1220",
@@ -511,7 +491,7 @@ EOF
         }
 
         if has_wssize then
-            for _, scale in ipairs({ "scale=6", "scale=7" }) do
+            for _, scale in ipairs({ "scale=6", "scale=7", "scale=8" }) do
                 for _, p in ipairs({ "pos=1,midsld", "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1", "pos=midsld", "pos=1,midsld,1220", "pos=2,midsld:seqovl=1" }) do
                     add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multidisorder:%s", scale, p))
                     add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multisplit:%s", scale, p))
@@ -537,7 +517,7 @@ EOF
         end
 
         if has_hostfake then
-            for _, h in ipairs({ "google.com", "ozon.ru", "vk.com", "gosuslugi.ru" }) do
+            for _, h in ipairs({ "google.com", "ozon.ru", "vk.com", "gosuslugi.ru", "yandex.ru" }) do
                 for _, ts in ipairs({ "tcp_ts=-600000", "tcp_ts=0" }) do
                     add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:%s", h, ts))
                 end
@@ -545,7 +525,7 @@ EOF
         end
 
         if has_fake then
-            for _, blob in ipairs({ "0x00000000", "blob_stun", "blob_tls_clienthello_www_google_com", "fake_default_tls" }) do
+            for _, blob in ipairs({ "0x00000000", "blob_stun", "blob_tls_clienthello_www_google_com", "blob_tls_clienthello_gosuslugi_ru", "fake_default_tls" }) do
                 for _, p in ipairs({ "pos=1,midsld", "pos=1,midsld,1220", "pos=sniext+1", "pos=host+1,midsld" }) do
                     add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:%s", blob, p))
                     add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:%s", blob, p))
@@ -572,15 +552,12 @@ EOF
             out:close()
         end
 EOF
-
-    local count=$(grep -c '^curl_test_' "$out_corpus" 2>/dev/null || echo 0)
-    echo "[blockcheckw-helper] [Deep Scan] Phase 1 probe completed. Generated $count focused candidate profiles in $out_corpus (pruned 8400+ unpromising branches)." >> "$LOG_FILE"
 }
 
 cmd_start() {
     local target="youtube"
     local domain=""
-    local mode="turbo"
+    local mode="smart"
     local do_circular="1"
     local auto_apply="0"
     local workers="2"
@@ -669,6 +646,7 @@ cmd_start() {
     rm -f "$OUTPUT_VANILLA" "$OUTPUT_SCAN" "$OUTPUT_CIRCULAR" "$TURBO_FILE" "$LOG_FILE" /tmp/blockcheckw_apply_result.json
     echo "" > "$LOG_FILE"
 
+    ensure_all_hostlists
     ensure_preset_hostlist "$target" "$domain"
 
     write_status "running" 10 "Инициализация сканирования ($domain)"
@@ -698,23 +676,6 @@ cmd_start() {
             fi
         }
         trap cleanup_subshell EXIT INT TERM
-
-        local timeout_sec=120
-        [ "$mode" != "turbo" ] && timeout_sec=600
-
-        local scan_args="-d $domain -p $protocols --dns auto --timeout $timeout_sec --auto --progress"
-        if [ "$mode" = "turbo" ]; then
-            prepare_turbo_corpus "$target" "$domain"
-            if [ -f "$TURBO_FILE" ] && [ -s "$TURBO_FILE" ]; then
-                scan_args="$scan_args --from-file $TURBO_FILE"
-            fi
-        else
-            local pruned_corpus="/tmp/blockcheckw_deep_pruned.txt"
-            prepare_pruned_deep_corpus "$target" "$domain" "$protocols" "$pruned_corpus"
-            if [ -f "$pruned_corpus" ] && [ -s "$pruned_corpus" ]; then
-                scan_args="$scan_args --from-file $pruned_corpus"
-            fi
-        fi
 
         # Kill any zombie/orphan nfqws2 holding queue 200 from previous runs
         local stray_pids=$(ps -w | grep -E 'nfqws2.*--qnum=200' | grep -v grep | awk '{print $1}')
@@ -773,113 +734,209 @@ cmd_start() {
         # Add top priority rule in fw4 output to bypass any residual transparent proxy / redirect rules
         nft insert rule inet fw4 output priority -250 meta mark and 0x30000000 != 0 accept 2>/dev/null || true
 
-        echo "[blockcheckw-helper] Starting scan for $domain (target=$target, mode=$mode, workers=$workers, timeout=${timeout_sec}s, auto_apply=$auto_apply)..." >> "$LOG_FILE"
-        write_status "running" 15 "Подготовка к сканированию ($domain)..."
-
         if [ ! -x "/usr/bin/blockcheckw" ]; then
             write_status "error" 0 "Ошибка: бинарный файл /usr/bin/blockcheckw не найден или нет прав на исполнение"
             echo "[blockcheckw-helper] Error: /usr/bin/blockcheckw missing or not executable" >> "$LOG_FILE"
             exit 1
         fi
 
-        /usr/bin/blockcheckw --profiles-per-instance 64 -w "$workers" scan $scan_args -o "$OUTPUT_SCAN" </dev/null >> "$LOG_FILE" 2>&1 &
-        local bcw_child=$!
-        echo "$bcw_child" > "$PID_FILE"
+        echo "[blockcheckw-helper] Starting Unified Smart Scan for $domain (target=$target, workers=$workers, auto_apply=$auto_apply)..." >> "$LOG_FILE"
+        write_status "running" 15 "Фаза 1: Экспресс-тест векторов DPI ($domain)..."
 
-        local cur_pct=18
-        local cur_phase="Тестирование обхода DPI..."
-        while kill -0 "$bcw_child" 2>/dev/null; do
-            sleep 1.5
+        local probe_corpus="/tmp/blockcheckw_probe_corpus.txt"
+        local probe_output="/tmp/blockcheckw_probe_output.txt"
+        rm -f "$probe_corpus" "$probe_output"
 
-            if [ -f "$LOG_FILE" ]; then
-                local tail_text=$(tail -n 35 "$LOG_FILE" 2>/dev/null)
+        generate_smart_probe_corpus "$target" "$domain" "$probe_corpus"
 
-                # Parse done / total counts from progress ndjson or summary line
-                local p_done=$(echo "$tail_text" | grep -oE '"done":[0-9]+' | tail -n 1 | awk -F: '{print $2}')
-                local p_total=$(echo "$tail_text" | grep -oE '"total":[0-9]+' | tail -n 1 | awk -F: '{print $2}')
-                if [ -z "$p_done" ] || [ -z "$p_total" ] || [ "$p_total" -eq 0 ]; then
-                    local slash_progress=$(echo "$tail_text" | grep -oE '[0-9]+/[0-9]+' | tail -n 1)
-                    if [ -n "$slash_progress" ]; then
-                        p_done=$(echo "$slash_progress" | awk -F/ '{print $1}')
-                        p_total=$(echo "$slash_progress" | awk -F/ '{print $2}')
-                    fi
-                fi
+        # Phase 1: Fast diagnostic probe (3-6s)
+        /usr/bin/blockcheckw -w "$workers" scan -d "$domain" -p "$protocols" --dns auto --from-file "$probe_corpus" -o "$probe_output" --auto --timeout 30 >> "$LOG_FILE" 2>&1
 
-                if echo "$tail_text" | grep -qiE 'DNS resolve failed|no IPv4 addresses found|DNS resolution error'; then
-                    cur_pct=15
-                    cur_phase="DNS-резолв: ожидание ответа..."
-                elif echo "$tail_text" | grep -q '=== Summary'; then
-                    cur_pct=88
-                    cur_phase="Подведение итогов сканирования..."
-                elif echo "$tail_text" | grep -q '=== Scanning HTTPS/TLS1.3'; then
-                    if echo "$tail_text" | grep -q 'completed:'; then
-                        cur_pct=85
-                        cur_phase="Сканирование TLS 1.3 завершено..."
-                    else
-                        if [ -n "$p_done" ] && [ -n "$p_total" ] && [ "$p_total" -gt 0 ]; then
-                            local sub_pct=$(( p_done * 100 / p_total ))
-                            cur_pct=$(( 65 + p_done * 20 / p_total ))
-                            cur_phase="Подбор TLS 1.3: $p_done / $p_total (${sub_pct}%)"
-                        else
-                            cur_pct=68
-                            cur_phase="Подбор стратегий для HTTPS / TLS 1.3..."
-                        fi
-                    fi
-                elif echo "$tail_text" | grep -q '=== Scanning HTTPS/TLS1.2'; then
-                    if echo "$tail_text" | grep -q 'completed:'; then
-                        cur_pct=65
-                        cur_phase="Сканирование TLS 1.2 завершено..."
-                    else
-                        if [ -n "$p_done" ] && [ -n "$p_total" ] && [ "$p_total" -gt 0 ]; then
-                            local sub_pct=$(( p_done * 100 / p_total ))
-                            cur_pct=$(( 30 + p_done * 35 / p_total ))
-                            cur_phase="Подбор TLS 1.2: $p_done / $p_total (${sub_pct}%)"
-                        else
-                            cur_pct=35
-                            cur_phase="Подбор стратегий для HTTPS / TLS 1.2..."
-                        fi
-                    fi
-                elif echo "$tail_text" | grep -q '=== Scanning HTTP'; then
-                    if echo "$tail_text" | grep -q 'completed:'; then
-                        cur_pct=30
-                        cur_phase="Сканирование HTTP завершено..."
-                    else
-                        if [ -n "$p_done" ] && [ -n "$p_total" ] && [ "$p_total" -gt 0 ]; then
-                            cur_pct=$(( 20 + p_done * 10 / p_total ))
-                            cur_phase="Подбор HTTP: $p_done / $p_total"
-                        else
-                            cur_pct=25
-                            cur_phase="Подбор стратегий для HTTP..."
-                        fi
-                    fi
-                elif echo "$tail_text" | grep -q '=== Baseline'; then
-                    cur_pct=22
-                    cur_phase="Проверка блокировки без обхода (Baseline)..."
-                elif echo "$tail_text" | grep -q '=== DNS resolve'; then
-                    cur_pct=18
-                    cur_phase="DNS-резолв для $domain..."
-                fi
+        local probe_eval=$(lua - "$probe_output" << 'EOF' 2>/dev/null
+local json = require("luci.jsonc")
+local f = io.open(arg[1], "r")
+if not f then print('{"count":0,"families":0}') return end
+local content = f:read("*a")
+f:close()
 
-                local succ=$(echo "$tail_text" | grep -oE 'success: [0-9]+' | tail -n 1 | awk '{print $2}')
-                if [ -n "$succ" ] && [ "$succ" -gt 0 ]; then
-                    cur_phase="$cur_phase [найдено: $succ]"
-                fi
+local count = 0
+local fams = { wssize=false, hostfake=false, fake=false, multidisorder=false, multisplit=false, seqovl=false }
 
-                write_status "running" "$cur_pct" "$cur_phase"
-            fi
-        done
+local parsed = json.parse(content)
+if parsed and parsed.strategies then
+    for _, s in ipairs(parsed.strategies) do
+        local a = (type(s) == "table" and s.args) or s
+        if a and a ~= "" then
+            count = count + 1
+            if a:find("wssize") then fams.wssize = true end
+            if a:find("hostfakesplit") or a:find("hostfake") then fams.hostfake = true end
+            if a:find("fake:blob") then fams.fake = true end
+            if a:find("multidisorder") then fams.multidisorder = true end
+            if a:find("multisplit") then fams.multisplit = true end
+            if a:find("seqovl") then fams.seqovl = true end
+        end
+    end
+else
+    for line in content:gmatch("[^\r\n]+") do
+        local clean = line:match("^%s*(%-%-[^\r\n]+)")
+        if clean and not clean:match("^%-%-%s*#") then
+            count = count + 1
+            if clean:find("wssize") then fams.wssize = true end
+            if clean:find("hostfakesplit") or clean:find("hostfake") then fams.hostfake = true end
+            if clean:find("fake:blob") then fams.fake = true end
+            if clean:find("multidisorder") then fams.multidisorder = true end
+            if clean:find("multisplit") then fams.multisplit = true end
+            if clean:find("seqovl") then fams.seqovl = true end
+        end
+    end
+end
 
-        wait "$bcw_child"
-        local exit_code=$?
+local fam_cnt = 0
+for _, active in pairs(fams) do
+    if active then fam_cnt = fam_cnt + 1 end
+end
 
-        # Locate latest scan report in /root if needed
-        local latest_vanilla=$(ls -t /root/*_report_vanilla.txt 2>/dev/null | head -n 1)
-        if [ -n "$latest_vanilla" ] && [ -f "$latest_vanilla" ]; then
-            cp -f "$latest_vanilla" "$OUTPUT_VANILLA"
-        fi
+print(string.format('{"count":%d,"families":%d}', count, fam_cnt))
+EOF
+)
+        local probe_count=$(echo "$probe_eval" | grep -oE '"count":[0-9]+' | awk -F: '{print $2}')
+        local probe_fams=$(echo "$probe_eval" | grep -oE '"families":[0-9]+' | awk -F: '{print $2}')
+        [ -z "$probe_count" ] && probe_count=0
+        [ -z "$probe_fams" ] && probe_fams=0
+
+        echo "[blockcheckw-helper] [Smart Scan] Phase 1 probe completed: found $probe_count working profiles across $probe_fams vector families." >> "$LOG_FILE"
+
         local latest_scan=$(ls -t /root/*_scan.json 2>/dev/null | head -n 1)
         if [ -n "$latest_scan" ] && [ -f "$latest_scan" ]; then
             cp -f "$latest_scan" "$OUTPUT_SCAN"
+        fi
+
+        local exit_code=0
+        local adaptive_output=""
+
+        # Phase 2: If probe yielded fewer than 3 strategies or fewer than 2 vector families, deepen adaptively
+        if [ "$probe_count" -lt 3 ] || [ "$probe_fams" -lt 2 ]; then
+            echo "[blockcheckw-helper] [Smart Scan] Deepening search into adaptive vector matrix (probe hits: $probe_count, families: $probe_fams)..." >> "$LOG_FILE"
+            write_status "running" 35 "Фаза 2: Адаптивное углубление поиска под DPI провайдера..."
+
+            local adaptive_corpus="/tmp/blockcheckw_adaptive_corpus.txt"
+            adaptive_output="/tmp/blockcheckw_adaptive_output.txt"
+            rm -f "$adaptive_corpus" "$adaptive_output"
+
+            generate_adaptive_corpus "$target" "$domain" "$protocols" "$probe_output" "$adaptive_corpus"
+
+            local adapt_cnt=$(grep -c '^curl_test_' "$adaptive_corpus" 2>/dev/null || echo 0)
+            echo "[blockcheckw-helper] [Smart Scan] Generated $adapt_cnt targeted permutations for DPI vector matrix." >> "$LOG_FILE"
+
+            /usr/bin/blockcheckw --profiles-per-instance 64 -w "$workers" scan -d "$domain" -p "$protocols" --dns auto --timeout 180 --from-file "$adaptive_corpus" -o "$adaptive_output" --auto --progress >> "$LOG_FILE" 2>&1 &
+            local bcw_child=$!
+            echo "$bcw_child" > "$PID_FILE"
+
+            local cur_pct=38
+            local cur_phase="Адаптивный подбор стратегий..."
+            while kill -0 "$bcw_child" 2>/dev/null; do
+                sleep 1.5
+
+                if [ -f "$LOG_FILE" ]; then
+                    local tail_text=$(tail -n 35 "$LOG_FILE" 2>/dev/null)
+                    local p_done=$(echo "$tail_text" | grep -oE '"done":[0-9]+' | tail -n 1 | awk -F: '{print $2}')
+                    local p_total=$(echo "$tail_text" | grep -oE '"total":[0-9]+' | tail -n 1 | awk -F: '{print $2}')
+                    if [ -z "$p_done" ] || [ -z "$p_total" ] || [ "$p_total" -eq 0 ]; then
+                        local slash_progress=$(echo "$tail_text" | grep -oE '[0-9]+/[0-9]+' | tail -n 1)
+                        if [ -n "$slash_progress" ]; then
+                            p_done=$(echo "$slash_progress" | awk -F/ '{print $1}')
+                            p_total=$(echo "$slash_progress" | awk -F/ '{print $2}')
+                        fi
+                    fi
+
+                    if [ -n "$p_done" ] && [ -n "$p_total" ] && [ "$p_total" -gt 0 ]; then
+                        local sub_pct=$(( p_done * 100 / p_total ))
+                        cur_pct=$(( 35 + p_done * 50 / p_total ))
+                        cur_phase="Адаптивный подбор под DPI: $p_done / $p_total (${sub_pct}%)"
+                    fi
+
+                    local succ=$(echo "$tail_text" | grep -oE 'success: [0-9]+' | tail -n 1 | awk '{print $2}')
+                    if [ -n "$succ" ] && [ "$succ" -gt 0 ]; then
+                        cur_phase="$cur_phase [найдено: $succ]"
+                    fi
+
+                    write_status "running" "$cur_pct" "$cur_phase"
+                fi
+            done
+
+            wait "$bcw_child"
+            exit_code=$?
+
+            latest_scan=$(ls -t /root/*_scan.json 2>/dev/null | head -n 1)
+            if [ -n "$latest_scan" ] && [ -f "$latest_scan" ]; then
+                cp -f "$latest_scan" "$OUTPUT_SCAN"
+            fi
+        fi
+
+        # Merge Phase 1 probe and Phase 2 adaptive outputs so no working strategies are lost
+        lua - "$OUTPUT_SCAN" "$probe_output" "$adaptive_output" << 'EOF' 2>/dev/null
+local json = require("luci.jsonc")
+local scan_file = arg[1]
+local p_file = arg[2]
+local a_file = arg[3]
+
+local base_data = { strategies = {} }
+local sf = io.open(scan_file, "r")
+if sf then
+    base_data = json.parse(sf:read("*a")) or { strategies = {} }
+    sf:close()
+end
+if not base_data.strategies then base_data.strategies = {} end
+
+local seen = {}
+for _, s in ipairs(base_data.strategies) do
+    local a = (type(s) == "table" and s.args) or s
+    if a and a ~= "" then seen[a] = true end
+end
+
+local function add_from_file(path)
+    if not path or path == "" then return end
+    local f = io.open(path, "r")
+    if not f then return end
+    local content = f:read("*a")
+    f:close()
+    local parsed = json.parse(content)
+    if parsed and parsed.strategies then
+        for _, s in ipairs(parsed.strategies) do
+            local a = (type(s) == "table" and s.args) or s
+            if a and a ~= "" and not seen[a] then
+                seen[a] = true
+                table.insert(base_data.strategies, s)
+            end
+        end
+    else
+        for line in content:gmatch("[^\r\n]+") do
+            local clean = line:match("^%s*(%-%-[^\r\n]+)")
+            if clean and not clean:match("^%-%-%s*#") and not seen[clean] then
+                seen[clean] = true
+                table.insert(base_data.strategies, { args = clean, protocol = "HTTPS/TLS1.3", coverage = 1 })
+            end
+        end
+    end
+end
+
+add_from_file(p_file)
+add_from_file(a_file)
+
+base_data.working = #base_data.strategies
+base_data.outcome = (#base_data.strategies > 0) and "found" or "not_found"
+
+local out_f = io.open(scan_file, "w")
+if out_f then
+    out_f:write(json.stringify(base_data, true))
+    out_f:close()
+end
+EOF
+
+        # Locate latest scan vanilla report in /root if needed
+        local latest_vanilla=$(ls -t /root/*_report_vanilla.txt 2>/dev/null | head -n 1)
+        if [ -n "$latest_vanilla" ] && [ -f "$latest_vanilla" ]; then
+            cp -f "$latest_vanilla" "$OUTPUT_VANILLA"
         fi
 
         # Deduplicate and extract strategy list for JSON output and circular builder

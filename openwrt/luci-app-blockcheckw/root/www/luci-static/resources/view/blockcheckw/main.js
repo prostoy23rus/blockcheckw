@@ -1924,8 +1924,6 @@ return view.extend({
 
 			if (st.circular && st.circular.trim() !== '') {
 				lastCircular = st.circular;
-				circularCard.style.display = 'block';
-				circularCodeEl.textContent = st.circular;
 			}
 
 			if (st.strategies && st.strategies.length > 0) {

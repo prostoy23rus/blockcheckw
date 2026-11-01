@@ -6,14 +6,16 @@ local json = require("luci.jsonc")
 
 local function classify(strat)
     strat = strat:lower()
-    if strat:find("fake:") or strat:find("tls_client_hello_clone") then
-        return "fake"
-    elseif strat:find("multidisorder") or strat:find("fakeddisorder") then
-        return "multidisorder"
-    elseif strat:find("multisplit") or strat:find("fakedsplit") then
-        return "multisplit"
+    if strat:find("wssize") then
+        return "wssize"
     elseif strat:find("hostfakesplit") then
         return "hostfakesplit"
+    elseif strat:find("multidisorder") or strat:find("fakeddisorder") then
+        return "multidisorder"
+    elseif strat:find("fake:") or strat:find("tls_client_hello_clone") then
+        return "fake"
+    elseif strat:find("multisplit") or strat:find("fakedsplit") then
+        return "multisplit"
     elseif strat:find("tcpseg:") or strat:find("oob:") or strat:find("synack") then
         return "tcpseg_oob"
     else
@@ -99,7 +101,7 @@ local function select_diverse(strategies, max_count)
         table.insert(buckets[fam], s)
     end
 
-    local order = { "fake", "multidisorder", "multisplit", "hostfakesplit", "tcpseg_oob", "other" }
+    local order = { "wssize", "hostfakesplit", "multidisorder", "fake", "multisplit", "tcpseg_oob", "other" }
     local selected = {}
     local seen = {}
 

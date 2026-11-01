@@ -56,8 +56,13 @@
     "preset_discord": {
       "name": "Предустановленный список Discord (3)",
       "label": "Discord (3)",
-      "domain": "gateway.discord.gg",
-      "test_url": "https://gateway.discord.gg",
+      "domain": "discord.com",
+      "test_url": "https://discord.com",
+      "validation_endpoints": [
+        { "name": "Веб-интерфейс (discord.com)", "url": "https://discord.com", "range": "0-32767" },
+        { "name": "API авторизации (discord.com/api)", "url": "https://discord.com/api/v9/experiments", "range": "0-16383" },
+        { "name": "Медиа CDN (cdn.discordapp.com)", "url": "https://cdn.discordapp.com/embed/avatars/0.png", "range": "0-8191" }
+      ],
       "hostlist": "list_hosts_discord",
       "port": "443",
       "protocols": [
@@ -67,11 +72,12 @@
       "filter_l7": "tls discord",
       "description": "Голосовые каналы, API-шлюз gateway, cdn.discordapp.com",
       "turbo_strategies": [
-        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=discord.com:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
+        "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld"
       ]
     },
     "preset_twitch": {

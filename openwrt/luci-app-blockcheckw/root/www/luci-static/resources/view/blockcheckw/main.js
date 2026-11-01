@@ -63,9 +63,9 @@ var PRESET_DEFS = {
 		name: 'Предустановленный список Discord (3)',
 		label: 'Discord (3)',
 		icon: '💬',
-		domain: 'gateway.discord.gg',
-		domainsText: 'gateway.discord.gg (голос), discord.com, cdn.discordapp.com',
-		test_url: 'https://gateway.discord.gg',
+		domain: 'discord.com',
+		domainsText: 'discord.com (приложение/API), gateway.discord.gg, cdn.discordapp.com',
+		test_url: 'https://discord.com',
 		key: 'preset_discord',
 		port: '443',
 		hint: {
@@ -648,7 +648,7 @@ return view.extend({
 		function guessUrlForStrategy(name) {
 			var n = (name || '').toLowerCase();
 			if (n.indexOf('tube') !== -1) return 'https://googlevideo.com';
-			if (n.indexOf('discord') !== -1) return 'https://gateway.discord.gg';
+			if (n.indexOf('discord') !== -1) return 'https://discord.com';
 			if (n.indexOf('twitch') !== -1) return 'https://twitch.tv';
 			if (n.indexOf('_x') !== -1 || n.indexOf('twitter') !== -1) return 'https://x.com';
 			if (n.indexOf('instagram') !== -1) return 'https://gateway.instagram.com';
@@ -709,7 +709,7 @@ return view.extend({
 				E('button', {
 					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
 					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
-					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://gateway.discord.gg'; }
+					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://discord.com'; }
 				}, '💬 Discord'),
 				E('button', {
 					class: 'bcw-btn-sm cbi-button cbi-button-neutral',

@@ -163,10 +163,15 @@ ensure_preset_hostlist() {
             ;;
         preset_discord|discord)
             local dc_file="$ipset_dir/zapret_hosts_discord.txt"
+            if grep -q 'googleapis\.comgateway\.discord\.gg' "$dc_file" 2>/dev/null; then
+                sed -i 's/googleapis\.comgateway\.discord\.gg/googleapis.com\ngateway.discord.gg/g' "$dc_file" 2>/dev/null || true
+            fi
             _add_domains_if_missing "$dc_file" \
                 "discord.com" "discord.gg" "discord.media" "discordapp.com" \
                 "discordapp.net" "discordstatus.com" "gateway.discord.gg" \
-                "cdn.discordapp.com" "status.discord.com"
+                "cdn.discordapp.com" "status.discord.com" "updates.discord.com" \
+                "media.discordapp.net" "images-ext-1.discordapp.net" "images-ext-2.discordapp.net" \
+                "dis.gd" "discord-attachments-uploads-prd.storage.googleapis.com"
             if ! uci -q get zapret2.list_hosts_discord >/dev/null; then
                 uci set zapret2.list_hosts_discord=list
                 uci set zapret2.list_hosts_discord.path="$dc_file"
@@ -207,7 +212,22 @@ ensure_preset_hostlist() {
     esac
 }
 
+ensure_firewall_quic_reject() {
+    if ! uci -q get firewall.reject_quic >/dev/null; then
+        uci set firewall.reject_quic=rule
+        uci set firewall.reject_quic.name='Reject-QUIC'
+        uci set firewall.reject_quic.src='lan'
+        uci set firewall.reject_quic.dest='wan'
+        uci set firewall.reject_quic.proto='udp'
+        uci set firewall.reject_quic.dest_port='443'
+        uci set firewall.reject_quic.target='REJECT'
+        uci commit firewall 2>/dev/null || true
+        /etc/init.d/firewall reload >/dev/null 2>&1 || true
+    fi
+}
+
 ensure_all_hostlists() {
+    ensure_firewall_quic_reject
     local ipset_dir="/opt/zapret2/ipset"
     mkdir -p "$ipset_dir" 2>/dev/null
 
@@ -601,7 +621,7 @@ cmd_start() {
             ;;
         preset_discord|discord)
             domain=$(get_preset_param "preset_discord" "domain")
-            [ -n "$domain" ] || domain="gateway.discord.gg"
+            [ -n "$domain" ] || domain="discord.com"
             protocols="tls12,tls13"
             ;;
         preset_twitch|twitch)
@@ -1251,7 +1271,7 @@ cmd_apply() {
             port="443"
             l7="tls discord"
             hostlist="list_hosts_discord"
-            test_url="https://gateway.discord.gg"
+            test_url="https://discord.com"
             ;;
         preset_twitch|twitch)
             base_sec="BlockcheckW_Twitch"
@@ -1525,7 +1545,7 @@ for idx, ep in ipairs(endpoints) do
     elapsed = tonumber(elapsed) or 0.0
 
     local code_num = tonumber(code) or 0
-    local is_ok = (code_num >= 200 and code_num < 500)
+    local is_ok = (code_num >= 200 and code_num < 400 and elapsed < 5.5)
     local speed_kbs = math.floor(speed / 1024)
     total_speed_kbs = total_speed_kbs + speed_kbs
 
@@ -1539,7 +1559,7 @@ for idx, ep in ipairs(endpoints) do
         url = ep.url,
         http_code = code,
         accessible = is_ok,
-        data_flow = (size > 0 or is_ok),
+        data_flow = (size > 0 and is_ok),
         size_bytes = size,
         speed_kbs = speed_kbs,
         time_sec = string.format("%.2f", elapsed)

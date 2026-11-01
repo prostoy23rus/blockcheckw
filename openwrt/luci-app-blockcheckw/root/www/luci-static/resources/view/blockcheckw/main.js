@@ -613,7 +613,7 @@ return view.extend({
 			style: 'border: none;'
 		}, (zapretInfo.zapret2_running === 'running') ? '✓ Zapret2 активен' : '✗ Zapret2 остановлен');
 
-		// Theme Management (Dark, Light, Router Default)
+		// Theme Management (Dark & Light)
 		var THEME_KEY = 'bcw_theme_mode';
 
 		var themeSelectEl = E('select', {
@@ -624,50 +624,22 @@ return view.extend({
 				applyUserThemeChoice(this.value);
 			}
 		}, [
-			E('option', { value: 'auto' }, '🌓 Как в роутере'),
 			E('option', { value: 'dark' }, '🌙 Тёмная'),
 			E('option', { value: 'light' }, '☀️ Светлая')
 		]);
 
-		function detectSystemIsDark() {
-			var dm = document.documentElement.getAttribute('data-darkmode');
-			if (dm === 'true') return true;
-			if (dm === 'false') return false;
-
-			var themeMode = document.documentElement.getAttribute('data-theme-mode');
-			if (themeMode === 'dark') return true;
-			if (themeMode === 'light') return false;
-
-			if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-				return true;
-			}
-
-			var palette = document.documentElement.getAttribute('data-routerich-palette');
-			if (palette && !dm) {
-				return true;
-			}
-
-			return false;
-		}
-
 		function updateAppliedTheme() {
-			var choice = themeSelectEl.value || 'auto';
-			var effectiveTheme;
-			if (choice === 'dark') {
-				effectiveTheme = 'dark';
-			} else if (choice === 'light') {
-				effectiveTheme = 'light';
-			} else {
-				effectiveTheme = detectSystemIsDark() ? 'dark' : 'light';
-			}
+			var choice = themeSelectEl.value || 'dark';
+			if (choice !== 'light') choice = 'dark';
 
-			container.setAttribute('data-theme', effectiveTheme);
+			container.setAttribute('data-theme', choice);
 			try {
-				document.body.setAttribute('data-bcw-theme', effectiveTheme);
+				document.body.setAttribute('data-bcw-theme', choice);
 			} catch(e) {}
 		}
 
 		function applyUserThemeChoice(choice) {
+			if (choice !== 'light') choice = 'dark';
 			try {
 				localStorage.setItem(THEME_KEY, choice);
 			} catch(e) {}
@@ -675,38 +647,15 @@ return view.extend({
 			updateAppliedTheme();
 		}
 
-		var initialTheme = 'auto';
+		var initialTheme = 'dark';
 		try {
-			initialTheme = localStorage.getItem(THEME_KEY) || 'auto';
+			initialTheme = localStorage.getItem(THEME_KEY) || 'dark';
+			if (initialTheme !== 'dark' && initialTheme !== 'light') {
+				initialTheme = 'dark';
+			}
 		} catch(e) {}
 		themeSelectEl.value = initialTheme;
 		updateAppliedTheme();
-
-		if (window.matchMedia) {
-			var mql = window.matchMedia('(prefers-color-scheme: dark)');
-			var onSystemThemeChange = function() {
-				if ((themeSelectEl.value || 'auto') === 'auto') {
-					updateAppliedTheme();
-				}
-			};
-			if (typeof mql.addEventListener === 'function') {
-				mql.addEventListener('change', onSystemThemeChange);
-			} else if (typeof mql.addListener === 'function') {
-				mql.addListener(onSystemThemeChange);
-			}
-		}
-
-		try {
-			var themeObserver = new MutationObserver(function() {
-				if ((themeSelectEl.value || 'auto') === 'auto') {
-					updateAppliedTheme();
-				}
-			});
-			themeObserver.observe(document.documentElement, {
-				attributes: true,
-				attributeFilter: ['data-darkmode', 'data-theme-mode']
-			});
-		} catch(e) {}
 
 		var btnCheckUpdate = E('button', {
 			class: 'bcw-header-item bcw-header-btn',

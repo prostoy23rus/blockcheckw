@@ -671,6 +671,15 @@ return view.extend({
 			testStrategySelectEl.appendChild(E('option', { value: st.section }, st.section + (st.enabled ? ' [Включена]' : ' [Отключена]')));
 		});
 
+		var testStrategyHintBox = E('div', {
+			style: 'margin-top: 10px; padding: 12px 14px; background: rgba(50, 115, 220, 0.12); border-left: 4px solid #3273dc; border-radius: 6px; font-size: 13px; line-height: 1.5;'
+		}, [
+			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
+			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2. Нажмите кнопку '),
+			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность ]'),
+			E('span', {}, ' в блоке управления ниже, чтобы отправить проверочный сетевой запрос на выбранный адрес. Кнопка [ ⚡ Запустить поиск ] нужна только если вы хотите с нуля подобрать новую связку.')
+		]);
+
 		var testStrategyRow = E('div', {
 			style: 'display: none; margin-top: 14px; padding: 14px 16px; background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid #383e4a;'
 		}, [
@@ -682,24 +691,7 @@ return view.extend({
 				E('label', { class: 'bcw-form-label' }, 'Тестовый адрес / URL:'),
 				testUrlInput
 			]),
-			E('div', { class: 'bcw-quick-urls', style: 'display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: 152px;' }, [
-				E('span', { style: 'font-size: 11px; opacity: 0.7; margin-right: 4px;' }, 'Быстрый выбор:'),
-				E('button', {
-					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
-					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
-					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://googlevideo.com'; }
-				}, '📺 YouTube (googlevideo.com)'),
-				E('button', {
-					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
-					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
-					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://discord.com'; }
-				}, '💬 Discord'),
-				E('button', {
-					class: 'bcw-btn-sm cbi-button cbi-button-neutral',
-					style: 'height: 26px; font-size: 11px; padding: 0 8px;',
-					click: function(e) { e.preventDefault(); testUrlInput.value = 'https://rutracker.org'; }
-				}, '🌐 Rutracker')
-			])
+			testStrategyHintBox
 		]);
 
 		// Summary Banner
@@ -837,24 +829,19 @@ return view.extend({
 			btnDetails
 		]);
 
-		var testStrategyHintBox = E('div', {
-			style: 'display: none; padding: 12px 16px; background: rgba(50, 115, 220, 0.12); border-left: 4px solid #3273dc; border-radius: 4px; margin-bottom: 14px; font-size: 13px; line-height: 1.5;'
-		}, [
-			E('strong', { style: 'color: #61afef;' }, 'ℹ️ Режим «Тест стратегии»: '),
-			E('span', {}, 'В этом режиме вы проверяете доступность сайтов через уже имеющуюся запись Zapret2. Нажмите кнопку '),
-			E('strong', { style: 'color: #00d1b2;' }, '[ 🌐 Проверить доступность ]'),
-			E('span', {}, ', чтобы отправить проверочный запрос на выбранный выше адрес. Кнопка [ ⚡ Запустить поиск ] нужна только если вы хотите с нуля подобрать новую связку.')
-		]);
-
 		// Active Strategy Inspector Card
 		var activeTargetTitleEl = E('span', { style: 'color: #3273dc; font-weight: bold;' }, 'YouTube');
 		var activeMetaBadgesEl = E('div', { style: 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center;' }, '');
 		var activeCodeEl = E('pre', { class: 'bcw-code-box', style: 'max-height: 220px;' }, '');
 
 		var btnCopyActive = E('button', {
+			type: 'button',
 			class: 'bcw-btn-sm cbi-button cbi-button-neutral',
-			style: 'height: 32px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
-			click: function() { copyActiveStrategy(); }
+			style: 'height: 30px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
+			click: function(e) {
+				if (e && e.stopPropagation) e.stopPropagation();
+				copyActiveStrategy();
+			}
 		}, '📋 Скопировать');
 
 		var versionsSelectEl = E('select', {
@@ -895,19 +882,91 @@ return view.extend({
 			])
 		]);
 
-		var activeStratCard = E('div', { id: 'bcw-active-strat-card', class: 'bcw-card bcw-card-active-strat', style: 'border-left: 4px solid #3273dc;' }, [
-			E('div', { class: 'bcw-card-header', style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px;' }, [
-				E('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
-					E('h3', { class: 'bcw-card-title', style: 'margin: 0; font-size: 15px;' }, '🛡️ Активная стратегия в Zapret2:'),
-					activeTargetTitleEl
-				]),
-				E('div', { class: 'bcw-copy-wrap', style: 'display: flex; gap: 8px; align-items: center;' }, [
-					btnCopyActive
-				])
-			]),
+		var isActiveStratExpanded = false;
+		var activeStratBodyEl = E('div', {
+			style: 'display: none; flex-direction: column; gap: 10px; margin-top: 14px;'
+		}, [
 			activeMetaBadgesEl,
 			versionsBarEl,
 			activeCodeEl
+		]);
+
+		var btnToggleActiveStrat = E('button', {
+			type: 'button',
+			class: 'bcw-btn-sm cbi-button cbi-button-neutral bcw-spoiler-btn',
+			style: 'height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px; border: 1px solid #485060; background: #282c34; color: #abb2bf;'
+		}, [
+			E('span', { class: 'bcw-active-spoiler-icon' }, '▼'),
+			E('span', { class: 'bcw-active-spoiler-text' }, 'Развернуть')
+		]);
+
+		var activeStratHeader = E('div', {
+			class: 'bcw-card-header bcw-spoiler-header',
+			style: 'cursor: pointer; user-select: none; margin-bottom: 0px; padding-bottom: 0px; border-bottom: none; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;'
+		}, [
+			E('div', { style: 'display: flex; align-items: center; gap: 10px; flex-wrap: wrap;' }, [
+				E('span', { class: 'bcw-active-spoiler-arrow', style: 'display: inline-block; transition: all 0.2s; font-size: 13px; color: #61afef;' }, '▶'),
+				E('h3', { class: 'bcw-card-title', style: 'margin: 0; font-size: 14px;' }, '🛡️ Активная стратегия в Zapret2:'),
+				activeTargetTitleEl
+			]),
+			E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
+				btnCopyActive,
+				btnToggleActiveStrat
+			])
+		]);
+
+		function updateActiveStratSpoilerUI() {
+			var arrowEl = activeStratHeader.querySelector('.bcw-active-spoiler-arrow');
+			var btnTextEl = btnToggleActiveStrat.querySelector('.bcw-active-spoiler-text');
+			var btnIconEl = btnToggleActiveStrat.querySelector('.bcw-active-spoiler-icon');
+
+			if (isActiveStratExpanded) {
+				activeStratBodyEl.style.display = 'flex';
+				activeStratHeader.style.marginBottom = '14px';
+				activeStratHeader.style.paddingBottom = '10px';
+				activeStratHeader.style.borderBottom = '1px solid rgba(255,255,255,0.07)';
+				if (arrowEl) {
+					arrowEl.textContent = '▼';
+					arrowEl.style.color = '#98c379';
+				}
+				if (btnTextEl) btnTextEl.textContent = 'Свернуть';
+				if (btnIconEl) btnIconEl.textContent = '▲';
+			} else {
+				activeStratBodyEl.style.display = 'none';
+				activeStratHeader.style.marginBottom = '0px';
+				activeStratHeader.style.paddingBottom = '0px';
+				activeStratHeader.style.borderBottom = 'none';
+				if (arrowEl) {
+					arrowEl.textContent = '▶';
+					arrowEl.style.color = '#61afef';
+				}
+				if (btnTextEl) btnTextEl.textContent = 'Развернуть';
+				if (btnIconEl) btnIconEl.textContent = '▼';
+			}
+		}
+
+		function toggleActiveStratSpoiler() {
+			isActiveStratExpanded = !isActiveStratExpanded;
+			updateActiveStratSpoilerUI();
+		}
+
+		function expandActiveStratSpoiler() {
+			isActiveStratExpanded = true;
+			updateActiveStratSpoilerUI();
+		}
+
+		activeStratHeader.addEventListener('click', function(e) {
+			toggleActiveStratSpoiler();
+		});
+
+		btnToggleActiveStrat.addEventListener('click', function(e) {
+			e.stopPropagation();
+			toggleActiveStratSpoiler();
+		});
+
+		var activeStratCard = E('div', { id: 'bcw-active-strat-card', class: 'bcw-card bcw-card-active-strat', style: 'border-left: 4px solid #3273dc;' }, [
+			activeStratHeader,
+			activeStratBodyEl
 		]);
 		// Note: activeStratCard is appended below scanner results as requested by user
 
@@ -995,7 +1054,6 @@ return view.extend({
 			E('div', { class: 'bcw-card-header' }, [
 				E('h3', { class: 'bcw-card-title' }, '2. Подбор стратегий и сканирование')
 			]),
-			testStrategyHintBox,
 			circularToggleBox,
 			actionsGridEl,
 			E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; display: flex; align-items: center; gap: 6px; padding: 4px 2px;' }, [
@@ -1505,9 +1563,6 @@ return view.extend({
 
 			customDomainRow.style.display = (targetId === 'domains' ? 'block' : 'none');
 			testStrategyRow.style.display = (targetId === 'test_strategy' ? 'block' : 'none');
-			if (testStrategyHintBox) {
-				testStrategyHintBox.style.display = (targetId === 'test_strategy' ? 'block' : 'none');
-			}
 
 			if (targetId === 'test_strategy' && !testStrategySelectEl.value) {
 				var defStrat = zapretAllStrategies.find(function(s) { return s.enabled; }) || zapretAllStrategies[0];
@@ -1667,6 +1722,9 @@ return view.extend({
 						ui.hideModal();
 						var activeCard = document.getElementById('bcw-active-strat-card') || document.querySelector('.bcw-card-active-strat');
 						if (activeCard) {
+							if (typeof expandActiveStratSpoiler === 'function') {
+								expandActiveStratSpoiler();
+							}
 							activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 							activeCard.classList.add('bcw-highlight-pulse');
 							setTimeout(function() { activeCard.classList.remove('bcw-highlight-pulse'); }, 2500);

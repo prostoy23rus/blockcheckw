@@ -2476,7 +2476,7 @@ return view.extend({
 							E('span', {}, icon),
 							E('span', {}, parsed.rating_title || parsed.rating)
 						])
-					]),
+					].filter(Boolean)),
 
 					E('div', {
 						style: 'display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;'
@@ -2512,13 +2512,18 @@ return view.extend({
 						class: 'cbi-button cbi-button-neutral',
 						style: 'padding: 6px 16px;',
 						click: function() { ui.hideModal(); }
-					}, 'Закрыть')
+					}, 'Закрыть'),
+					E('button', {
+						class: 'cbi-button cbi-button-neutral',
+						style: 'padding: 6px 16px; margin-left: 8px;',
+						click: function() { runSpeedTest(); }
+					}, '🔄 Повторить замер')
 				];
 
 				if (isThrottled || !isSuccess) {
 					modalButtons.push(E('button', {
 						class: 'cbi-button cbi-button-action',
-						style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 18px;',
+						style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 18px; margin-left: 8px;',
 						click: function() {
 							ui.hideModal();
 							startScan();

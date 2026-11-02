@@ -1,6 +1,6 @@
 # BlockcheckW (Zapret2 Edition)
 
-[![GitHub Release](https://img.shields.io/badge/Release-v0.15.24-00d1b2?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
+[![GitHub Release](https://img.shields.io/badge/Release-v0.15.25-00d1b2?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20|%2022.03%20|%2023.05%20|%2024.10%20|%2025.x%20|%20snapshot-blue?style=flat-square)](https://openwrt.org)
 [![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel%20|%20riscv64-success?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)

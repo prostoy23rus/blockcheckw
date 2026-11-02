@@ -889,8 +889,7 @@ return view.extend({
 			tilesGridEl,
 			customDomainRow,
 			testStrategyRow,
-			targetSummaryBox,
-			modeHintBox
+			targetSummaryBox
 		]);
 		mainLayout.appendChild(targetSectionCard);
 
@@ -1663,33 +1662,7 @@ return view.extend({
 		}
 
 		function updateModeHint() {
-			var pDef = PRESET_DEFS[currentTarget] || PRESET_DEFS['builtin'];
-			var h = pDef.hint;
-			if (!h) {
-				modeHintBox.style.display = 'none';
-				return;
-			}
-			modeHintBox.style.display = 'flex';
-
-			modeHintTitleEl.textContent = '💡 ' + (h.title || pDef.name);
-			modeHintSummaryEl.textContent = h.summary || '';
-
-			while (modeHintGridEl.firstChild) {
-				modeHintGridEl.removeChild(modeHintGridEl.firstChild);
-			}
-
-			if (h.details && h.details.length) {
-				h.details.forEach(function(item) {
-					var itemEl = E('div', { class: 'bcw-hint-item' }, [
-						E('div', { class: 'bcw-hint-item-title' }, item.title),
-						E('div', { class: 'bcw-hint-item-text' }, item.text)
-					]);
-					modeHintGridEl.appendChild(itemEl);
-				});
-				modeHintGridEl.style.display = 'grid';
-			} else {
-				modeHintGridEl.style.display = 'none';
-			}
+			// Mode hint box removed for a cleaner, compact interface
 		}
 
 		function updateSummaryBox() {

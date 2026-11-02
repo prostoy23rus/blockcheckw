@@ -152,6 +152,7 @@ ensure_preset_hostlist() {
             if [ ! -f "$yt_file" ] || [ ! -s "$yt_file" ]; then
                 [ -f "$yt_file.default" ] && cp -f "$yt_file.default" "$yt_file" 2>/dev/null
             fi
+            sed -i -E '/googleadservices|googletagmanager|googlesyndication|googletagservices/d' "$yt_file" 2>/dev/null || true
             _add_domains_if_missing "$yt_file" \
                 "googlevideo.com" "youtube.com" "youtu.be" "ytimg.com" \
                 "ggpht.com" "gvt1.com" "youtubei.googleapis.com" \

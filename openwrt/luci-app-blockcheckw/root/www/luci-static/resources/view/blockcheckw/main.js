@@ -523,6 +523,12 @@ return view.extend({
 			'.bcw-action-btn-speed:hover { background: rgba(97, 175, 239, 0.15); border-color: #61afef; color: #61afef; transform: translateY(-1px); box-shadow: 0 0 12px rgba(97, 175, 239, 0.25); }\n' +
 			'.bcw-action-btn-watchdog { background: var(--bcw-btn-bg); border-color: var(--bcw-btn-border); color: #00d1b2; }\n' +
 			'.bcw-action-btn-watchdog:hover { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; transform: translateY(-1px); box-shadow: 0 0 12px rgba(0, 209, 178, 0.25); }\n' +
+			'.bcw-switch { position: relative; display: inline-block; width: 46px; height: 24px; flex-shrink: 0; cursor: pointer; margin: 0; }\n' +
+			'.bcw-switch input { opacity: 0; width: 0; height: 0; position: absolute; margin: 0; pointer-events: none; }\n' +
+			'.bcw-switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255, 255, 255, 0.16); transition: all 0.25s ease; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.2); box-sizing: border-box; }\n' +
+			'.bcw-switch-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #abb2bf; transition: all 0.25s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }\n' +
+			'.bcw-switch input:checked + .bcw-switch-slider { background-color: #00d1b2; border-color: #00d1b2; box-shadow: 0 0 10px rgba(0, 209, 178, 0.45); }\n' +
+			'.bcw-switch input:checked + .bcw-switch-slider:before { transform: translateX(22px); background-color: #081a17; }\n' +
 			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: var(--bcw-text-muted); }\n' +
 			'\n' +
 			'/* Legacy / General Action Buttons */\n' +
@@ -700,23 +706,11 @@ return view.extend({
 			'Удалить службу'
 		]);
 
-		var btnWatchdogHeader = E('button', {
-			class: 'bcw-header-item bcw-header-btn',
-			id: 'bcw-btn-watchdog',
-			title: 'Авто-сторож Zapret2: фоновый мониторинг доступности и авто-лечение сбоев DPI',
-			style: 'color: #00d1b2; font-weight: bold;',
-			click: function() { showWatchdogModal(); }
-		}, [
-			E('span', {}, '🛡️'),
-			document.createTextNode(' Авто-сторож')
-		]);
-
 		var headerRightActions = E('div', {
 			class: 'bcw-header-actions',
 			style: 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
 		}, [
 			zapretBadgeEl,
-			btnWatchdogHeader,
 			themeSelectEl,
 			btnCheckUpdate,
 			btnFeedback,
@@ -2585,23 +2579,16 @@ return view.extend({
 
 		function updateWatchdogUI() {
 			var isEn = watchdogStatusData.enabled === true;
-			if (btnWatchdogHeader) {
-				var icon = isEn ? '🛡️' : '⚪';
-				var text = isEn ? (' Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : ' Авто-сторож (Выкл)';
-				var col = isEn ? '#00d1b2' : '#abb2bf';
-				btnWatchdogHeader.innerHTML = '<span>' + icon + '</span>' + text;
-				btnWatchdogHeader.style.color = col;
-			}
 			if (btnWatchdogAction) {
 				var icon = isEn ? '🛡️' : '⚪';
-				var text = isEn ? ('Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : 'Авто-сторож';
-				btnWatchdogAction.innerHTML = '<span>' + icon + '</span><span>' + text + '</span>';
+				var text = isEn ? ('Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : 'Авто-сторож (Выкл)';
+				btnWatchdogAction.innerHTML = '<span>' + icon + '</span> <span>' + text + '</span>';
 				if (isEn) {
 					btnWatchdogAction.style.borderColor = 'rgba(0, 209, 178, 0.4)';
 					btnWatchdogAction.style.color = '#00d1b2';
 				} else {
 					btnWatchdogAction.style.borderColor = '';
-					btnWatchdogAction.style.color = '';
+					btnWatchdogAction.style.color = '#abb2bf';
 				}
 			}
 		}
@@ -2612,14 +2599,26 @@ return view.extend({
 
 			var chkEnable = E('input', {
 				type: 'checkbox',
-				class: 'bcw-chk-input',
-				id: 'bcw-watchdog-chk'
+				id: 'bcw-watchdog-chk',
+				change: function() {
+					updateSwitchUI(this.checked);
+				}
 			});
 			chkEnable.checked = isEn;
 
+			var switchSlider = E('span', { class: 'bcw-switch-slider' });
+
+			var switchWrap = E('label', {
+				class: 'bcw-switch',
+				title: 'Нажмите для включения/выключения'
+			}, [
+				chkEnable,
+				switchSlider
+			]);
+
 			var intervalSelect = E('select', {
 				class: 'bcw-select',
-				style: 'padding: 4px 10px; font-size: 13px; max-width: 240px;'
+				style: 'padding: 5px 12px; font-size: 13px; max-width: 240px; border-radius: 6px;'
 			}, [
 				E('option', { value: '1', selected: curInterval == 1 }, 'Каждый 1 час'),
 				E('option', { value: '2', selected: curInterval == 2 }, 'Каждые 2 часа'),
@@ -2631,8 +2630,33 @@ return view.extend({
 
 			var statusPill = E('span', {
 				class: 'badge ' + (isEn ? 'cbi-color-green' : 'cbi-color-neutral'),
-				style: 'font-weight: bold; font-size: 12px;'
+				style: 'font-weight: bold; font-size: 12.5px; padding: 4px 10px; border-radius: 4px;'
 			}, isEn ? '🟢 Активен' : '⚪ Отключен');
+
+			var intervalRow = E('div', {
+				style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px; transition: opacity 0.2s;'
+			}, [
+				E('span', { style: 'font-size: 13px; color: #abb2bf;' }, 'Интервал авто-проверки:'),
+				intervalSelect
+			]);
+
+			function updateSwitchUI(enabled) {
+				if (enabled) {
+					statusPill.textContent = '🟢 Активен';
+					statusPill.className = 'badge cbi-color-green';
+					statusPill.style.color = '#00d1b2';
+					intervalSelect.disabled = false;
+					intervalRow.style.opacity = '1';
+				} else {
+					statusPill.textContent = '⚪ Отключен';
+					statusPill.className = 'badge cbi-color-neutral';
+					statusPill.style.color = '#abb2bf';
+					intervalSelect.disabled = true;
+					intervalRow.style.opacity = '0.5';
+				}
+			}
+
+			updateSwitchUI(isEn);
 
 			var logBox = E('pre', {
 				class: 'bcw-code-box',
@@ -2646,20 +2670,28 @@ return view.extend({
 				]),
 
 				E('div', {
-					style: 'display: flex; flex-direction: column; gap: 12px; background: rgba(0,0,0,0.15); border-radius: 8px; padding: 14px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.06);'
+					style: 'display: flex; flex-direction: column; gap: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.08);'
 				}, [
-					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;' }, [
-						E('label', { for: 'bcw-watchdog-chk', style: 'display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; font-weight: bold; color: #e5e9f0;' }, [
-							chkEnable,
-							E('span', {}, 'Включить автономного сторожа (Watchdog & Auto-Heal)')
+					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;' }, [
+						E('div', {
+							style: 'display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none;',
+							click: function(e) {
+								if (e.target !== chkEnable && e.target !== switchSlider) {
+									chkEnable.checked = !chkEnable.checked;
+									updateSwitchUI(chkEnable.checked);
+								}
+							}
+						}, [
+							switchWrap,
+							E('div', { style: 'display: flex; flex-direction: column;' }, [
+								E('span', { style: 'font-weight: bold; font-size: 13.5px; color: #e5e9f0;' }, 'Автономный сторож (Watchdog & Auto-Heal)'),
+								E('span', { style: 'font-size: 11.5px; color: #abb2bf;' }, 'Фоновый мониторинг доступности и авто-лечение сбоев DPI')
+							])
 						]),
 						statusPill
 					]),
 
-					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;' }, [
-						E('span', { style: 'font-size: 13px; color: #abb2bf;' }, 'Интервал авто-проверки:'),
-						intervalSelect
-					]),
+					intervalRow,
 
 					E('div', { style: 'display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; font-size: 12px;' }, [
 						E('span', { style: 'color: #abb2bf;' }, 'Последняя проверка: ' + (watchdogStatusData.last_run || 'Никогда')),
@@ -2696,17 +2728,24 @@ return view.extend({
 
 			var btnSaveWatchdog = E('button', {
 				class: 'cbi-button cbi-button-positive',
-				style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 18px;',
+				style: 'background: #00d1b2; color: #081a17; font-weight: bold; padding: 6px 20px; font-size: 13px;',
 				click: function() {
+					var self = this;
 					var enable = chkEnable.checked;
 					var inter = intervalSelect.value;
 					var cmdArgs = enable ? ['watchdog', 'enable', inter] : ['watchdog', 'disable'];
 
+					self.disabled = true;
+					self.textContent = '⏳ Сохранение...';
+
 					fs.exec(HELPER_BIN, cmdArgs).then(function(res) {
 						ui.hideModal();
-						refreshWatchdogStatus();
+						return refreshWatchdogStatus();
+					}).then(function() {
 						ui.addNotification(null, E('p', {}, enable ? ('✓ Авто-сторож включен (проверка каждые ' + inter + ' ч.)!') : 'Авто-сторож отключен.'), 'info');
 					}).catch(function(err) {
+						self.disabled = false;
+						self.textContent = '💾 Сохранить';
 						ui.addNotification(null, E('p', {}, 'Ошибка настройки сторожа: ' + err), 'danger');
 					});
 				}

@@ -1157,6 +1157,23 @@ return view.extend({
 		var ispValEl = E('span', { style: 'color: #61afef; font-weight: 600;' }, (statusData.isp || 'Определение...'));
 		var blockTypeValEl = E('span', { style: 'color: #e5c07b; font-weight: 600;' }, formatBlockType(statusData.block_type));
 
+		var dpiFingerprintBadgesEl = E('span', {
+			style: 'display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center;'
+		}, [
+			E('span', { style: 'color: var(--bcw-text-muted); font-style: italic;' }, 'Определяется во время подбора...')
+		]);
+
+		var dpiFingerprintRowEl = E('div', {
+			class: 'bcw-dpi-fingerprint-row',
+			style: 'margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--bcw-border-sub); display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;'
+		}, [
+			E('div', { style: 'font-weight: 600; color: #61afef; display: flex; align-items: center; gap: 5px; min-width: 175px;' }, [
+				E('span', {}, '🧬'),
+				'DPI-профиль (уязвимости):'
+			]),
+			dpiFingerprintBadgesEl
+		]);
+
 		var lineParamsBoxEl = E('div', {
 			class: 'bcw-line-params-box',
 			style: 'margin-top: 14px; padding: 12px 16px; background: var(--bcw-bg-card-sub); border-radius: 6px; border: 1px solid var(--bcw-border-sub); font-size: 13px;'
@@ -1174,7 +1191,8 @@ return view.extend({
 					E('strong', { style: 'color: var(--bcw-text-muted);' }, 'Тип блокировки: '),
 					blockTypeValEl
 				])
-			])
+			]),
+			dpiFingerprintRowEl
 		]);
 
 		var progressTimerEl = E('span', { style: 'font-size: 13px; color: #61afef; margin-left: 10px; font-weight: normal;' }, '');
@@ -1982,6 +2000,8 @@ return view.extend({
 			activeScanInProgress = true;
 			ispValEl.textContent = 'Определение...';
 			blockTypeValEl.textContent = 'Определение...';
+			dpiFingerprintBadgesEl.innerHTML = '';
+			dpiFingerprintBadgesEl.appendChild(E('span', { style: 'color: var(--bcw-text-muted); font-style: italic;' }, 'Определяется во время подбора...'));
 
 			progressBarEl.style.background = 'linear-gradient(90deg, #3273dc, #00d1b2)';
 			progressPhaseEl.textContent = 'Запуск подбора...';
@@ -2160,6 +2180,29 @@ return view.extend({
 			}
 			if (st.block_type && st.block_type.trim() !== '') {
 				blockTypeValEl.textContent = formatBlockType(st.block_type);
+			}
+
+			if (st.dpi_fingerprint && Array.isArray(st.dpi_fingerprint.vulns) && st.dpi_fingerprint.vulns.length > 0) {
+				dpiFingerprintBadgesEl.innerHTML = '';
+				var badgeColors = {
+					geneva: '#00d1b2',
+					hostfake: '#61afef',
+					seqovl: '#e5c07b',
+					multidisorder: '#c678dd',
+					fake: '#98c379',
+					oob: '#e06c75',
+					syndata: '#d19a66',
+					wssize: '#56b6c2',
+					multisplit: '#4fa6ed'
+				};
+				st.dpi_fingerprint.vulns.forEach(function(v) {
+					var label = (st.dpi_fingerprint.labels && st.dpi_fingerprint.labels[v]) || v;
+					var color = badgeColors[v] || '#00d1b2';
+					dpiFingerprintBadgesEl.appendChild(E('span', {
+						class: 'badge',
+						style: 'background: rgba(255,255,255,0.06); border: 1px solid ' + color + '; color: ' + color + '; font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;'
+					}, '✓ ' + label));
+				});
 			}
 
 			if (activeLogTab === 'scanner' && st.log) {

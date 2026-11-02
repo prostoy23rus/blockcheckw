@@ -5,7 +5,7 @@ LUCI_DEPENDS:=+blockcheckw +luci-base +luci-compat +zapret2
 LUCI_PKGARCH:=all
 
 PKG_NAME:=luci-app-blockcheckw
-PKG_VERSION:=0.15.21
+PKG_VERSION:=0.15.22
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 

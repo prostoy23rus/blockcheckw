@@ -361,6 +361,13 @@ if arf then
     end
 end
 
+local dpf = io.open("/tmp/blockcheckw_dpi_fingerprint.json", "r")
+if dpf then
+    local dp = json.parse(dpf:read("*a"))
+    dpf:close()
+    if dp then obj.dpi_fingerprint = dp end
+end
+
 local tmp_file = status_file .. ".tmp"
 local out = io.open(tmp_file, "w")
 if out then
@@ -398,36 +405,65 @@ generate_smart_probe_corpus() {
     local domain="$2"
     local probe_file="$3"
 
+    local is_discord=0
+    case "$preset" in
+        preset_discord|discord) is_discord=1 ;;
+    esac
+
+    # Genetic Fingerprinting Suite: 7 orthogonal DPI vulnerability families
+    # Based on Geneva CCS'19, zapret2 Lua desync, and empirical ISP heuristics
     cat <<EOF > "$probe_file"
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
-curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
-curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
-curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=7 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=7 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
+# --- Family 1: Geneva TCB Desync (CCS '19 8+4 multi-segmentation) ---
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=8,12
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=8,12
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=8,12
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=8,12
+
+# --- Family 2: Whitelisted Russian SNIs (Hostfake) ---
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=t2.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
-curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-600000
+
+# --- Family 3: Sequence Overlap (Seqovl) ---
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
-curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
-curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld:seqovl=1
+
+# --- Family 4: Packet Disordering ---
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,slectv+1,mlds:0-2,acold,eopold+2,ewdhost=1
+
+# --- Family 5: Synthetic Fake Payload & Badsum Drop ---
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:badsum:tcp_seq=-10000:repeats=2 --lua-desync=multisplit:pos=1,midsld
+
+# --- Family 6: Out-of-Band (OOB) & SYN-Data Early Injection ---
+curl_test_https_tls13 ipv4 $domain : nfqws2 --in-range=-s1 --lua-desync=oob:urp=midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=syndata --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
 EOF
 
-    # Also append preset-specific top strategies
-    lua - "$preset" "$domain" "$PRESETS_FILE" "$probe_file" << 'EOF' 2>/dev/null
+    # Family 7: Window Size Scaling (wssize) - STRICTLY for non-discord targets
+    if [ "$is_discord" -eq 0 ]; then
+        cat <<EOF >> "$probe_file"
+curl_test_https_tls12 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
+EOF
+    fi
+
+    # Append preset-specific turbo strategies
+    lua - "$preset" "$domain" "$PRESETS_FILE" "$probe_file" "$is_discord" << 'EOF' 2>/dev/null
         local json = require("luci.jsonc")
         local p = arg[1]
         local domain = arg[2]
         local presets_file = arg[3]
         local probe_file = arg[4]
+        local is_discord = (arg[5] == "1")
 
         local f = io.open(presets_file, "r")
         if not f then return end
@@ -440,9 +476,12 @@ EOF
             local out = io.open(probe_file, "a")
             if out then
                 for _, s in ipairs(strats) do
-                    local clean = s:gsub("^%s*nfqws2%s+", "")
-                    out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, clean))
-                    out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, clean))
+                    -- Never append wssize to Discord probe
+                    if not (is_discord and s:find("wssize")) then
+                        local clean = s:gsub("^%s*nfqws2%s+", "")
+                        out:write(string.format("curl_test_https_tls12 ipv4 %s : nfqws2 %s\n", domain, clean))
+                        out:write(string.format("curl_test_https_tls13 ipv4 %s : nfqws2 %s\n", domain, clean))
+                    end
                 end
                 out:close()
             end
@@ -465,36 +504,65 @@ generate_adaptive_corpus() {
         local presets_file = arg[4]
         local preset = arg[5]
 
-        local probe_data = {}
-        local pf = io.open(probe_file, "r")
-        if pf then
-            probe_data = json.parse(pf:read("*a")) or {}
-            pf:close()
+        local is_discord = (preset:lower():find("discord") ~= nil)
+
+        local fams = {
+            geneva = false,
+            hostfake = false,
+            seqovl = false,
+            multidisorder = false,
+            fake = false,
+            oob = false,
+            syndata = false,
+            wssize = false,
+            multisplit = false
+        }
+
+        local f_fp = io.open("/tmp/blockcheckw_dpi_fingerprint.json", "r")
+        if f_fp then
+            local fp = json.parse(f_fp:read("*a"))
+            f_fp:close()
+            if fp and fp.vulns then
+                for _, v in ipairs(fp.vulns) do fams[v] = true end
+            end
         end
 
-        local probe_strats = probe_data.strategies or {}
-        local has_wssize = false
-        local has_disorder = false
-        local has_split = false
-        local has_fake = false
-        local has_hostfake = false
-
-        for _, s in ipairs(probe_strats) do
-            local a = (type(s) == "table" and s.args) or s
-            if a:find("wssize") then has_wssize = true end
-            if a:find("multidisorder") then has_disorder = true end
-            if a:find("multisplit") then has_split = true end
-            if a:find("fake:blob") then has_fake = true end
-            if a:find("hostfakesplit") then has_hostfake = true end
+        -- Check probe output directly as fallback
+        local pf = io.open(probe_file, "r")
+        if pf then
+            local pdata = json.parse(pf:read("*a")) or {}
+            pf:close()
+            local pstrats = pdata.strategies or {}
+            for _, s in ipairs(pstrats) do
+                local a = (type(s) == "table" and s.args) or s
+                local al = a:lower()
+                if al:find("pos=8,12") or al:find("8,12") then fams.geneva = true end
+                if al:find("hostfakesplit") or al:find("hostfake") then fams.hostfake = true end
+                if al:find("seqovl") then fams.seqovl = true end
+                if al:find("multidisorder") then fams.multidisorder = true end
+                if al:find("fake:blob") or al:find("badsum") then fams.fake = true end
+                if al:find("oob:") or al:find("urp=") then fams.oob = true end
+                if al:find("syndata") then fams.syndata = true end
+                if al:find("wssize") then fams.wssize = true end
+                if al:find("multisplit") then fams.multisplit = true end
+            end
         end
 
         -- If probe was completely blocked or empty, enable broad modern coverage
-        if not (has_wssize or has_disorder or has_split or has_fake or has_hostfake) then
-            has_wssize = true
-            has_disorder = true
-            has_split = true
-            has_fake = true
-            has_hostfake = true
+        local any_active = false
+        for _, v in pairs(fams) do if v then any_active = true break end end
+        if not any_active then
+            fams.geneva = true
+            fams.hostfake = true
+            fams.seqovl = true
+            fams.multidisorder = true
+            fams.fake = true
+            fams.multisplit = true
+            if not is_discord then fams.wssize = true end
+        end
+
+        if is_discord then
+            fams.wssize = false
         end
 
         local candidate_args = {}
@@ -502,53 +570,84 @@ generate_adaptive_corpus() {
             table.insert(candidate_args, str)
         end
 
-        local pos_list = {
-            "pos=1", "pos=2", "pos=sniext+1", "pos=sniext+4", "pos=host+1",
-            "pos=midsld", "pos=1,midsld", "pos=1,midsld,1220",
-            "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
-            "pos=2,midsld", "pos=sniext+1,host+1", "pos=1,host+1,midsld",
-            "pos=1,host+1,endhost-1"
-        }
+        -- 1. Geneva TCB mutations
+        if fams.geneva then
+            add_cand("--payload=tls_client_hello --lua-desync=multisplit:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=multisplit:pos=1,8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=multidisorder:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=multisplit:pos=8,12:seqovl=1")
+            add_cand("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=t2.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
+        end
 
-        if has_wssize then
-            for _, scale in ipairs({ "scale=6", "scale=7", "scale=8" }) do
-                for _, p in ipairs({ "pos=1,midsld", "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1", "pos=midsld", "pos=1,midsld,1220", "pos=2,midsld:seqovl=1" }) do
-                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multidisorder:%s", scale, p))
-                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multisplit:%s", scale, p))
-                end
+        -- 2. Hostfake mutations
+        if fams.hostfake then
+            for _, h in ipairs({ "gosuslugi.ru", "t2.ru", "vk.com", "google.com", "ozon.ru", "yandex.ru" }) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000", h))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=0", h))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000 --lua-desync=multisplit:pos=1,midsld", h))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld,1220", h))
             end
         end
 
-        if has_disorder then
+        -- 3. Sequence Overlap (Seqovl) mutations
+        if fams.seqovl then
+            for _, seq in ipairs({ "seqovl=1", "seqovl=2", "seqovl=620" }) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=10:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=2,sld:%s", seq))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld:%s", seq))
+            end
+        end
+
+        -- 4. Disordering mutations
+        if fams.multidisorder then
+            local pos_list = {
+                "pos=1,midsld",
+                "pos=1,midsld,1220",
+                "pos=1,slectv+1,mlds:0-2,acold,eopold+2,ewdhost=1",
+                "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1",
+                "pos=2,midsld",
+                "pos=sniext+1,host+1",
+                "pos=1,host+1,midsld"
+            }
             for _, p in ipairs(pos_list) do
                 add_cand(string.format("--payload=tls_client_hello --lua-desync=multidisorder:%s", p))
             end
         end
 
-        if has_split then
-            for _, p in ipairs(pos_list) do
-                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:%s", p))
-            end
-            for _, seq in ipairs({ "seqovl=1", "seqovl=2", "seqovl=620" }) do
-                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=10:%s", seq))
-                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:%s", seq))
-                add_cand(string.format("--payload=tls_client_hello --lua-desync=multisplit:pos=2,sld:%s", seq))
-            end
-        end
-
-        if has_hostfake then
-            for _, h in ipairs({ "google.com", "ozon.ru", "vk.com", "gosuslugi.ru", "yandex.ru" }) do
-                for _, ts in ipairs({ "tcp_ts=-600000", "tcp_ts=0" }) do
-                    add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:%s", h, ts))
-                end
-            end
-        end
-
-        if has_fake then
-            for _, blob in ipairs({ "0x00000000", "blob_stun", "blob_tls_clienthello_www_google_com", "blob_tls_clienthello_gosuslugi_ru", "fake_default_tls" }) do
-                for _, p in ipairs({ "pos=1,midsld", "pos=1,midsld,1220", "pos=sniext+1", "pos=host+1,midsld" }) do
+        -- 5. Fake & Badsum mutations
+        if fams.fake then
+            for _, blob in ipairs({ "0x00000000", "blob_stun", "blob_tls_clienthello_www_google_com", "blob_tls_clienthello_gosuslugi_ru" }) do
+                for _, p in ipairs({ "pos=1,midsld", "pos=1,midsld,1220", "pos=sniext+1" }) do
                     add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:%s", blob, p))
                     add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=%s:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:%s", blob, p))
+                end
+            end
+            add_cand("--payload=tls_client_hello --lua-desync=fake:badsum:tcp_seq=-10000:repeats=2 --lua-desync=multisplit:pos=1,midsld")
+            add_cand("--payload=tls_client_hello --lua-desync=fake:badsum:tcp_seq=-10000:repeats=2 --lua-desync=multidisorder:pos=1,midsld")
+        end
+
+        -- 6. OOB & SYN-Data mutations
+        if fams.oob then
+            add_cand("--in-range=-s1 --lua-desync=oob:urp=midsld")
+            add_cand("--in-range=-s1 --lua-desync=oob:urp=2")
+            add_cand("--in-range=-s1 --lua-desync=oob:urp=0")
+        end
+        if fams.syndata then
+            add_cand("--lua-desync=syndata --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld")
+            add_cand("--lua-desync=syndata --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld")
+        end
+
+        -- 7. Window Size (wssize) - STRICTLY non-discord
+        if fams.wssize and not is_discord then
+            for _, scale in ipairs({ "scale=6", "scale=7" }) do
+                for _, p in ipairs({ "pos=1,midsld", "pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1", "pos=1,midsld,1220" }) do
+                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multidisorder:%s", scale, p))
+                    add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multisplit:%s", scale, p))
                 end
             end
         end
@@ -775,56 +874,97 @@ cmd_start() {
         local probe_eval=$(lua - "$probe_output" << 'EOF' 2>/dev/null
 local json = require("luci.jsonc")
 local f = io.open(arg[1], "r")
-if not f then print('{"count":0,"families":0}') return end
+if not f then print('{"count":0,"families":0,"vulns":[],"labels":{},"summary":""}') return end
 local content = f:read("*a")
 f:close()
 
 local count = 0
-local fams = { wssize=false, hostfake=false, fake=false, multidisorder=false, multisplit=false, seqovl=false }
+local fams = {
+    geneva = false,
+    hostfake = false,
+    seqovl = false,
+    multidisorder = false,
+    fake = false,
+    oob = false,
+    syndata = false,
+    wssize = false,
+    multisplit = false
+}
 
 local parsed = json.parse(content)
+local strats = {}
 if parsed and parsed.strategies then
-    for _, s in ipairs(parsed.strategies) do
-        local a = (type(s) == "table" and s.args) or s
-        if a and a ~= "" then
-            count = count + 1
-            if a:find("wssize") then fams.wssize = true end
-            if a:find("hostfakesplit") or a:find("hostfake") then fams.hostfake = true end
-            if a:find("fake:blob") then fams.fake = true end
-            if a:find("multidisorder") then fams.multidisorder = true end
-            if a:find("multisplit") then fams.multisplit = true end
-            if a:find("seqovl") then fams.seqovl = true end
-        end
-    end
+    strats = parsed.strategies
 else
     for line in content:gmatch("[^\r\n]+") do
         local clean = line:match("^%s*(%-%-[^\r\n]+)")
         if clean and not clean:match("^%-%-%s*#") then
-            count = count + 1
-            if clean:find("wssize") then fams.wssize = true end
-            if clean:find("hostfakesplit") or clean:find("hostfake") then fams.hostfake = true end
-            if clean:find("fake:blob") then fams.fake = true end
-            if clean:find("multidisorder") then fams.multidisorder = true end
-            if clean:find("multisplit") then fams.multisplit = true end
-            if clean:find("seqovl") then fams.seqovl = true end
+            table.insert(strats, clean)
         end
     end
 end
 
-local fam_cnt = 0
-for _, active in pairs(fams) do
-    if active then fam_cnt = fam_cnt + 1 end
+for _, s in ipairs(strats) do
+    local a = (type(s) == "table" and s.args) or s
+    if a and a ~= "" then
+        count = count + 1
+        local al = a:lower()
+        if al:find("pos=8,12") or al:find("8,12") then fams.geneva = true end
+        if al:find("hostfakesplit") or al:find("hostfake") then fams.hostfake = true end
+        if al:find("seqovl") then fams.seqovl = true end
+        if al:find("multidisorder") then fams.multidisorder = true end
+        if al:find("fake:blob") or al:find("badsum") then fams.fake = true end
+        if al:find("oob:") or al:find("urp=") then fams.oob = true end
+        if al:find("syndata") then fams.syndata = true end
+        if al:find("wssize") then fams.wssize = true end
+        if al:find("multisplit") then fams.multisplit = true end
+    end
 end
 
-print(string.format('{"count":%d,"families":%d}', count, fam_cnt))
+local active_vulns = {}
+local labels = {
+    geneva = "Geneva 8+4 TCB Desync",
+    hostfake = "Hostfake (RU SNI)",
+    seqovl = "Seqovl Overlap",
+    multidisorder = "Packet Disordering",
+    fake = "Fake Injection",
+    oob = "OOB Out-of-Band",
+    syndata = "SYN-Data Early Injection",
+    wssize = "Window Clamping (wssize)",
+    multisplit = "Multi-segmentation"
+}
+
+for k, active in pairs(fams) do
+    if active then table.insert(active_vulns, k) end
+end
+table.sort(active_vulns)
+
+local summary_parts = {}
+for _, v in ipairs(active_vulns) do
+    if labels[v] then table.insert(summary_parts, labels[v]) end
+end
+local summary = table.concat(summary_parts, ", ")
+
+local fp = {
+    count = count,
+    families = #active_vulns,
+    vulns = active_vulns,
+    labels = labels,
+    summary = summary
+}
+
+print(json.stringify(fp))
 EOF
 )
-        local probe_count=$(echo "$probe_eval" | grep -oE '"count":[0-9]+' | awk -F: '{print $2}')
-        local probe_fams=$(echo "$probe_eval" | grep -oE '"families":[0-9]+' | awk -F: '{print $2}')
+        echo "$probe_eval" > /tmp/blockcheckw_dpi_fingerprint.json 2>/dev/null || true
+
+        local probe_count=$(echo "$probe_eval" | grep -oE '"count":[0-9]+' | head -n 1 | awk -F: '{print $2}')
+        local probe_fams=$(echo "$probe_eval" | grep -oE '"families":[0-9]+' | head -n 1 | awk -F: '{print $2}')
+        local probe_summary=$(echo "$probe_eval" | grep -oE '"summary":"[^"]*"' | head -n 1 | cut -d'"' -f4)
         [ -z "$probe_count" ] && probe_count=0
         [ -z "$probe_fams" ] && probe_fams=0
 
-        echo "[blockcheckw-helper] [Smart Scan] Phase 1 probe completed: found $probe_count working profiles across $probe_fams vector families." >> "$LOG_FILE"
+        echo "[blockcheckw-helper] [DPI Genetic Fingerprint] Detected $probe_count working profiles across $probe_fams vulnerability families: $probe_summary" >> "$LOG_FILE"
 
         local latest_scan=$(ls -t /root/*_scan.json 2>/dev/null | head -n 1)
         if [ -n "$latest_scan" ] && [ -f "$latest_scan" ]; then
@@ -834,10 +974,12 @@ EOF
         local exit_code=0
         local adaptive_output=""
 
-        # Phase 2: If probe yielded fewer than 3 strategies or fewer than 2 vector families, deepen adaptively
-        if [ "$probe_count" -lt 3 ] || [ "$probe_fams" -lt 2 ]; then
+        # Phase 2: If probe yielded fewer than 4 strategies or fewer than 3 vector families, deepen adaptively
+        if [ "$probe_count" -lt 4 ] || [ "$probe_fams" -lt 3 ]; then
             echo "[blockcheckw-helper] [Smart Scan] Deepening search into adaptive vector matrix (probe hits: $probe_count, families: $probe_fams)..." >> "$LOG_FILE"
-            write_status "running" 35 "Фаза 2: Адаптивное углубление поиска под DPI провайдера..."
+            local adapt_phase="Фаза 2: Адаптивный подбор под DPI"
+            [ -n "$probe_summary" ] && adapt_phase="Фаза 2: Адаптивный подбор ($probe_summary)"
+            write_status "running" 35 "$adapt_phase..."
 
             local adaptive_corpus="/tmp/blockcheckw_adaptive_corpus.txt"
             adaptive_output="/tmp/blockcheckw_adaptive_output.txt"
@@ -1021,8 +1163,8 @@ EOF
 
         # Build circular strategy if requested
         if [ "$do_circular" = "1" ] && [ "$found_count" -gt 0 ]; then
-            write_status "running" 88 "Сборка отказоустойчивой Circular-стратегии..."
-            lua "$CIRCULAR_BUILDER" "$OUTPUT_SCAN" 3 20 4 loop > "$OUTPUT_CIRCULAR" 2>> "$LOG_FILE"
+            write_status "running" 88 "Сборка ортогональной Circular-стратегии..."
+            lua "$CIRCULAR_BUILDER" "$OUTPUT_SCAN" 3 20 4 loop tls_client_hello "$target" > "$OUTPUT_CIRCULAR" 2>> "$LOG_FILE"
         fi
 
         local apply_info=""
@@ -1199,6 +1341,15 @@ if not st.apply_result then
                 st.auto_applied = true
             end
         end
+    end
+end
+
+if not st.dpi_fingerprint then
+    local dpf = io.open("/tmp/blockcheckw_dpi_fingerprint.json", "r")
+    if dpf then
+        local dp = json.parse(dpf:read("*a"))
+        dpf:close()
+        if dp then st.dpi_fingerprint = dp end
     end
 end
 
@@ -1598,8 +1749,16 @@ EOF
 }
 
 cmd_speedtest() {
-    local target_or_url="${1:-preset_youtube}"
-    local custom_url="$2"
+    local target_or_url="preset_youtube"
+    local custom_url=""
+
+    if [ "$1" = "--target" ]; then
+        target_or_url="${2:-preset_youtube}"
+        custom_url="$3"
+    else
+        target_or_url="${1:-preset_youtube}"
+        custom_url="$2"
+    fi
 
     lua - "$target_or_url" "$custom_url" "$PRESETS_FILE" << 'EOF'
 local json = require("luci.jsonc")

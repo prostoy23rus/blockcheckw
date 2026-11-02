@@ -2443,7 +2443,21 @@ cmd_check_update() {
 
     local tmp_ver="/tmp/bcw_remote_ver.json"
     rm -f "$tmp_ver"
-    fetch_file "openwrt/version.json?_t=$(date +%s)" "$tmp_ver" 5 || fetch_file "openwrt/version.json" "$tmp_ver" 5
+
+    # 1. Direct GitHub Raw first (bypasses CDN edge cache, always fresh)
+    for gh_ip in 185.199.108.133 185.199.111.133 185.199.109.133 185.199.110.133; do
+        curl -fsSL -k --connect-timeout 2 -m 4 --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/openwrt/version.json?_t=$(date +%s)" -o "$tmp_ver" 2>/dev/null
+        if [ -s "$tmp_ver" ] && ! head -n 3 "$tmp_ver" | grep -qiE '404|not found|<html>'; then
+            break
+        fi
+        rm -f "$tmp_ver"
+    done
+
+    # 2. If direct GitHub was unreachable, purge jsDelivr and fetch via mirrors
+    if [ ! -s "$tmp_ver" ]; then
+        curl -fsSL -k --connect-timeout 2 -m 3 "https://purge.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/openwrt/version.json" >/dev/null 2>&1 || true
+        fetch_file "openwrt/version.json" "$tmp_ver" 5
+    fi
 
     lua - "$cur_ver" "$tmp_ver" "$VERSION_FILE" << 'EOF'
 local json = require("luci.jsonc")
@@ -2547,7 +2561,7 @@ cmd_update() {
     fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/blockcheckw-helper" "$tmp_dir/blockcheckw-helper" 8 || ok=0
     fetch_file "openwrt/luci-app-blockcheckw/root/usr/bin/circular-builder.lua" "$tmp_dir/circular-builder.lua" 8 || ok=0
     fetch_file "openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" "$tmp_dir/main.js" 8 || ok=0
-    fetch_file "strategies/zapret2_presets.json" "$tmp_dir/zapret2_presets.json" 8 || ok=0
+    fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/blockcheckw/zapret2_presets.json" "$tmp_dir/zapret2_presets.json" 8 || fetch_file "strategies/zapret2_presets.json" "$tmp_dir/zapret2_presets.json" 8 || ok=0
     fetch_file "openwrt/version.json" "$tmp_dir/version.json" 8 || ok=0
     fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/luci/menu.d/luci-app-blockcheckw.json" "$tmp_dir/menu.json" 8 || true
     fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-blockcheckw.json" "$tmp_dir/acl.json" 8 || true

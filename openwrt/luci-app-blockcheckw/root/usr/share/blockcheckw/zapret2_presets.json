@@ -66,8 +66,17 @@
       "validation_endpoints": [
         { "name": "Веб-интерфейс (discord.com)", "url": "https://discord.com", "range": "0-32767" },
         { "name": "API авторизации (discord.com/api)", "url": "https://discord.com/api/v9/experiments", "range": "0-16383" },
-        { "name": "Медиа CDN (cdn.discordapp.com)", "url": "https://cdn.discordapp.com/embed/avatars/0.png", "range": "0-8191" }
+        { "name": "Медиа CDN (cdn.discordapp.com)", "url": "https://cdn.discordapp.com/embed/avatars/0.png", "range": "0-8191" },
+        { "name": "Голосовой RTC канал (STUN UDP)", "url": "stun://stun.l.google.com:19302", "type": "stun", "host": "stun.l.google.com", "port": 19302 }
       ],
+      "dual_circuit": true,
+      "voice_profile": {
+        "name": "Discord VoiceFlow (WebRTC RTC & IP Discovery)",
+        "ports": "50000-65535,19294-19344",
+        "protocol": "udp",
+        "filter_l7": "discord stun",
+        "script": "--payload=discord_ip_discovery,stun --blob=blob_stun:@/opt/zapret2/files/fake/stun.bin --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
+      },
       "hostlist": "list_hosts_discord",
       "port": "443",
       "protocols": [

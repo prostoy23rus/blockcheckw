@@ -1497,6 +1497,10 @@ cmd_apply() {
         done
     elif [ "$base_sec" = "BlockcheckW_Discord" ]; then
         uci -q set "zapret2.Discord_circular.enabled=0"
+        uci -q set "zapret2.BlockcheckW_Discord_Voice.enabled=0"
+        for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.BlockcheckW_Discord_Voice_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+            uci -q set "zapret2.$s.enabled=0"
+        done
     elif [ "$base_sec" = "BlockcheckW_General" ]; then
         uci -q set "zapret2.Routerich_circular.enabled=0"
     fi
@@ -1509,6 +1513,10 @@ cmd_apply() {
     uci set "zapret2.$sec_name.enabled=1"
     uci set "zapret2.$sec_name.port=$port"
     uci set "zapret2.$sec_name.protocol=tcp"
+    uci -q delete "zapret2.$sec_name.filter_l3"
+    uci -q delete "zapret2.$sec_name.filter_l7"
+    uci -q delete "zapret2.$sec_name.hostlist"
+    uci -q delete "zapret2.$sec_name.hostlist_exclude"
     uci add_list "zapret2.$sec_name.filter_l3=ipv4"
     for proto in $l7; do
         uci add_list "zapret2.$sec_name.filter_l7=$proto"
@@ -1518,6 +1526,25 @@ cmd_apply() {
         uci add_list "zapret2.$sec_name.hostlist_exclude=list_hosts_user_exclude"
     fi
     uci set "zapret2.$sec_name.script=$script_text"
+
+    # Milestone 2: Discord VoiceFlow (Paired UDP strategy for Discord WebRTC Voice & STUN)
+    local voice_sec_name=""
+    if [ "$base_sec" = "BlockcheckW_Discord" ]; then
+        uci -q set zapret2.blob_stun.enabled=1
+        local v_idx=$(echo "$sec_name" | grep -oE '_[0-9]+$')
+        voice_sec_name="BlockcheckW_Discord_Voice${v_idx}"
+
+        uci set "zapret2.$voice_sec_name=strategy"
+        uci set "zapret2.$voice_sec_name.enabled=1"
+        uci set "zapret2.$voice_sec_name.port=50000-65535,19294-19344"
+        uci set "zapret2.$voice_sec_name.protocol=udp"
+        uci -q delete "zapret2.$voice_sec_name.filter_l3"
+        uci -q delete "zapret2.$voice_sec_name.filter_l7"
+        uci add_list "zapret2.$voice_sec_name.filter_l3=ipv4"
+        uci add_list "zapret2.$voice_sec_name.filter_l7=discord"
+        uci add_list "zapret2.$voice_sec_name.filter_l7=stun"
+        uci set "zapret2.$voice_sec_name.script=--payload=discord_ip_discovery,stun --blob=blob_stun:@/opt/zapret2/files/fake/stun.bin --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
+    fi
 
     uci commit zapret2
 
@@ -1615,12 +1642,30 @@ cmd_activate() {
                 uci -q set "zapret2.$s.enabled=0"
             done
         fi
-        [ "$base_sec" = "BlockcheckW_Discord" ] && uci -q set "zapret2.Discord_circular.enabled=0"
+        if [ "$base_sec" = "BlockcheckW_Discord" ]; then
+            uci -q set "zapret2.Discord_circular.enabled=0"
+            uci -q set "zapret2.BlockcheckW_Discord_Voice.enabled=0"
+            for s in $(uci show zapret2 2>/dev/null | grep -E '^zapret2\.BlockcheckW_Discord_Voice_' | grep '=strategy$' | cut -d'.' -f2 | cut -d'=' -f1); do
+                uci -q set "zapret2.$s.enabled=0"
+            done
+        fi
         [ "$base_sec" = "BlockcheckW_General" ] && uci -q set "zapret2.Routerich_circular.enabled=0"
     fi
 
     # Enable target section
     uci set "zapret2.$section.enabled=1"
+
+    # Synchronize Discord VoiceFlow strategy
+    if [ "$base_sec" = "BlockcheckW_Discord" ]; then
+        uci -q set zapret2.blob_stun.enabled=1
+        local v_idx=$(echo "$section" | grep -oE '_[0-9]+$')
+        local target_voice="BlockcheckW_Discord_Voice${v_idx}"
+        if uci -q get "zapret2.$target_voice" >/dev/null; then
+            uci set "zapret2.$target_voice.enabled=1"
+        elif uci -q get "zapret2.BlockcheckW_Discord_Voice" >/dev/null; then
+            uci set "zapret2.BlockcheckW_Discord_Voice.enabled=1"
+        fi
+    fi
     uci commit zapret2
 
     /etc/init.d/zapret2 restart >/dev/null 2>&1
@@ -1668,7 +1713,14 @@ local endpoints = {}
 
 if preset_obj and preset_obj.validation_endpoints and #preset_obj.validation_endpoints > 0 then
     for _, ep in ipairs(preset_obj.validation_endpoints) do
-        table.insert(endpoints, { name = ep.name, url = ep.url, range = ep.range or "0-16383" })
+        table.insert(endpoints, {
+            name = ep.name,
+            url = ep.url,
+            range = ep.range or "0-16383",
+            type = ep.type or "http",
+            host = ep.host,
+            port = ep.port
+        })
     end
 else
     local test_url = (arg2 and arg2 ~= "") and arg2 or (preset_obj and (preset_obj.test_url or preset_obj.domain)) or arg1
@@ -1676,7 +1728,7 @@ else
         test_url = "https://" .. test_url
     end
     local host_label = test_url:gsub("^https?://", ""):gsub("/.*$", "")
-    table.insert(endpoints, { name = "Основной узел (" .. host_label .. ")", url = test_url, range = "0-32767" })
+    table.insert(endpoints, { name = "Основной узел (" .. host_label .. ")", url = test_url, range = "0-32767", type = "http" })
 end
 
 local results = {}
@@ -1685,38 +1737,94 @@ local main_ok = false
 local total_speed_kbs = 0
 
 for idx, ep in ipairs(endpoints) do
-    local range_opt = (ep.range and ep.range ~= "") and ("--range " .. ep.range) or "--range 0-16383"
-    local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}' -o /dev/null --connect-timeout 4 -m 6 '%s' 2>/dev/null", range_opt, ep.url)
-    local pipe = io.popen(cmd)
-    local out = pipe and pipe:read("*a") or ""
-    if pipe then pipe:close() end
+    if ep.type == "stun" then
+        local nixio = require("nixio")
+        local t0 = nixio.nanotime and nixio.nanotime() or 0
+        local host = ep.host or "stun.l.google.com"
+        local port = tonumber(ep.port) or 19302
+        local ai = nixio.getaddrinfo(host, "inet")
+        local ip = ai and ai[1] and ai[1].address
+        local s_ok = false
+        local dt_ms = 0
+        local s_code = "000"
+        if ip then
+            local s = nixio.socket("inet", "dgram")
+            if s then
+                s:setopt("socket", "rcvtimeo", 2)
+                local req = string.char(0x00, 0x01, 0x00, 0x00, 0x21, 0x12, 0xa4, 0x42,
+                                        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c)
+                s:sendto(req, ip, port)
+                local buf = s:recvfrom(512)
+                dt_ms = nixio.nanotime and math.floor((nixio.nanotime() - t0) / 1000000) or 15
+                s:close()
+                if buf and #buf >= 20 then
+                    local b1, b2, b3, b4, b5, b6, b7, b8 = buf:byte(1, 8)
+                    if b1 == 0x01 and b2 == 0x01 and b5 == 0x21 and b6 == 0x12 and b7 == 0xa4 and b8 == 0x42 then
+                        s_ok = true
+                        s_code = "STUN-200"
+                    else
+                        s_ok = true
+                        s_code = "STUN-OK"
+                    end
+                else
+                    s_code = "TIMEOUT"
+                end
+            else
+                s_code = "SOCK-ERR"
+            end
+        else
+            s_code = "DNS-FAIL"
+        end
 
-    local code, size, speed, elapsed = out:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)")
-    code = code or "000"
-    size = tonumber(size) or 0
-    speed = tonumber(speed) or 0
-    elapsed = tonumber(elapsed) or 0.0
+        if s_ok then
+            total_ok = total_ok + 1
+            if idx == 1 then main_ok = true end
+        end
 
-    local code_num = tonumber(code) or 0
-    local is_ok = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and elapsed < 5.5
-    local speed_kbs = math.floor(speed / 1024)
-    total_speed_kbs = total_speed_kbs + speed_kbs
+        table.insert(results, {
+            name = ep.name,
+            url = ep.url or ("stun://" .. host .. ":" .. port),
+            http_code = s_code,
+            accessible = s_ok,
+            data_flow = s_ok,
+            size_bytes = s_ok and 32 or 0,
+            speed_kbs = 0,
+            time_sec = string.format("%.3f", dt_ms / 1000)
+        })
+    else
+        local range_opt = (ep.range and ep.range ~= "") and ("--range " .. ep.range) or "--range 0-16383"
+        local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}' -o /dev/null --connect-timeout 4 -m 6 '%s' 2>/dev/null", range_opt, ep.url)
+        local pipe = io.popen(cmd)
+        local out = pipe and pipe:read("*a") or ""
+        if pipe then pipe:close() end
 
-    if is_ok then
-        total_ok = total_ok + 1
-        if idx == 1 then main_ok = true end
+        local code, size, speed, elapsed = out:match("([^|]+)|([^|]+)|([^|]+)|([^|]+)")
+        code = code or "000"
+        size = tonumber(size) or 0
+        speed = tonumber(speed) or 0
+        elapsed = tonumber(elapsed) or 0.0
+
+        local code_num = tonumber(code) or 0
+        local is_ok = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and elapsed < 5.5
+        local speed_kbs = math.floor(speed / 1024)
+        total_speed_kbs = total_speed_kbs + speed_kbs
+
+        if is_ok then
+            total_ok = total_ok + 1
+            if idx == 1 then main_ok = true end
+        end
+
+        table.insert(results, {
+            name = ep.name,
+            url = ep.url,
+            http_code = code,
+            accessible = is_ok,
+            data_flow = ((size > 0 or code_num == 200 or code_num == 204 or code_num == 206 or code_num == 403 or code_num == 404) and is_ok),
+            size_bytes = size,
+            speed_kbs = speed_kbs,
+            time_sec = string.format("%.2f", elapsed)
+        })
     end
-
-    table.insert(results, {
-        name = ep.name,
-        url = ep.url,
-        http_code = code,
-        accessible = is_ok,
-        data_flow = ((size > 0 or code_num == 200 or code_num == 204 or code_num == 206 or code_num == 403 or code_num == 404) and is_ok),
-        size_bytes = size,
-        speed_kbs = speed_kbs,
-        time_sec = string.format("%.2f", elapsed)
-    })
 end
 
 local all_ok = (total_ok == #endpoints and #endpoints > 0)
@@ -1728,7 +1836,11 @@ if all_ok then
     status_msg = "✓ Все компоненты сервиса доступны, данные передаются без помех (" .. #endpoints .. "/" .. #endpoints .. ")"
 elseif main_ok then
     overall_status = "degraded"
-    status_msg = "⚠️ Частичная доступность: основной сайт отвечает, но часть медиа/видеопотоков заблокирована ТСПУ!"
+    if preset_key == "preset_discord" then
+        status_msg = "⚠️ Частичная доступность: чат и API отвечают, но голосовой RTC канал Discord заблокирован ТСПУ!"
+    else
+        status_msg = "⚠️ Частичная доступность: основной сайт отвечает, но часть медиа/видеопотоков заблокирована ТСПУ!"
+    end
 end
 
 local avg_speed = (#endpoints > 0) and math.floor(total_speed_kbs / #endpoints) or 0
@@ -2266,6 +2378,34 @@ cmd_info() {
                     versions_count = 0,
                     versions = {}
                 }
+            end
+
+            if (key == "preset_discord" or key == "discord") and res.services[key] then
+                res.services[key].dual_circuit = true
+                local voice_active = nil
+                for _, st in ipairs(all_strats) do
+                    if st.section:match("^BlockcheckW_Discord_Voice") and st.enabled then
+                        voice_active = st
+                        break
+                    end
+                end
+                if not voice_active then
+                    for _, st in ipairs(all_strats) do
+                        if st.section:match("^BlockcheckW_Discord_Voice") then
+                            voice_active = st
+                            break
+                        end
+                    end
+                end
+                if voice_active then
+                    res.services[key].voice_circuit = {
+                        section = voice_active.section,
+                        enabled = voice_active.enabled,
+                        port = voice_active.port or "50000-65535,19294-19344",
+                        protocol = "udp",
+                        script = voice_active.script or ""
+                    }
+                end
             end
         end
 

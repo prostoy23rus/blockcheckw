@@ -1502,8 +1502,13 @@ return view.extend({
 			}
 
 			if (sData && sData.script && sData.script.trim() !== '') {
-				var secBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Раздел: zapret2.' + sData.section);
-				var portBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' }, 'Порт: ' + sData.port);
+				var isDiscordTarget = (currentTarget === 'preset_discord' || currentTarget === 'discord');
+				var secBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' },
+					(isDiscordTarget && sData.dual_circuit) ? ('Контур TCP: zapret2.' + sData.section) : ('Раздел: zapret2.' + sData.section)
+				);
+				var portBadge = E('span', { class: 'badge', style: 'background: #3e4451; color: #fff; font-size: 11px;' },
+					(isDiscordTarget && sData.dual_circuit) ? ('Порт TCP: ' + sData.port) : ('Порт: ' + sData.port)
+				);
 				var statusBadge = sData.enabled ?
 					E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ Включена') :
 					E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Отключена');
@@ -1516,12 +1521,26 @@ return view.extend({
 				activeMetaBadgesEl.appendChild(statusBadge);
 				activeMetaBadgesEl.appendChild(circBadge);
 
+				if (isDiscordTarget && sData.dual_circuit && sData.voice_circuit) {
+					var vc = sData.voice_circuit;
+					var voiceBadge = E('span', {
+						class: 'badge',
+						style: 'background: rgba(88, 101, 242, 0.25); color: #7289da; border: 1px solid rgba(88, 101, 242, 0.4); font-size: 11px;'
+					}, '🎙️ VoiceFlow: ' + (vc.enabled ? '✓ Активен' : '✗ Отключен') + ' (' + vc.section + ', UDP ' + vc.port + ')');
+					activeMetaBadgesEl.appendChild(voiceBadge);
+				}
+
 				if (sData.versions_count && sData.versions_count > 1) {
 					var verCountBadge = E('span', { class: 'badge', style: 'background: #4b5263; color: #61afef; font-size: 11px;' }, '📁 Всего записей: ' + sData.versions_count);
 					activeMetaBadgesEl.appendChild(verCountBadge);
 				}
 
-				activeCodeEl.textContent = sData.script;
+				if (isDiscordTarget && sData.dual_circuit && sData.voice_circuit && sData.voice_circuit.script) {
+					activeCodeEl.textContent = '# [Контур 1: TCP 443 — Чат, WebSockets & API (' + sData.section + ')]\n' + sData.script +
+						'\n\n# [Контур 2: VoiceFlow UDP 50000-65535, 19294-19344 — WebRTC Voice & STUN (' + sData.voice_circuit.section + ')]\n' + sData.voice_circuit.script;
+				} else {
+					activeCodeEl.textContent = sData.script;
+				}
 
 				// Update versions history dropdown
 				if (sData.versions && sData.versions.length > 1) {
@@ -1685,8 +1704,13 @@ return view.extend({
 			} else {
 				var sData = zapretServicesData[pDef.key || currentTarget];
 				if (sData && sData.enabled) {
-					summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
-					summaryStatusBadgeEl.textContent = sData.is_circular ? '🔄 Активна Circular-связка (' + sData.section + ')' : '✓ Активна стратегия (' + sData.section + ')';
+					if ((currentTarget === 'preset_discord' || currentTarget === 'discord') && sData.dual_circuit && sData.voice_circuit && sData.voice_circuit.enabled) {
+						summaryStatusBadgeEl.className = 'badge cbi-color-blue';
+						summaryStatusBadgeEl.textContent = '🎙️ Dual-Circuit: TCP (' + sData.section + ') + Voice RTC (UDP)';
+					} else {
+						summaryStatusBadgeEl.className = sData.is_circular ? 'badge cbi-color-blue' : 'badge cbi-color-green';
+						summaryStatusBadgeEl.textContent = sData.is_circular ? '🔄 Активна Circular-связка (' + sData.section + ')' : '✓ Активна стратегия (' + sData.section + ')';
+					}
 				} else {
 					summaryStatusBadgeEl.className = 'badge cbi-color-neutral';
 					summaryStatusBadgeEl.textContent = 'Не настроено в Zapret2';

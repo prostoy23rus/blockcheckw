@@ -521,6 +521,8 @@ return view.extend({
 			'.bcw-action-btn-secondary:hover { background: var(--bcw-btn-hover-bg); color: var(--bcw-btn-hover-color); border-color: #3273dc; transform: translateY(-1px); }\n' +
 			'.bcw-action-btn-speed { background: var(--bcw-btn-bg); border-color: var(--bcw-btn-border); color: #61afef; }\n' +
 			'.bcw-action-btn-speed:hover { background: rgba(97, 175, 239, 0.15); border-color: #61afef; color: #61afef; transform: translateY(-1px); box-shadow: 0 0 12px rgba(97, 175, 239, 0.25); }\n' +
+			'.bcw-action-btn-watchdog { background: var(--bcw-btn-bg); border-color: var(--bcw-btn-border); color: #00d1b2; }\n' +
+			'.bcw-action-btn-watchdog:hover { background: rgba(0, 209, 178, 0.15); border-color: #00d1b2; color: #00d1b2; transform: translateY(-1px); box-shadow: 0 0 12px rgba(0, 209, 178, 0.25); }\n' +
 			'.bcw-param-hint { font-size: 11.5px; opacity: 0.85; line-height: 1.45; word-break: normal; overflow-wrap: break-word; color: var(--bcw-text-muted); }\n' +
 			'\n' +
 			'/* Legacy / General Action Buttons */\n' +
@@ -962,30 +964,14 @@ return view.extend({
 			E('span', {}, 'Проверить доступность')
 		]);
 
-		var btnDetails = E('button', {
-			class: 'bcw-action-btn bcw-action-btn-secondary',
-			click: function() {
-				var currentService = zapretServicesData[currentTarget] || {};
-				if (!lastAppliedResult && (!currentService || !currentService.enabled)) {
-					bcwShowModal('Подробнее о связке', [
-						E('p', { style: 'font-size: 14px; color: #abb2bf;' }, 'Для выбранного сервиса пока не подобрана активная стратегия.'),
-						E('p', { style: 'font-size: 13px; color: #61afef; margin-top: 8px;' }, 'Нажмите кнопку «⚡ Запустить поиск», чтобы автоматически подобрать и активировать рабочую связку.')
-					], [
-						E('button', {
-							class: 'cbi-button cbi-button-neutral',
-							click: function() { ui.hideModal(); }
-						}, 'Закрыть')
-					]);
-					return;
-				}
-				showStrategyAppliedModal({
-					isAuto: true,
-					applyResult: lastAppliedResult
-				});
-			}
+		var btnWatchdogAction = E('button', {
+			class: 'bcw-action-btn bcw-action-btn-watchdog',
+			id: 'bcw-btn-action-watchdog',
+			title: 'Авто-сторож Zapret2: фоновый мониторинг доступности и авто-лечение сбоев DPI',
+			click: function() { showWatchdogModal(); }
 		}, [
-			E('span', {}, 'ℹ️'),
-			E('span', {}, 'Подробнее о связке')
+			E('span', {}, '🛡️'),
+			E('span', {}, 'Авто-сторож')
 		]);
 
 		var btnSpeedTest = E('button', {
@@ -1002,7 +988,7 @@ return view.extend({
 			btnStopScan,
 			btnTestConn,
 			btnSpeedTest,
-			btnDetails
+			btnWatchdogAction
 		]);
 
 		// Active Strategy Inspector Card
@@ -2598,13 +2584,25 @@ return view.extend({
 		}
 
 		function updateWatchdogUI() {
+			var isEn = watchdogStatusData.enabled === true;
 			if (btnWatchdogHeader) {
-				var isEn = watchdogStatusData.enabled === true;
 				var icon = isEn ? '🛡️' : '⚪';
 				var text = isEn ? (' Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : ' Авто-сторож (Выкл)';
 				var col = isEn ? '#00d1b2' : '#abb2bf';
 				btnWatchdogHeader.innerHTML = '<span>' + icon + '</span>' + text;
 				btnWatchdogHeader.style.color = col;
+			}
+			if (btnWatchdogAction) {
+				var icon = isEn ? '🛡️' : '⚪';
+				var text = isEn ? ('Авто-сторож (' + watchdogStatusData.interval_hours + 'ч)') : 'Авто-сторож';
+				btnWatchdogAction.innerHTML = '<span>' + icon + '</span><span>' + text + '</span>';
+				if (isEn) {
+					btnWatchdogAction.style.borderColor = 'rgba(0, 209, 178, 0.4)';
+					btnWatchdogAction.style.color = '#00d1b2';
+				} else {
+					btnWatchdogAction.style.borderColor = '';
+					btnWatchdogAction.style.color = '';
+				}
 			}
 		}
 

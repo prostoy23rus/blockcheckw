@@ -75,7 +75,7 @@
         "ports": "50000-65535,19294-19344",
         "protocol": "udp",
         "filter_l7": "discord stun",
-        "script": "--payload=discord_ip_discovery,stun --blob=blob_stun:@/opt/zapret2/files/fake/stun.bin --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
+        "script": "--payload=discord_ip_discovery,stun --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
       },
       "hostlist": "list_hosts_discord",
       "port": "443",

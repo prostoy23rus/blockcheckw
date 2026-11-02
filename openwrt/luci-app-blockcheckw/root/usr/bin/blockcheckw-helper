@@ -1543,7 +1543,7 @@ cmd_apply() {
         uci add_list "zapret2.$voice_sec_name.filter_l3=ipv4"
         uci add_list "zapret2.$voice_sec_name.filter_l7=discord"
         uci add_list "zapret2.$voice_sec_name.filter_l7=stun"
-        uci set "zapret2.$voice_sec_name.script=--payload=discord_ip_discovery,stun --blob=blob_stun:@/opt/zapret2/files/fake/stun.bin --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
+        uci set "zapret2.$voice_sec_name.script=--payload=discord_ip_discovery,stun --lua-desync=circular:fails=3:maxtime=20 --lua-desync=fake:blob=blob_stun:repeats=2:strategy=1 --lua-desync=udplen:increment=2:strategy=2 --lua-desync=fake:blob=blob_stun:repeats=4:strategy=3"
     fi
 
     uci commit zapret2

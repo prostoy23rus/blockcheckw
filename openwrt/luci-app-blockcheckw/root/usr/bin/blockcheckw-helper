@@ -2099,164 +2099,6 @@ print(json.stringify(result))
 EOF
 }
 
-cmd_watchdog() {
-    local action="${1:-status}"
-    local arg2="$2"
-    local cron_file="/etc/crontabs/root"
-    local watchdog_log="/var/log/blockcheckw_watchdog.log"
-    local config_file="/etc/blockcheckw_watchdog.json"
-
-    case "$action" in
-        status)
-            local is_enabled=false
-            if [ -f "$cron_file" ] && grep -q 'blockcheckw-helper watchdog run' "$cron_file" 2>/dev/null; then
-                is_enabled=true
-            fi
-
-            local log_tail=""
-            if [ -f "$watchdog_log" ]; then
-                log_tail=$(tail -n 30 "$watchdog_log")
-            fi
-
-            lua - "$is_enabled" "$config_file" "$log_tail" << 'EOF'
-local json = require("luci.jsonc")
-local is_en = (arg[1] == "true")
-local cfg_path = arg[2]
-local l_tail = arg[3] or ""
-
-local int_h = 4
-local l_run = "Никогда"
-local l_stat = "unknown"
-
-local f = io.open(cfg_path, "r")
-if f then
-    local d = json.parse(f:read("*a"))
-    f:close()
-    if d then
-        int_h = tonumber(d.interval_hours) or 4
-        l_run = d.last_run or "Никогда"
-        l_stat = d.last_status or "unknown"
-    end
-end
-
-local res = {
-    success = true,
-    enabled = is_en,
-    interval_hours = int_h,
-    last_run = l_run,
-    last_status = l_stat,
-    log = l_tail
-}
-print(json.stringify(res))
-EOF
-            ;;
-
-        enable)
-            local interval="${arg2:-4}"
-            mkdir -p /etc/crontabs
-            touch "$cron_file"
-            sed -i '/blockcheckw-helper watchdog/d' "$cron_file"
-            echo "0 */$interval * * * /usr/bin/blockcheckw-helper watchdog run >/dev/null 2>&1" >> "$cron_file"
-            /etc/init.d/cron enable >/dev/null 2>&1
-            /etc/init.d/cron restart >/dev/null 2>&1
-
-            local now=$(date '+%Y-%m-%d %H:%M:%S')
-            cat <<EOF > "$config_file"
-{
-  "enabled": true,
-  "interval_hours": $interval,
-  "last_update": "$now",
-  "last_run": "Ожидание",
-  "last_status": "ok"
-}
-EOF
-            echo "[$now] [WATCHDOG] Авто-сторож Zapret2 активирован (интервал: каждые $interval ч.)." >> "$watchdog_log"
-            echo "{\"success\":true,\"enabled\":true,\"interval_hours\":$interval,\"message\":\"Авто-сторож успешно активирован (проверка каждые $interval ч.).\"}"
-            ;;
-
-        disable)
-            if [ -f "$cron_file" ]; then
-                sed -i '/blockcheckw-helper watchdog/d' "$cron_file"
-                /etc/init.d/cron restart >/dev/null 2>&1
-            fi
-
-            local now=$(date '+%Y-%m-%d %H:%M:%S')
-            if [ -f "$config_file" ]; then
-                sed -i 's/"enabled":\s*true/"enabled": false/' "$config_file"
-            fi
-            echo "[$now] [WATCHDOG] Авто-сторож Zapret2 отключен пользователем." >> "$watchdog_log"
-            echo "{\"success\":true,\"enabled\":false,\"message\":\"Авто-сторож отключен.\"}"
-            ;;
-
-        run)
-            local now=$(date '+%Y-%m-%d %H:%M:%S')
-            echo "[$now] [WATCHDOG] Начало плановой проверки доступности сервисов..." >> "$watchdog_log"
-
-            local zap_status=$(/etc/init.d/zapret2 status 2>/dev/null)
-            if [ -z "$zap_status" ] || [ "$zap_status" = "stopped" ]; then
-                echo "[$now] [ALERT] Служба Zapret2 остановлена! Запуск..." >> "$watchdog_log"
-                /etc/init.d/zapret2 start >/dev/null 2>&1
-                sleep 3
-            fi
-
-            local targets_to_check="preset_youtube preset_discord"
-            local overall_result="ok"
-
-            for t in $targets_to_check; do
-                local t_now=$(date '+%Y-%m-%d %H:%M:%S')
-                local test_out=$(cmd_test "$t" "" 2>/dev/null)
-                local is_ok=false
-                if echo "$test_out" | grep -q '"all_ok":true' || echo "$test_out" | grep -q '"accessible":true'; then
-                    is_ok=true
-                fi
-
-                local spd=$(echo "$test_out" | grep -o '"avg_speed_kbs":[0-9]*' | cut -d: -f2)
-                spd=${spd:-0}
-
-                if [ "$is_ok" = "true" ]; then
-                    echo "[$t_now] [OK] $t: доступен (скорость: ${spd} КБ/с)" >> "$watchdog_log"
-                else
-                    echo "[$t_now] [ALERT] $t: сервис ЗАБЛОКИРОВАН ТСПУ или недоступен!" >> "$watchdog_log"
-                    overall_result="alert"
-
-                    if is_scanner_running; then
-                        echo "[$t_now] [SKIP] Сканер уже выполняется, пропуск повторного запуска." >> "$watchdog_log"
-                    else
-                        echo "[$t_now] [HEAL] Запуск авто-подбора стратегии (Smart-Scan) для $t..." >> "$watchdog_log"
-                        /usr/bin/blockcheckw-helper start --target "$t" --smart --auto-apply >/dev/null 2>&1 &
-                        echo "[$t_now] [HEAL] Фоновый подбор для $t успешно запущен." >> "$watchdog_log"
-                    fi
-                fi
-            done
-
-            local end_now=$(date '+%Y-%m-%d %H:%M:%S')
-            echo "[$end_now] [WATCHDOG] Плановая проверка завершена (статус: $overall_result)." >> "$watchdog_log"
-
-            local cur_interval=4
-            if [ -f "$config_file" ]; then
-                local ci=$(grep -o '"interval_hours":[0-9]*' "$config_file" | cut -d: -f2)
-                [ -n "$ci" ] && cur_interval="$ci"
-            fi
-
-            cat <<EOF > "$config_file"
-{
-  "enabled": true,
-  "interval_hours": $cur_interval,
-  "last_run": "$end_now",
-  "last_status": "$overall_result"
-}
-EOF
-
-            echo "{\"success\":true,\"status\":\"$overall_result\",\"last_run\":\"$end_now\"}"
-            ;;
-
-        *)
-            echo "Usage: $0 watchdog {status|enable [hours]|disable|run}"
-            exit 1
-            ;;
-    esac
-}
-
 cmd_info() {
     ensure_all_hostlists
     local zapret_running=$(/etc/init.d/zapret2 status 2>/dev/null)
@@ -2665,6 +2507,8 @@ rm -f /usr/share/rpcd/acl.d/luci-app-blockcheckw.json
 rm -rf /www/luci-static/resources/view/blockcheckw
 
 rm -f /tmp/blockcheckw_*
+rm -f /etc/blockcheckw_watchdog.json /var/log/blockcheckw_watchdog.log
+sed -i '/watchdog/d' /etc/crontabs/root 2>/dev/null || true
 rm -f /var/run/blockcheckw.pid
 rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
 
@@ -2828,7 +2672,6 @@ case "$1" in
     delete_strategy) shift; cmd_delete_strategy "$@" ;;
     test) shift; cmd_test "$@" ;;
     speedtest) shift; cmd_speedtest "$@" ;;
-    watchdog) shift; cmd_watchdog "$@" ;;
     info) cmd_info ;;
     logs) shift; cmd_logs "$@" ;;
     check_update) cmd_check_update ;;
@@ -2837,7 +2680,7 @@ case "$1" in
     diag) shift; cmd_diag "$@" ;;
     ensure_hostlists) shift; cmd_ensure_hostlists "$@" ;;
     *)
-        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|speedtest|watchdog|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
+        echo "Usage: $0 {start|status|stop|apply|activate|delete_strategy|test|speedtest|info|logs|check_update|update|uninstall|diag|ensure_hostlists}"
         exit 1
         ;;
 esac

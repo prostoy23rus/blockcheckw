@@ -1,16 +1,16 @@
 {
-  "version": "0.16.0",
+  "version": "0.16.1",
   "release_date": "2026-11-06",
   "repo": "prostoy23rus/zapret2wizard",
   "branch": "main",
   "changelog": [
+    "Полное удаление фонового модуля Авто-сторожа (Watchdog) для максимального облегчения системы и устранения лишней нагрузки",
     "Официальный релиз Zapret2Wizard — самостоятельный автономный мастер обхода DPI",
     "Репозиторий стал полностью независимым (standalone) с сохранением всей истории и звёзд",
     "Обновлён интерфейс LuCI: мастер настройки стратегий Zapret2 (Zapret2Wizard)",
     "DPI Genetic Fingerprinting: адаптивная калибровка атак badsum, tcp_ts, hostfake, oob, seqovl, disorder",
     "Discord VoiceFlow: двухконтурный обход UDP STUN и WebRTC Voice (50000-65535, 19294-19344)",
     "Circular Assembler: 4-семейная ортогональная ротация с защитой от сбоев ТСПУ",
-    "Watchdog Daemon: фоновый авто-хилинг и самодиагностика демонов nfqws2",
     "Векторы Routerich 2026: интеграция tcp_md5, ip_autottl и fakeddisorder"
   ]
 }

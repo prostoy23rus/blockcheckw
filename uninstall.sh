@@ -86,6 +86,8 @@ rm -rf /www/luci-static/resources/view/blockcheckw
 
 echo -e "${BLUE}ℹ${NC} Очистка временных файлов и логов..."
 rm -f /tmp/blockcheckw_*
+rm -f /etc/blockcheckw_watchdog.json /var/log/blockcheckw_watchdog.log
+sed -i '/watchdog/d' /etc/crontabs/root 2>/dev/null || true
 rm -f /var/run/blockcheckw.pid
 
 # Опциональное удаление правила Reject-QUIC

@@ -43,23 +43,23 @@ fetch_file() {
         /etc/init.d/dnsmasq reload >/dev/null 2>&1 || true
     fi
 
-    # 1. jsDelivr Global CDN (Fastest, unblocked in Russia via Cloudflare edge)
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 2. Fastly jsDelivr CDN
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 3. GHProxy Mirror
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 4. Direct GitHub Raw fallback with --resolve
-    for gh_ip in 185.199.108.133 185.199.111.133; do
+    # 1. Direct GitHub Raw with --resolve (always 100% fresh, real-time)
+    for gh_ip in 185.199.108.133 185.199.111.133 185.199.109.133 185.199.110.133; do
         curl -fsSL -k --connect-timeout 2 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
         _save_download && return 0
     done
+
+    # 2. GHProxy Real-Time Mirror (No edge cache, queries GitHub live)
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 3. jsDelivr Global CDN Fallback
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
+
+    # 4. Fastly jsDelivr CDN Fallback
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    _save_download && return 0
 
     rm -f "$tmp_file"
     return 1
@@ -446,6 +446,14 @@ curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-des
 # --- Family 6: Out-of-Band (OOB) & SYN-Data Early Injection ---
 curl_test_https_tls13 ipv4 $domain : nfqws2 --in-range=-s1 --lua-desync=oob:urp=midsld
 curl_test_https_tls13 ipv4 $domain : nfqws2 --lua-desync=syndata --payload=tls_client_hello --lua-desync=multisplit:pos=1,midsld
+
+# --- Family 7: TCP MD5 Option & Auto-TTL Injection (Routerich 2026 Core) ---
+curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multisplit:pos=midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multisplit:pos=midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multidisorder:pos=midsld
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fakeddisorder:pos=midsld:tcp_md5
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:ip_autottl=-2,3-20:repeats=6
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=rst:ip_autottl=-2,3-20
 EOF
 
     # Family 7: Window Size Scaling (wssize) - STRICTLY for non-discord targets
@@ -516,7 +524,9 @@ generate_adaptive_corpus() {
             oob = false,
             syndata = false,
             wssize = false,
-            multisplit = false
+            multisplit = false,
+            tcp_md5 = false,
+            autottl = false
         }
 
         local f_fp = io.open("/tmp/blockcheckw_dpi_fingerprint.json", "r")
@@ -546,6 +556,8 @@ generate_adaptive_corpus() {
                 if al:find("syndata") then fams.syndata = true end
                 if al:find("wssize") then fams.wssize = true end
                 if al:find("multisplit") then fams.multisplit = true end
+                if al:find("tcp_md5") then fams.tcp_md5 = true end
+                if al:find("autottl") then fams.autottl = true end
             end
         end
 
@@ -651,6 +663,21 @@ generate_adaptive_corpus() {
                     add_cand(string.format("--lua-desync=wssize:wsize=1:%s --payload=tls_client_hello --lua-desync=multisplit:%s", scale, p))
                 end
             end
+        end
+
+        -- 8. Routerich 2026 Core: TCP MD5 Signature & Auto-TTL & Fakeddisorder
+        if fams.tcp_md5 or fams.autottl or fams.fake or not any_active then
+            for _, p in ipairs({ "pos=midsld", "pos=1,midsld", "pos=sld", "pos=1,midsld,1220" }) do
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multisplit:%s", p))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multidisorder:%s", p))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=blob_tls_clienthello_www_google_com:tcp_md5:repeats=6 --lua-desync=multisplit:%s", p))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:ip_autottl=-2,3-20:repeats=6 --lua-desync=multisplit:%s", p))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=fakeddisorder:%s:tcp_md5", p))
+            end
+            add_cand("--payload=tls_client_hello --lua-desync=rst:ip_autottl=-2,3-20")
+            add_cand("--payload=tls_client_hello --lua-desync=fakeddisorder:pos=midsld:tcp_md5")
+            add_cand("--payload=tls_client_hello --lua-desync=fakeddisorder:pos=1,midsld:tcp_md5")
+            add_cand("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6")
         end
 
         -- Deduplicate candidates
@@ -889,7 +916,9 @@ local fams = {
     oob = false,
     syndata = false,
     wssize = false,
-    multisplit = false
+    multisplit = false,
+    tcp_md5 = false,
+    autottl = false
 }
 
 local parsed = json.parse(content)
@@ -919,6 +948,8 @@ for _, s in ipairs(strats) do
         if al:find("syndata") then fams.syndata = true end
         if al:find("wssize") then fams.wssize = true end
         if al:find("multisplit") then fams.multisplit = true end
+        if al:find("tcp_md5") then fams.tcp_md5 = true end
+        if al:find("autottl") then fams.autottl = true end
     end
 end
 
@@ -932,7 +963,9 @@ local labels = {
     oob = "OOB Out-of-Band",
     syndata = "SYN-Data Early Injection",
     wssize = "Window Clamping (wssize)",
-    multisplit = "Multi-segmentation"
+    multisplit = "Multi-segmentation",
+    tcp_md5 = "TCP MD5 Option (Routerich)",
+    autottl = "Auto-TTL Calibration"
 }
 
 for k, active in pairs(fams) do

@@ -12,6 +12,10 @@ local function classify(strat)
         return "geneva"
     elseif strat:find("seqovl") then
         return "seqovl"
+    elseif strat:find("tcp_md5") then
+        return "tcp_md5"
+    elseif strat:find("autottl") or strat:find("ip_autottl") then
+        return "autottl"
     elseif strat:find("multidisorder") or strat:find("fakeddisorder") then
         return "multidisorder"
     elseif strat:find("fake:") or strat:find("badsum") or strat:find("tls_client_hello_clone") then
@@ -38,7 +42,7 @@ local function clean_strategy(line)
         line = line:sub(8)
     end
     -- Must contain --lua-desync or valid desync args
-    if not line:find("lua%-desync") and not line:find("multisplit") and not line:find("multidisorder") and not line:find("fake") and not line:find("oob") then
+    if not line:find("lua%-desync") and not line:find("multisplit") and not line:find("multidisorder") and not line:find("fake") and not line:find("oob") and not line:find("tcp_md5") and not line:find("autottl") then
         return nil
     end
     -- strip headers if attached anywhere in line
@@ -148,13 +152,13 @@ local function select_orthogonal(strategies, max_count, target)
     -- Slot 3: Packet Disordering vector
     try_add({ "multidisorder" })
 
-    -- Slot 4: Payload / Fake / OOB / Syndata / Clean Split vector
-    local slot4_fams = { "fake", "oob", "syndata", "multisplit" }
+    -- Slot 4: Routerich TCP MD5 / Auto-TTL / Fake / OOB / Syndata / Clean Split vector
+    local slot4_fams = { "tcp_md5", "autottl", "fake", "oob", "syndata", "multisplit" }
     if not is_discord then table.insert(slot4_fams, "wssize") end
     try_add(slot4_fams)
 
     -- Fallback pass: Pick from unused families
-    local all_fams = { "hostfake", "geneva", "seqovl", "multidisorder", "fake", "oob", "syndata", "multisplit" }
+    local all_fams = { "tcp_md5", "autottl", "hostfake", "geneva", "seqovl", "multidisorder", "fake", "oob", "syndata", "multisplit" }
     if not is_discord then table.insert(all_fams, "wssize") end
     table.insert(all_fams, "other")
 

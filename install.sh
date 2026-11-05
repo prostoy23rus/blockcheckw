@@ -44,20 +44,22 @@ fetch_file() {
         return 1
     }
 
-    # 1. Direct GitHub Raw
-    curl -fsSL -k --connect-timeout "$timeout" "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    # 1. Direct GitHub Raw with resolve
+    for gh_ip in 185.199.108.133 185.199.111.133 185.199.109.133 185.199.110.133; do
+        curl -fsSL -k --connect-timeout 2 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
+        _save_download && return 0
+    done
+
+    # 2. GHProxy Real-Time Mirror
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
-    # 2. jsDelivr Global CDN (Fast, unblocked in RU)
+    # 3. jsDelivr Global CDN Fallback
     curl -fsSL -k --connect-timeout "$timeout" "https://cdn.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
-    # 3. Fastly jsDelivr CDN
+    # 4. Fastly jsDelivr CDN Fallback
     curl -fsSL -k --connect-timeout "$timeout" "https://fastly.jsdelivr.net/gh/${REPO_OWNER}/${REPO_NAME}@main/$rel_path" -o "$tmp_file" 2>/dev/null
-    _save_download && return 0
-
-    # 4. GHProxy Mirror
-    curl -fsSL -k --connect-timeout "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
     rm -f "$tmp_file"

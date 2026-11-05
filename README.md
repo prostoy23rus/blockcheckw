@@ -1,15 +1,15 @@
-# BlockcheckW (Zapret2 Edition)
+# Zapret2Wizard (Zapret2 Edition)
 
-[![GitHub Release](https://img.shields.io/badge/Release-v0.15.25-00d1b2?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
+[![GitHub Release](https://img.shields.io/badge/Release-v0.16.0-00d1b2?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20|%2022.03%20|%2023.05%20|%2024.10%20|%2025.x%20|%20snapshot-blue?style=flat-square)](https://openwrt.org)
-[![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel%20|%20riscv64-success?style=flat-square)](https://github.com/prostoy23rus/blockcheckw)
+[![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel%20|%20riscv64-success?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 <p align="center">
   <img src="docs/images/luci_dashboard.png" alt="BlockcheckW LuCI Dashboard" width="950" />
 </p>
 
-**BlockcheckW** — интеллектуальный параллельный сканер и генетический оптимизатор DPI-стратегий для **Zapret2**, оснащённый современным адаптивным веб-интерфейсом **LuCI OpenWrt**, автономным самовосстанавливающимся сторожем (**Watchdog & Auto-Heal**), синтезом отказоустойчивых 4-слотовых **Circular-связок**, замером реальной скорости потокового видео и системой обновления в **1 клик** прямо из веб-панели роутера.
+**Zapret2Wizard** — интеллектуальный параллельный сканер и генетический оптимизатор DPI-стратегий для **Zapret2**, оснащённый современным адаптивным веб-интерфейсом **LuCI OpenWrt**, автономным самовосстанавливающимся сторожем (**Watchdog & Auto-Heal**), синтезом отказоустойчивых 4-слотовых **Circular-связок**, замером реальной скорости потокового видео и системой обновления в **1 клик** прямо из веб-панели роутера.
 
 ---
 
@@ -20,13 +20,13 @@
 Подключитесь к роутеру по SSH (например, `ssh root@192.168.1.1` или через пункт «Терминал» в LuCI) и выполните одну команду:
 
 ```bash
-sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh)"
+sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/install.sh)"
 ```
 
 > [!TIP]
 > **Если GitHub заблокирован провайдером:** используйте быстрое зеркало через глобальный CDN (не блокируется в РФ):
 > ```bash
-> sh -c "$(curl -sSL https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/install.sh)"
+> sh -c "$(curl -sSL https://cdn.jsdelivr.net/gh/prostoy23rus/zapret2wizard@main/install.sh)"
 > ```
 
 Скрипт автоматически:
@@ -34,7 +34,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 2. Установит недостающие системные зависимости (`curl`, `luci-compat`, `ca-bundle`).
 3. Загрузит скомпилированное Rust-ядро сканера, LuCI веб-интерфейс, генератор Circular-связок и автономного сторожа.
 4. Настроит правила межсетевого экрана (включая автоматическое отклонение QUIC `Reject-QUIC`).
-5. Сбросит кэш и мгновенно активирует интерфейс в меню роутера: **Службы ➔ BlockcheckW (Поиск стратегий)** (`http://192.168.1.1/cgi-bin/luci/admin/services/blockcheckw`).
+5. Сбросит кэш и мгновенно активирует интерфейс в меню роутера: **Службы ➔ Zapret2Wizard (Поиск стратегий)** (`http://192.168.1.1/cgi-bin/luci/admin/services/blockcheckw`).
 
 ---
 
@@ -102,7 +102,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 
 ### 7. Встроенная проверка и установка обновлений из GitHub в 1 клик
 * В шапке интерфейса отображается плашка текущей версии (например, `v0.15.24`) и кнопка проверки обновлений.
-* Служба напрямую запрашивает репозиторий `prostoy23rus/blockcheckw` на GitHub.
+* Служба напрямую запрашивает репозиторий `prostoy23rus/zapret2wizard` на GitHub.
 * При появлении новой версии в интерфейсе появляется уведомление со списком изменений и кнопкой **[ 🚀 Обновить из GitHub ]**.
 * Обновление компонентов, LuCI скриптов и сброс кэша происходят автоматически в один клик без ввода консольных команд!
 
@@ -129,7 +129,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 <details>
 <summary><b>Развернуть сравнительную таблицу возможностей (BlockcheckW vs zapret2-finder vs upstream)</b></summary>
 
-| Возможность / Параметр | Стандартный blockcheck2.sh | zapret2-finder (Bash) | blockcheckw (upstream rcd27) | **prostoy23rus/blockcheckw (v0.15.24)** |
+| Возможность / Параметр | Стандартный blockcheck2.sh | zapret2-finder (Bash) | blockcheckw (upstream rcd27) | **prostoy23rus/zapret2wizard (v0.15.24)** |
 | :--- | :---: | :---: | :---: | :---: |
 | **Движок** | Bash + curl | Bash + curl | Rust (компилируемый бинарник) | **Rust + LuCI + Lua + Shell** |
 | **Время поиска (Турбо)** | ❌ Нет (~60-90 мин) | ❌ Нет (~15-30 мин) | ❌ Нет (~2-5 мин) | ⚡ **10–15 секунд** |
@@ -181,7 +181,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 <details>
 <summary><b>Пошаговая инструкция по работе с LuCI веб-интерфейсом (развернуть)</b></summary>
 
-После установки откройте веб-интерфейс роутера: **Службы ➔ BlockcheckW (Поиск стратегий)**.
+После установки откройте веб-интерфейс роутера: **Службы ➔ Zapret2Wizard (Поиск стратегий)**.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -218,8 +218,8 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 
 ## 🔄 Обновление службы через LuCI
 
-В будущем, когда в репозиторий `prostoy23rus/blockcheckw` добавляются новые функции, исправления или пресеты:
-1. Зайдите на страницу **BlockcheckW (Поиск стратегий)**.
+В будущем, когда в репозиторий `prostoy23rus/zapret2wizard` добавляются новые функции, исправления или пресеты:
+1. Зайдите на страницу **Zapret2Wizard (Поиск стратегий)**.
 2. В шапке интерфейса отображается актуальный статус версии.
 3. При появлении новой версии в интерфейсе появится баннер со списком изменений и кнопкой **[ 🚀 Обновить из GitHub ]**.
 4. Нажмите **[ 🚀 Обновить из GitHub ]**. Система скачает актуальные файлы, обновит LuCI и автоматически перезагрузит страницу через 3 секунды.
@@ -342,7 +342,7 @@ blockcheckw status -d youtube.com -d discord.com -d rutracker.org
 Если вы решите удалить BlockcheckW и веб-интерфейс с роутера, это можно сделать любым удобным способом:
 
 ### Способ 1. Через веб-интерфейс LuCI (в 1 клик)
-1. Откройте веб-интерфейс роутера: **Службы ➔ BlockcheckW (Поиск стратегий)**.
+1. Откройте веб-интерфейс роутера: **Службы ➔ Zapret2Wizard (Поиск стратегий)**.
 2. В правом верхнем углу шапки нажмите кнопку **[ 🗑 Удалить службу ]**.
 3. Подтвердите действие в диалоговом окне. Служба автоматически удалит все компоненты, сбросит кэш LuCI и перенаправит вас на страницу общего статуса роутера.
 
@@ -350,12 +350,12 @@ blockcheckw status -d youtube.com -d discord.com -d rutracker.org
 Подключитесь к роутеру по SSH и выполните команду деинсталляции:
 
 ```bash
-sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/uninstall.sh)"
+sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/uninstall.sh)"
 ```
 
 Также поддерживается запуск деинсталлятора через единый скрипт установки:
 ```bash
-sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/install.sh)" -- --uninstall
+sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/install.sh)" -- --uninstall
 ```
 
 Или локально через встроенный хелпер:
@@ -374,11 +374,11 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 
 Мы активно развиваем проект и приветствуем любые отзывы, сообщения об ошибках и идеи по развитию!
 
-* 🐛 **[Сообщить об ошибке (Bug Report)](https://github.com/prostoy23rus/blockcheckw/issues/new?template=bug_report.yml)**  
+* 🐛 **[Сообщить об ошибке (Bug Report)](https://github.com/prostoy23rus/zapret2wizard/issues/new?template=bug_report.yml)**  
   Если сканер завис, стратегия не применилась, веб-интерфейс отображается некорректно или возникла ошибка — создайте тикет с логами из вкладки «Мониторинг и логи службы».
-* 💡 **[Предложить идею или улучшение (Feature Request)](https://github.com/prostoy23rus/blockcheckw/issues/new?template=feature_request.yml)**  
+* 💡 **[Предложить идею или улучшение (Feature Request)](https://github.com/prostoy23rus/zapret2wizard/issues/new?template=feature_request.yml)**  
   Хотите добавить новый пресет сервиса, предложить оптимизацию алгоритма Circular или улучшение дизайна LuCI? Опишите вашу идею!
-* 💬 **[Обсуждения сообщества (GitHub Discussions)](https://github.com/prostoy23rus/blockcheckw/discussions)**  
+* 💬 **[Обсуждения сообщества (GitHub Discussions)](https://github.com/prostoy23rus/zapret2wizard/discussions)**  
   Задавайте вопросы, делитесь рабочими Circular-связками под своего провайдера и обсуждайте актуальные методы обхода DPI.
 
 ---
@@ -387,6 +387,6 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/blockcheckw/ma
 
 * **Оригинальный zapret2**: автор [bol-van](https://github.com/bol-van/zapret2).
 * **Upstream blockcheckw**: [rcd27/blockcheckw](https://github.com/rcd27/blockcheckw).
-* **Модификация, LuCI интерфейс, Генетический Circular-синтез, Авто-сторож и Speedtest**: [prostoy23rus](https://github.com/prostoy23rus/blockcheckw).
+* **Модификация, LuCI интерфейс, Генетический Circular-синтез, Авто-сторож и Speedtest**: [prostoy23rus](https://github.com/prostoy23rus/zapret2wizard).
 
 Лицензия: [MIT License](LICENSE).

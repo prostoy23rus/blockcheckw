@@ -1,7 +1,7 @@
 #!/bin/sh
 # ==============================================================================
-# BlockcheckW & LuCI Universal Uninstaller for OpenWrt
-# Repository: https://github.com/prostoy23rus/blockcheckw
+# Zapret2Wizard & LuCI Universal Uninstaller for OpenWrt
+# Repository: https://github.com/prostoy23rus/zapret2wizard
 # ==============================================================================
 
 set -e
@@ -28,14 +28,15 @@ for arg in "$@"; do
 done
 
 echo -e "${RED}${BOLD}"
-echo "  ____  _            _        _               _    __        __"
-echo " | __ )| | ___   ___| | _____| |__   ___  ___| | __\ \      / /"
-echo " |  _ \| |/ _ \ / __| |/ / __| '_ \ / _ \/ __| |/ / \ \ /\ / / "
-echo " | |_) | | (_) | (__|   < (__| | | |  __/ (__|   <   \ V  V /  "
-echo " |____/|_|\___/ \___|_|\_\___|_| |_|\___|\___|_|\_\   \_/\_/   "
+echo "  _____                  _   ___  __          ___                  _ "
+echo " |__  / __ _ _ __  _ __ ___| |_|__ \ \ \        / (_)______ _ _ __ __| |"
+echo "   / / / _\` | '_ \| '__/ _ \ __| / /  \ \  /\  / /| |_  / _\` | '__/ _\` |"
+echo "  / /_| (_| | |_) | | |  __/ |_ / /_   \ \/  \/ / | |/ / (_| | | | (_| |"
+echo " /____|\__,_| .__/|_|  \___|\__|____|   \__/\__/  |_/___\__,_|_|  \__,_|"
+echo "            |_|                                                         "
 echo -e "${NC}"
-echo -e "${BOLD}Деинсталлятор службы BlockcheckW и LuCI интерфейса${NC}"
-echo -e "Репозиторий: ${BLUE}https://github.com/prostoy23rus/blockcheckw${NC}\n"
+echo -e "${BOLD}Деинсталлятор службы Zapret2Wizard и LuCI интерфейса${NC}"
+echo -e "Репозиторий: ${BLUE}https://github.com/prostoy23rus/zapret2wizard${NC}\n"
 
 # 1. Проверка root прав
 if [ "$(id -u)" -ne 0 ]; then
@@ -56,7 +57,7 @@ if [ "$AUTO_YES" -eq 0 ]; then
     echo -e "${GREEN}✓ Конфигурация Zapret2 (/etc/config/zapret2) будет сохранена,${NC}"
     echo -e "  чтобы ваши настроенные стратегии десинка продолжали работать."
     echo ""
-    printf "Вы действительно хотите удалить BlockcheckW? [y/N]: "
+    printf "Вы действительно хотите удалить Zapret2Wizard? [y/N]: "
     read -r CONFIRM
     case "$CONFIRM" in
         y|Y|yes|YES) ;;
@@ -74,6 +75,7 @@ killall -9 blockcheckw-helper 2>/dev/null || true
 echo -e "${BLUE}ℹ${NC} Удаление исполняемых файлов и библиотек..."
 rm -f /usr/bin/blockcheckw
 rm -f /usr/bin/blockcheckw-helper
+rm -f /usr/bin/zapret2wizard
 rm -f /usr/bin/circular-builder.lua
 rm -rf /usr/share/blockcheckw
 
@@ -122,5 +124,5 @@ rm -rf /tmp/luci-indexcache* /tmp/luci-modulecache*
 ubus call luci reload >/dev/null 2>&1 || true
 
 echo -e "\n${GREEN}${BOLD}==============================================================================${NC}"
-echo -e "${GREEN}${BOLD}       BlockcheckW и интерфейс LuCI успешно удалены с роутера!                ${NC}"
+echo -e "${GREEN}${BOLD}       Zapret2Wizard и интерфейс LuCI успешно удалены с роутера!                ${NC}"
 echo -e "${GREEN}${BOLD}==============================================================================${NC}\n"

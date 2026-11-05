@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.lua text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+blockcheckw-helper text eol=lf

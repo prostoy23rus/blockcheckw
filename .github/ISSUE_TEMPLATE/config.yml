@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: "💬 Обсуждения сообщества (GitHub Discussions)"
-    url: "https://github.com/prostoy23rus/blockcheckw/discussions"
+    url: "https://github.com/prostoy23rus/zapret2wizard/discussions"
     about: "Задайте вопрос, поделитесь своими рабочими Circular-стратегиями или обсудите работу DPI в вашем регионе."
   - name: "⚡ Быстрые вопросы и идеи"
-    url: "https://github.com/prostoy23rus/blockcheckw/issues/new?template=feature_request.yml"
+    url: "https://github.com/prostoy23rus/zapret2wizard/issues/new?template=feature_request.yml"
     about: "Предложить новый пресет для сервиса или новую фичу для интерфейса LuCI."

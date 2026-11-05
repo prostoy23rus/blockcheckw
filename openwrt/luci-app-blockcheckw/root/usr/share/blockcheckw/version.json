@@ -1,13 +1,16 @@
 {
-  "version": "0.15.28",
-  "release_date": "2026-11-02",
-  "repo": "prostoy23rus/blockcheckw",
+  "version": "0.16.0",
+  "release_date": "2026-11-06",
+  "repo": "prostoy23rus/zapret2wizard",
   "branch": "main",
   "changelog": [
-    "Внедрение ядра Routerich 2026: интеграция передовых векторов обхода ТСПУ (tcp_md5, ip_autottl=-2,3-20, fakeddisorder)",
-    "Вектор аппаратной опции TCP MD5 (RFC 2385) для мгновенного сброса фейков целевым сервером без реакции ТСПУ",
-    "Интеллектуальная калибровка Auto-TTL (ip_autottl) для прецизионного отсечения пакетов перед сервером",
-    "Поддержка гибридного desync fakeddisorder в Circular-ротации (4-й ортогональный слот защиты)",
-    "Обновлены проверенные турбо-стратегии для YouTube, Twitch и встроенных хостов"
+    "Официальный релиз Zapret2Wizard — самостоятельный автономный мастер обхода DPI",
+    "Репозиторий стал полностью независимым (standalone) с сохранением всей истории и звёзд",
+    "Обновлён интерфейс LuCI: мастер настройки стратегий Zapret2 (Zapret2Wizard)",
+    "DPI Genetic Fingerprinting: адаптивная калибровка атак badsum, tcp_ts, hostfake, oob, seqovl, disorder",
+    "Discord VoiceFlow: двухконтурный обход UDP STUN и WebRTC Voice (50000-65535, 19294-19344)",
+    "Circular Assembler: 4-семейная ортогональная ротация с защитой от сбоев ТСПУ",
+    "Watchdog Daemon: фоновый авто-хилинг и самодиагностика демонов nfqws2",
+    "Векторы Routerich 2026: интеграция tcp_md5, ip_autottl и fakeddisorder"
   ]
 }

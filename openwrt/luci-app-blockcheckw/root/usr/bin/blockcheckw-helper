@@ -13,7 +13,7 @@ PRESETS_FILE="/usr/share/blockcheckw/zapret2_presets.json"
 CIRCULAR_BUILDER="/usr/bin/circular-builder.lua"
 
 VERSION_FILE="/usr/share/blockcheckw/version.json"
-REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main"
+REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main"
 
 fetch_file() {
     local rel_path="$1"
@@ -45,20 +45,20 @@ fetch_file() {
 
     # 1. Direct GitHub Raw with --resolve (always 100% fresh, real-time)
     for gh_ip in 185.199.108.133 185.199.111.133 185.199.109.133 185.199.110.133; do
-        curl -fsSL -k --connect-timeout 2 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
+        curl -fsSL -k --connect-timeout 2 -m "$timeout" --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/$rel_path" -o "$tmp_file" 2>/dev/null
         _save_download && return 0
     done
 
     # 2. GHProxy Real-Time Mirror (No edge cache, queries GitHub live)
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/$rel_path" -o "$tmp_file" 2>/dev/null
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://ghproxy.net/https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
     # 3. jsDelivr Global CDN Fallback
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://cdn.jsdelivr.net/gh/prostoy23rus/zapret2wizard@main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
     # 4. Fastly jsDelivr CDN Fallback
-    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/$rel_path" -o "$tmp_file" 2>/dev/null
+    curl -fsSL -k --connect-timeout 3 -m "$timeout" "https://fastly.jsdelivr.net/gh/prostoy23rus/zapret2wizard@main/$rel_path" -o "$tmp_file" 2>/dev/null
     _save_download && return 0
 
     rm -f "$tmp_file"
@@ -2479,7 +2479,7 @@ cmd_check_update() {
 
     # 1. Direct GitHub Raw first (bypasses CDN edge cache, always fresh)
     for gh_ip in 185.199.108.133 185.199.111.133 185.199.109.133 185.199.110.133; do
-        curl -fsSL -k --connect-timeout 2 -m 4 --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main/openwrt/version.json?_t=$(date +%s)" -o "$tmp_ver" 2>/dev/null
+        curl -fsSL -k --connect-timeout 2 -m 4 --resolve "raw.githubusercontent.com:443:$gh_ip" "https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main/openwrt/version.json?_t=$(date +%s)" -o "$tmp_ver" 2>/dev/null
         if [ -s "$tmp_ver" ] && ! head -n 3 "$tmp_ver" | grep -qiE '404|not found|<html>'; then
             break
         fi
@@ -2488,7 +2488,7 @@ cmd_check_update() {
 
     # 2. If direct GitHub was unreachable, purge jsDelivr and fetch via mirrors
     if [ ! -s "$tmp_ver" ]; then
-        curl -fsSL -k --connect-timeout 2 -m 3 "https://purge.jsdelivr.net/gh/prostoy23rus/blockcheckw@main/openwrt/version.json" >/dev/null 2>&1 || true
+        curl -fsSL -k --connect-timeout 2 -m 3 "https://purge.jsdelivr.net/gh/prostoy23rus/zapret2wizard@main/openwrt/version.json" >/dev/null 2>&1 || true
         fetch_file "openwrt/version.json" "$tmp_ver" 5
     fi
 
@@ -2576,7 +2576,7 @@ local res = {
     has_update = has_update,
     changelog = rem.changelog or local_cl,
     release_date = rem.release_date or "",
-    repo = rem.repo or "prostoy23rus/blockcheckw"
+    repo = rem.repo or "prostoy23rus/zapret2wizard"
 }
 print(json.stringify(res))
 EOF
@@ -2617,6 +2617,7 @@ cmd_update() {
     # Install files atomically
     cp -f "$tmp_dir/blockcheckw-helper" /usr/bin/blockcheckw-helper
     cp -f "$tmp_dir/circular-builder.lua" /usr/bin/circular-builder.lua
+    ln -sf /usr/bin/blockcheckw-helper /usr/bin/zapret2wizard 2>/dev/null || true
     cp -f "$tmp_dir/main.js" /www/luci-static/resources/view/blockcheckw/main.js
     cp -f "$tmp_dir/zapret2_presets.json" /usr/share/blockcheckw/zapret2_presets.json
     cp -f "$tmp_dir/version.json" /usr/share/blockcheckw/version.json
@@ -2656,6 +2657,7 @@ killall -9 blockcheckw-helper 2>/dev/null || true
 
 rm -f /usr/bin/blockcheckw
 rm -f /usr/bin/blockcheckw-helper
+rm -f /usr/bin/zapret2wizard
 rm -f /usr/bin/circular-builder.lua
 rm -rf /usr/share/blockcheckw
 rm -f /usr/share/luci/menu.d/luci-app-blockcheckw.json
@@ -2762,12 +2764,12 @@ end
 
 local report_lines = {
     "============================================================",
-    "  BLOCKCHECKW DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
+    "  ZAPRET2WIZARD DIAGNOSTIC REPORT (RouteRich / OpenWrt)",
     "============================================================",
     "Date:        " .. date_str,
     "Device:      " .. model_str,
     "Kernel/Arch: " .. uname_str,
-    "BlockcheckW: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
+    "Zapret2Wizard: App v" .. app_version .. " | Binary: " .. (bcw_ver ~= "" and bcw_ver or "NOT FOUND"),
     "Binary Path: " .. (bcw_bin ~= "" and bcw_bin or "N/A") .. " (size: " .. bcw_size .. ", md5: " .. bcw_md5 .. ")",
     "",
     "--- OpenWrt Release Info ---",

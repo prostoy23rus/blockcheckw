@@ -688,7 +688,7 @@ return view.extend({
 
 		var btnFeedback = E('a', {
 			class: 'bcw-header-item bcw-header-btn',
-			href: 'https://github.com/prostoy23rus/blockcheckw/issues',
+			href: 'https://github.com/prostoy23rus/zapret2wizard/issues',
 			target: '_blank',
 			title: 'Сообщить об ошибке или предложить улучшение на GitHub'
 		}, [
@@ -699,7 +699,7 @@ return view.extend({
 		var btnUninstall = E('button', {
 			class: 'bcw-header-item bcw-header-btn',
 			style: 'color: #e06c75;',
-			title: 'Полностью удалить BlockcheckW с роутера',
+			title: 'Полностью удалить Zapret2Wizard с роутера',
 			click: function() { confirmUninstall(); }
 		}, [
 			E('span', {}, '🗑'),
@@ -721,7 +721,7 @@ return view.extend({
 			E('div', { style: 'display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;' }, [
 				E('div', {}, [
 					E('h2', { class: 'bcw-header-title', style: 'margin: 0; font-size: 21px; display: flex; align-items: center; gap: 8px;' }, [
-						'⚡ BlockcheckW — Поиск стратегий Zapret2'
+						'⚡ Zapret2Wizard — Мастер автономного обхода DPI (Zapret2)'
 					]),
 					E('div', { class: 'bcw-header-sub', style: 'font-size: 13px; opacity: 0.8; margin-top: 4px;' }, [
 						'Быстрый подбор рабочих параметров DPI для роутера, сборка отказоустойчивых Circular-связок и внедрение в 1 клик.'
@@ -2797,7 +2797,7 @@ return view.extend({
 			var ver = info.current_version || '0.15.1';
 			var date = info.current_release_date || info.release_date || '31.10.2026';
 			var list = formatChangelogList(info.current_changelog || info.changelog);
-			var title = isPostUpdate ? ('🎉 Служба успешно обновлена до v' + ver + '!') : ('Что нового в BlockcheckW v' + ver);
+			var title = isPostUpdate ? ('🎉 Служба успешно обновлена до v' + ver + '!') : ('Что нового в Zapret2Wizard v' + ver);
 
 			bcwShowModal(title, [
 				E('div', { style: 'border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 14px;' }, [
@@ -2805,7 +2805,7 @@ return view.extend({
 						isPostUpdate ? '🚀 Обновление успешно установлено' : ('🎉 Релиз v' + ver),
 						E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, 'v' + ver)
 					]),
-					E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 4px;' }, 'Дата релиза: ' + date + ' • Репозиторий: ' + (info.repo || 'prostoy23rus/blockcheckw') + ' (ветка main)')
+					E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 4px;' }, 'Дата релиза: ' + date + ' • Репозиторий: ' + (info.repo || 'prostoy23rus/zapret2wizard') + ' (ветка main)')
 				]),
 				E('div', { style: 'font-size: 14px; font-weight: bold; color: #61afef; margin-bottom: 8px;' }, '📋 Список внесённых изменений и нововведений:'),
 				E('ul', { style: 'list-style: none; padding: 12px 14px; margin: 0 0 16px 0; max-height: 320px; overflow-y: auto; background: rgba(0,0,0,0.25); border-radius: 6px; border: 1px solid #383e4a;' }, list),
@@ -2829,14 +2829,14 @@ return view.extend({
 		};
 
 		function confirmRunUpdate(targetVer) {
-			bcwShowModal('Обновление службы BlockcheckW', [
+			bcwShowModal('Обновление службы Zapret2Wizard', [
 				E('div', { style: 'margin-bottom: 14px;' }, [
 					E('div', { style: 'font-size: 16px; font-weight: bold; color: #00d1b2; display: flex; align-items: center; gap: 8px;' }, [
 						'🚀 Доступна новая версия: v' + targetVer,
 						E('span', { class: 'badge cbi-color-blue', style: 'font-size: 11px;' }, 'v' + curVer + ' ➔ v' + targetVer)
 					]),
 					E('p', { style: 'margin-top: 10px; color: #e5e9f0; line-height: 1.5;' },
-						'Обновить службу BlockcheckW до версии v' + targetVer + ' прямо сейчас? Все настроенные стратегии в Zapret2 будут сохранены.'
+						'Обновить службу Zapret2Wizard до версии v' + targetVer + ' прямо сейчас? Все настроенные стратегии в Zapret2 будут сохранены.'
 					)
 				])
 			], [
@@ -2859,7 +2859,7 @@ return view.extend({
 			updateBannerCard.innerHTML = '';
 			var nextVer = info.latest_version || 'новой версии';
 			var releaseDate = info.release_date ? ' (' + info.release_date + ')' : '';
-			var repoName = info.repo || 'prostoy23rus/blockcheckw';
+			var repoName = info.repo || 'prostoy23rus/zapret2wizard';
 
 			var changelogNodes = [];
 			var rawList = info.changelog || [];
@@ -2948,7 +2948,7 @@ return view.extend({
 				updateBannerCard.style.display = 'none';
 
 				if (isManual) {
-					ui.addNotification(null, E('p', {}, '✓ У вас установлена последняя версия BlockcheckW (v' + (parsed.current_version || curVer) + '). Обновлений не требуется.'), 'info');
+					ui.addNotification(null, E('p', {}, '✓ У вас установлена последняя версия Zapret2Wizard (v' + (parsed.current_version || curVer) + '). Обновлений не требуется.'), 'info');
 				}
 			}
 		}
@@ -2969,7 +2969,7 @@ return view.extend({
 			});
 		}
 		function doRunUpdate(targetVer) {
-			bcwShowModal('Обновление службы BlockcheckW', [
+			bcwShowModal('Обновление службы Zapret2Wizard', [
 				E('p', { class: 'spinning', style: 'font-size: 14px; font-weight: bold;' }, 'Загрузка свежих файлов из GitHub и обновление...'),
 				E('div', { style: 'font-size: 12px; color: #abb2bf; margin-top: 10px; line-height: 1.6;' }, [
 					'1. Загрузка обновленного скрипта управления и LuCI интерфейса',
@@ -3108,8 +3108,8 @@ return view.extend({
 		}
 
 		function confirmUninstall() {
-			bcwShowModal('Удаление BlockcheckW с роутера', [
-				E('p', { style: 'font-weight: bold; color: #ff3860; font-size: 14px;' }, '⚠️ Вы действительно хотите полностью удалить BlockcheckW с роутера?'),
+			bcwShowModal('Удаление Zapret2Wizard с роутера', [
+				E('p', { style: 'font-weight: bold; color: #ff3860; font-size: 14px;' }, '⚠️ Вы действительно хотите полностью удалить Zapret2Wizard с роутера?'),
 				E('div', { style: 'margin: 12px 0; font-size: 13px; line-height: 1.5; color: #abb2bf;' }, [
 					E('p', {}, 'Будут полностью удалены:'),
 					E('ul', { style: 'margin-left: 20px; margin-top: 6px;' }, [
@@ -3132,7 +3132,7 @@ return view.extend({
 						ui.hideModal();
 						doUninstallService();
 					}
-				}, '🗑 Да, удалить BlockcheckW')
+				}, '🗑 Да, удалить Zapret2Wizard')
 			]);
 		}
 
@@ -3146,7 +3146,7 @@ return view.extend({
 				try { parsed = JSON.parse(res.stdout); } catch(e) {}
 				if (parsed && parsed.success) {
 					bcwShowModal('Удаление завершено', [
-						E('p', { style: 'color: #00d1b2; font-weight: bold; font-size: 15px;' }, '✓ ' + (parsed.message || 'BlockcheckW успешно удалён с роутера!')),
+						E('p', { style: 'color: #00d1b2; font-weight: bold; font-size: 15px;' }, '✓ ' + (parsed.message || 'Zapret2Wizard успешно удалён с роутера!')),
 						E('p', { style: 'font-size: 13px; margin-top: 8px;' }, 'Сейчас вы будете перенаправлены на главную страницу OpenWrt...')
 					]);
 					setTimeout(function() {
@@ -3166,7 +3166,7 @@ return view.extend({
 		try {
 			if (localStorage.getItem('bcw_just_updated') === '1') {
 				localStorage.removeItem('bcw_just_updated');
-				ui.addNotification(null, E('p', {}, '✓ Служба BlockcheckW успешно обновлена до актуальной версии!'), 'info');
+				ui.addNotification(null, E('p', {}, '✓ Служба Zapret2Wizard успешно обновлена до актуальной версии!'), 'info');
 			}
 		} catch(e) {}
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 # ==============================================================================
-# BlockcheckW & LuCI Universal Installer for OpenWrt
-# Repository: https://github.com/prostoy23rus/blockcheckw
+# Zapret2Wizard & LuCI Universal Installer for OpenWrt
+# Repository: https://github.com/prostoy23rus/zapret2wizard
 # Supported OpenWrt: 21.02, 22.03, 23.05, 24.10, 25.x, snapshot (opkg & apk)
 # ==============================================================================
 
@@ -16,9 +16,9 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/blockcheckw/main"
+REPO_RAW="https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/main"
 REPO_OWNER="prostoy23rus"
-REPO_NAME="blockcheckw"
+REPO_NAME="zapret2wizard"
 UPSTREAM_OWNER="rcd27"
 
 # Multi-mirror downloader function (GitHub Raw + jsDelivr Global CDN + Fastly + GHProxy)
@@ -67,13 +67,14 @@ fetch_file() {
 }
 
 echo -e "${CYAN}${BOLD}"
-echo "  ____  _            _        _               _    __        __"
-echo " | __ )| | ___   ___| | _____| |__   ___  ___| | __\ \      / /"
-echo " |  _ \| |/ _ \ / __| |/ / __| '_ \ / _ \/ __| |/ / \ \ /\ / / "
-echo " | |_) | | (_) | (__|   < (__| | | |  __/ (__|   <   \ V  V /  "
-echo " |____/|_|\___/ \___|_|\_\___|_| |_|\___|\___|_|\_\   \_/\_/   "
+echo "  _____                  _   ___  __          ___                  _ "
+echo " |__  / __ _ _ __  _ __ ___| |_|__ \ \ \        / (_)______ _ _ __ __| |"
+echo "   / / / _\` | '_ \| '__/ _ \ __| / /  \ \  /\  / /| |_  / _\` | '__/ _\` |"
+echo "  / /_| (_| | |_) | | |  __/ |_ / /_   \ \/  \/ / | |/ / (_| | | | (_| |"
+echo " /____|\__,_| .__/|_|  \___|\__|____|   \__/\__/  |_/___\__,_|_|  \__,_|"
+echo "            |_|                                                         "
 echo -e "${NC}"
-echo -e "${BOLD}Универсальный установщик BlockcheckW и LuCI интерфейса для OpenWrt${NC}"
+echo -e "${BOLD}Zapret2Wizard — Универсальный мастер и LuCI интерфейс для OpenWrt${NC}"
 echo -e "Репозиторий: ${BLUE}https://github.com/${REPO_OWNER}/${REPO_NAME}${NC}\n"
 
 # Проверка режима деинсталляции
@@ -261,6 +262,7 @@ fetch_file "openwrt/luci-app-blockcheckw/root/usr/share/rpcd/acl.d/luci-app-bloc
 fetch_file "openwrt/luci-app-blockcheckw/root/www/luci-static/resources/view/blockcheckw/main.js" /www/luci-static/resources/view/blockcheckw/main.js 8
 
 chmod +x /usr/bin/blockcheckw-helper /usr/bin/circular-builder.lua
+    ln -sf /usr/bin/blockcheckw-helper /usr/bin/zapret2wizard 2>/dev/null || true
 chmod 644 /www/luci-static/resources/view/blockcheckw/main.js
 chmod 644 /usr/share/blockcheckw/* /usr/share/luci/menu.d/luci-app-blockcheckw.json /usr/share/rpcd/acl.d/luci-app-blockcheckw.json 2>/dev/null || true
 

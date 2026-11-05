@@ -949,6 +949,47 @@ return view.extend({
 			E('span', {}, 'Проверить доступность')
 		]);
 
+		var btnSpeedTest = E('button', {
+			class: 'bcw-action-btn bcw-action-btn-speed',
+			title: 'Замер реальной скорости потокового видео и выявление DPI-троттлинга',
+			click: function() { runSpeedTest(); }
+		}, [
+			E('span', {}, '⚡'),
+			E('span', {}, 'Замер скорости')
+		]);
+
+		var actionsGridEl = E('div', { class: 'bcw-actions-grid' }, [
+			btnStartScan,
+			btnStopScan,
+			btnTestConn,
+			btnSpeedTest
+		]);
+
+		// Active Strategy Inspector Card
+		var activeTargetTitleEl = E('span', { style: 'color: #3273dc; font-weight: bold;' }, 'YouTube');
+		var activeMetaBadgesEl = E('div', { style: 'display: flex; flex-wrap: wrap; gap: 8px; align-items: center;' }, '');
+		var activeCodeEl = E('pre', { class: 'bcw-code-box', style: 'max-height: 220px;' }, '');
+
+		var btnCopyActive = E('button', {
+			type: 'button',
+			class: 'bcw-btn-sm cbi-button cbi-button-neutral',
+			style: 'height: 30px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;',
+			click: function(e) {
+				if (e && e.stopPropagation) e.stopPropagation();
+				copyActiveStrategy();
+			}
+		}, '📋 Скопировать');
+
+		var versionsSelectEl = E('select', {
+			class: 'bcw-select',
+			style: 'width: 100%; max-width: 320px; height: 32px; font-size: 12px; padding: 0 10px;',
+			change: function(e) {
+				var sec = e.target.value;
+				if (!sec) return;
+				selectSavedVersion(sec);
+			}
+		});
+
 		var btnActivateVersion = E('button', {
 			class: 'bcw-btn-sm cbi-button cbi-button-action',
 			style: 'height: 32px; font-size: 12px; display: none; font-weight: bold; align-items: center; justify-content: center; gap: 6px;',

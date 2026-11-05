@@ -1,12 +1,12 @@
 # Zapret2Wizard (Zapret2 Edition)
 
-[![GitHub Release](https://img.shields.io/badge/Release-v0.16.0-00d1b2?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
+[![GitHub Release](https://img.shields.io/badge/Release-v0.16.1-00d1b2?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20|%2022.03%20|%2023.05%20|%2024.10%20|%2025.x%20|%20snapshot-blue?style=flat-square)](https://openwrt.org)
 [![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel%20|%20riscv64-success?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 <p align="center">
-  <img src="docs/images/luci_dashboard.png" alt="BlockcheckW LuCI Dashboard" width="950" />
+  <img src="docs/images/luci_dashboard.png" alt="Zapret2Wizard LuCI Dashboard" width="950" />
 </p>
 
 **Zapret2Wizard** — интеллектуальный параллельный сканер и генетический оптимизатор DPI-стратегий для **Zapret2**, оснащённый современным адаптивным веб-интерфейсом **LuCI OpenWrt**, синтезом отказоустойчивых 4-слотовых **Circular-связок**, двухконтурным обходом **Discord VoiceFlow**, замером реальной скорости потокового видео и системой обновления в **1 клик** прямо из веб-панели роутера.
@@ -32,13 +32,13 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 Скрипт автоматически:
 1. Определит архитектуру процессора (`aarch64`, `x86_64`, `arm_cortex-a7`, `mipsel_24kc` и др.).
 2. Установит недостающие системные зависимости (`curl`, `luci-compat`, `ca-bundle`).
-3. Загрузит скомпилированное Rust-ядро сканера, LuCI веб-интерфейс, генератор Circular-связок и автономного сторожа.
+3. Загрузит скомпилированное Rust-ядро сканера, LuCI веб-интерфейс и генератор Circular-связок.
 4. Настроит правила межсетевого экрана (включая автоматическое отклонение QUIC `Reject-QUIC`).
 5. Сбросит кэш и мгновенно активирует интерфейс в меню роутера: **Службы ➔ Zapret2Wizard (Поиск стратегий)** (`http://192.168.1.1/cgi-bin/luci/admin/services/blockcheckw`).
 
 ---
 
-## 🚀 Ключевые возможности и архитектура (v0.15.24)
+## 🚀 Ключевые возможности и архитектура (v0.16.1)
 
 Данный репозиторий представляет собой глубокую модернизацию и автономную эволюцию оригинального проекта `rcd27/blockcheckw`:
 
@@ -90,7 +90,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 * Результат готов практически мгновенно! Если же провайдер использует нестандартную блокировку, одним кликом доступен «Глубокий скан» (полный параллельный перебор корпуса).
 
 ### 6. Встроенная проверка и установка обновлений из GitHub в 1 клик
-* В шапке интерфейса отображается плашка текущей версии (например, `v0.15.24`) и кнопка проверки обновлений.
+* В шапке интерфейса отображается плашка текущей версии (например, `v0.16.1`) и кнопка проверки обновлений.
 * Служба напрямую запрашивает репозиторий `prostoy23rus/zapret2wizard` на GitHub.
 * При появлении новой версии в интерфейсе появляется уведомление со списком изменений и кнопкой **[ 🚀 Обновить из GitHub ]**.
 * Обновление компонентов, LuCI скриптов и сброс кэша происходят автоматически в один клик без ввода консольных команд!
@@ -102,7 +102,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 * **Контрольная проверка доступности (curl)**: кнопка **[ 🌐 Проверить доступность ]** выполняет точечный контрольный замер выбранного сервиса с выводом HTTP-кода ответа (`HTTP 200/301/302`).
 
 ### 8. Интерактивный терминал и логи службы в реальном времени
-* Вкладка **Лог сканера BlockcheckW**: детальный вывод процесса подбора стратегий с отображением таймингов, найденных комбинаций и статуса сборки Circular.
+* Вкладка **Лог сканера Zapret2Wizard**: детальный вывод процесса подбора стратегий с отображением таймингов, найденных комбинаций и статуса сборки Circular.
 * Вкладка **Системный лог Zapret2**: вывод сообщений системного журнала (`logread | grep zapret`).
 * Вкладка **Активные процессы nfqws2**: список запущенных процессов десинка с аргументами и PID.
 
@@ -113,12 +113,12 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 
 ---
 
-## 📊 Сравнение: BlockcheckW vs Альтернативы
+## 📊 Сравнение: Zapret2Wizard vs Альтернативы
 
 <details>
-<summary><b>Развернуть сравнительную таблицу возможностей (BlockcheckW vs zapret2-finder vs upstream)</b></summary>
+<summary><b>Развернуть сравнительную таблицу возможностей (Zapret2Wizard vs zapret2-finder vs upstream)</b></summary>
 
-| Возможность / Параметр | Стандартный blockcheck2.sh | zapret2-finder (Bash) | blockcheckw (upstream rcd27) | **prostoy23rus/zapret2wizard (v0.15.24)** |
+| Возможность / Параметр | Стандартный blockcheck2.sh | zapret2-finder (Bash) | blockcheckw (upstream rcd27) | **prostoy23rus/zapret2wizard (v0.16.1)** |
 | :--- | :---: | :---: | :---: | :---: |
 | **Движок** | Bash + curl | Bash + curl | Rust (компилируемый бинарник) | **Rust + LuCI + Lua + Shell** |
 | **Время поиска (Турбо)** | ❌ Нет (~60-90 мин) | ❌ Нет (~15-30 мин) | ❌ Нет (~2-5 мин) | ⚡ **10–15 секунд** |
@@ -150,7 +150,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 Служба спроектирована максимально легковесной и подходит для любых домашних роутеров (включая бюджетные модели с 16–32 МБ Flash и 128 МБ RAM):
 
 * **В обычном режиме 24/7 (фоновый режим)**:
-  - **Сканер BlockcheckW:** **0% CPU** и **0 МБ RAM** *(сканер не висит постоянным демоном; запускается только по запросу и сразу полностью выгружается из памяти)*.
+  - **Сканер Zapret2Wizard:** **0% CPU** и **0 МБ RAM** *(сканер не висит постоянным демоном; запускается только по запросу и сразу полностью выгружается из памяти)*.
   - **Служба Zapret2 (`nfqws2`):** суммарно всего **~5–8 МБ RAM** и **<0.5% CPU** *(обрабатывает только первый пакет установки соединения TLS ClientHello, не нагружая процессор основным потоком данных)*.
 * **В момент активного поиска (10–15 секунд при «Турбо»)**:
   - Кратковременная нагрузка на CPU **~15–25%** и **~15–20 МБ RAM** на время параллельных сетевых проверок, после чего память мгновенно освобождается.
@@ -173,7 +173,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ ⚡ BlockcheckW — Поиск стратегий Zapret2   [✓ Zapret2]  [v0.15.24]  [🗑 Удалить]   │
+│ ⚡ Zapret2Wizard — Поиск стратегий Zapret2   [✓ Zapret2]  [v0.16.1]  [🗑 Удалить]   │
 │ Быстрый подбор рабочих параметров DPI, сборка Circular и внедрение в 1 клик.     │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -218,6 +218,13 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 <summary><b>Консольные команды сканера для опытных пользователей (CLI)</b></summary>
 
 Бинарник `blockcheckw` также доступен для использования напрямую через терминал роутера или Linux-сервера:
+
+### Быстрое управление через терминал роутера:
+```bash
+zapret2wizard status
+zapret2wizard speedtest
+zapret2wizard update
+```
 
 ### Быстрый поиск стратегии для домена:
 ```bash
@@ -325,7 +332,7 @@ blockcheckw status -d youtube.com -d discord.com -d rutracker.org
 <details>
 <summary><b>Все варианты удаления (веб-интерфейс LuCI, SSH-терминал)</b></summary>
 
-Если вы решите удалить BlockcheckW и веб-интерфейс с роутера, это можно сделать любым удобным способом:
+Если вы решите удалить Zapret2Wizard и веб-интерфейс с роутера, это можно сделать любым удобным способом:
 
 ### Способ 1. Через веб-интерфейс LuCI (в 1 клик)
 1. Откройте веб-интерфейс роутера: **Службы ➔ Zapret2Wizard (Поиск стратегий)**.

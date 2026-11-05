@@ -44,7 +44,7 @@ var PRESET_DEFS = {
 		label: 'YouTube (3)',
 		icon: '📺',
 		domain: 'www.youtube.com',
-		domainsText: 'googlevideo.com (видеопотоки), i.ytimg.com (превью), youtube.com',
+		domainsText: 'googlevideo.com (CDN), i.ytimg.com (превью), youtube.com, manifest.googlevideo.com',
 		test_url: 'https://www.youtube.com',
 		key: 'preset_youtube',
 		port: '443',
@@ -64,7 +64,7 @@ var PRESET_DEFS = {
 		label: 'Discord (3)',
 		icon: '💬',
 		domain: 'discord.com',
-		domainsText: 'discord.com (приложение/API), gateway.discord.gg, cdn.discordapp.com',
+		domainsText: 'discord.com, gateway.discord.gg (голос), cdn.discordapp.com (медиа), stable.dl2.discordapp.net',
 		test_url: 'https://discord.com',
 		key: 'preset_discord',
 		port: '443',
@@ -1160,7 +1160,7 @@ return view.extend({
 			class: 'cbi-button cbi-button-action bcw-btn-diag-copy',
 			style: 'display: none; margin-top: 14px; height: 38px; padding: 0 16px; font-size: 13px; font-weight: bold; background: #3273dc; color: #fff; border-color: #3273dc; align-items: center; justify-content: center; gap: 6px; cursor: pointer; border-radius: 6px;',
 			click: function() { copyDiagnosticReport(); }
-		}, '📋 Скопировать диагностический отчёт для Telegram');
+		}, '📋 Скопировать диагностический отчёт (GitHub / Telegram)');
 
 		
 		var monitorSuccessAlertEl = E('div', {
@@ -1359,7 +1359,7 @@ return view.extend({
 						class: 'bcw-btn-sm cbi-button cbi-button-action bcw-btn-diag-copy-header',
 						style: 'height: 32px; padding: 0 12px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; background: #3273dc; color: #fff; border-color: #3273dc; font-weight: 600;',
 						click: function() { copyDiagnosticReport(); }
-					}, '📋 Скопировать отчёт для Telegram')
+					}, '📋 Скопировать диагностический отчёт')
 				])
 			]),
 			logTabsBar,
@@ -1387,8 +1387,8 @@ return view.extend({
 				readonly: 'readonly'
 			}, reportText);
 
-			bcwShowModal('📋 Диагностический отчёт для Telegram', [
-				E('p', { style: 'font-size: 13px; margin-bottom: 8px; color: #e5e9f0;' }, 'Выделите текст ниже и скопируйте его, чтобы отправить разработчику в Telegram:'),
+			bcwShowModal('📋 Диагностический отчёт для GitHub / Telegram', [
+				E('p', { style: 'font-size: 13px; margin-bottom: 8px; color: #e5e9f0;' }, 'Выделите текст ниже и скопируйте его, чтобы прикрепить к обращению на GitHub или в Telegram:'),
 				ta
 			], [
 				E('button', {
@@ -1429,22 +1429,22 @@ return view.extend({
 
 				if (navigator.clipboard && navigator.clipboard.writeText) {
 					navigator.clipboard.writeText(reportText).then(function() {
-						ui.addNotification(null, E('p', {}, '✓ Диагностический отчёт скопирован в буфер обмена! Отправьте его разработчику в Telegram.'), 'info');
+						ui.addNotification(null, E('p', {}, '✓ Диагностический отчёт скопирован в буфер обмена! Вы можете вставить его в обращение на GitHub или в Telegram.'), 'info');
 						btns.forEach(function(b) { b.textContent = '✓ Скопировано!'; });
 						setTimeout(function() {
-							btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+							btns.forEach(function(b) { b.textContent = '📋 Скопировать диагностический отчёт'; });
 						}, 3000);
 					}).catch(function() {
 						showDiagnosticModal(reportText);
-						btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+						btns.forEach(function(b) { b.textContent = '📋 Скопировать диагностический отчёт'; });
 					});
 				} else {
 					showDiagnosticModal(reportText);
-					btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+					btns.forEach(function(b) { b.textContent = '📋 Скопировать диагностический отчёт'; });
 				}
 			}).catch(function(err) {
 				ui.addNotification(null, E('p', {}, 'Ошибка сбора диагностического отчёта: ' + err), 'danger');
-				btns.forEach(function(b) { b.textContent = '📋 Скопировать отчёт для Telegram'; });
+				btns.forEach(function(b) { b.textContent = '📋 Скопировать диагностический отчёт'; });
 			});
 		}
 
@@ -2371,7 +2371,8 @@ return view.extend({
 							]),
 							E('div', { style: 'display: flex; align-items: center; gap: 8px;' }, [
 								epOk ? E('span', { class: 'badge cbi-color-green', style: 'font-size: 11px;' }, '✓ HTTP ' + ep.http_code) :
-								       E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Код ' + ep.http_code),
+								       (ep.truncated ? E('span', { class: 'badge cbi-color-amber', style: 'font-size: 11px; background: #d19a66; color: #000; font-weight: bold;' }, '⚠️ Обрыв ТСПУ (0 Б)') :
+								                       E('span', { class: 'badge cbi-color-red', style: 'font-size: 11px;' }, '✗ Код ' + ep.http_code)),
 								ep.size_bytes > 0 ? E('span', { style: 'font-size: 11px; color: #61afef; font-weight: bold;' }, '⚡ ' + speedText) : null,
 								ep.time_sec ? E('span', { style: 'font-size: 11px; color: #5c6370;' }, ep.time_sec + 'с') : null
 							].filter(Boolean))

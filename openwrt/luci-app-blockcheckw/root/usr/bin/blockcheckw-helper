@@ -156,7 +156,8 @@ ensure_preset_hostlist() {
             _add_domains_if_missing "$yt_file" \
                 "googlevideo.com" "youtube.com" "youtu.be" "ytimg.com" \
                 "ggpht.com" "gvt1.com" "youtubei.googleapis.com" \
-                "yt3.ggpht.com" "i.ytimg.com"
+                "yt3.ggpht.com" "yt4.ggpht.com" "i.ytimg.com" "i9.ytimg.com" \
+                "signaler-pa.youtube.com" "manifest.googlevideo.com" "yt3.googleusercontent.com"
             if ! uci -q get zapret2.list_hosts_youtube >/dev/null; then
                 uci set zapret2.list_hosts_youtube=list
                 uci set zapret2.list_hosts_youtube.path="$yt_file"
@@ -172,7 +173,11 @@ ensure_preset_hostlist() {
                 "discordapp.net" "discordstatus.com" "gateway.discord.gg" \
                 "cdn.discordapp.com" "status.discord.com" "updates.discord.com" \
                 "media.discordapp.net" "images-ext-1.discordapp.net" "images-ext-2.discordapp.net" \
-                "dis.gd" "discord-attachments-uploads-prd.storage.googleapis.com"
+                "dis.gd" "discord.co" "discord.app" "discord.dev" "discord.new" \
+                "discord.gift" "discord.gifts" "discord.store" "discord.design" \
+                "discordcdn.com" "discordsez.com" "discordsays.com" "discordmerch.com" \
+                "discordpartygames.com" "discordactivities.com" "stable.dl2.discordapp.net" \
+                "discord-attachments-uploads-prd.storage.googleapis.com"
             if ! uci -q get zapret2.list_hosts_discord >/dev/null; then
                 uci set zapret2.list_hosts_discord=list
                 uci set zapret2.list_hosts_discord.path="$dc_file"
@@ -1838,7 +1843,25 @@ for idx, ep in ipairs(endpoints) do
         elapsed = tonumber(elapsed) or 0.0
 
         local code_num = tonumber(code) or 0
-        local is_ok = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and elapsed < 5.5
+        local is_ok = false
+        local is_truncated = false
+
+        if (code_num >= 200 and code_num < 400) then
+            if code_num == 204 then
+                is_ok = (elapsed < 5.0)
+            else
+                -- Body stream validation against TSPU mid-stream truncation / 16 KB stall (inspired by ByeByeDPI)
+                if size > 0 then
+                    is_ok = (elapsed < 5.5)
+                else
+                    is_ok = false
+                    is_truncated = true
+                end
+            end
+        elseif (code_num == 403 or code_num == 404) then
+            is_ok = (elapsed < 4.5)
+        end
+
         local speed_kbs = math.floor(speed / 1024)
         total_speed_kbs = total_speed_kbs + speed_kbs
 
@@ -1852,12 +1875,18 @@ for idx, ep in ipairs(endpoints) do
             url = ep.url,
             http_code = code,
             accessible = is_ok,
-            data_flow = ((size > 0 or code_num == 200 or code_num == 204 or code_num == 206 or code_num == 403 or code_num == 404) and is_ok),
+            truncated = is_truncated,
+            data_flow = ((size > 0 or code_num == 204 or code_num == 403 or code_num == 404) and is_ok),
             size_bytes = size,
             speed_kbs = speed_kbs,
             time_sec = string.format("%.2f", elapsed)
         })
     end
+end
+
+local has_truncated = false
+for _, r in ipairs(results) do
+    if r.truncated then has_truncated = true break end
 end
 
 local all_ok = (total_ok == #endpoints and #endpoints > 0)
@@ -1867,6 +1896,9 @@ local status_msg = "✗ Сервис не отвечает (заблокиров
 if all_ok then
     overall_status = "optimal"
     status_msg = "✓ Все компоненты сервиса доступны, данные передаются без помех (" .. #endpoints .. "/" .. #endpoints .. ")"
+elseif has_truncated then
+    overall_status = "degraded"
+    status_msg = "⚠️ Обнаружен скрытый троттлинг ТСПУ: соединение установлено, но передача потока данных заблокирована (0 байт)!"
 elseif main_ok then
     overall_status = "degraded"
     if preset_key == "preset_discord" then
@@ -2572,7 +2604,7 @@ local memory_str = run_cmd("free -m")
 local loadavg_str = read_file("/proc/loadavg")
 local disk_str = run_cmd("df -h / /tmp 2>/dev/null")
 
-local app_version = "0.15.12"
+local app_version = "0.16.1"
 local vf = io.open(version_file, "r")
 if vf then
     local d = json.parse(vf:read("*a"))
@@ -2590,6 +2622,8 @@ local zeroblock_status = run_cmd("/etc/init.d/zeroblock status 2>/dev/null")
 local nfqws_procs = run_cmd("ps | grep -E 'nfqws2' | grep -v grep")
 local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
 local nft_tables = run_cmd("nft list tables 2>/dev/null")
+local zapret_uci = run_cmd("uci show zapret2 2>/dev/null | grep -E '\\.name=|\\.strategy=|\\.dual_circuit=|\\.ports=' | head -n 35")
+local dns_servers = run_cmd("cat /etc/resolv.conf 2>/dev/null | grep -E '^nameserver' | tr '\\n' ', '")
 
 local status_json = read_file(status_file)
 local status_tbl = json.parse(status_json) or {}
@@ -2633,6 +2667,12 @@ local report_lines = {
     bcw_procs ~= "" and bcw_procs or "  (none)",
     "Nftables tables:",
     nft_tables ~= "" and nft_tables or "  (none)",
+    "",
+    "--- DNS & Resolvers ---",
+    "Nameservers: " .. (dns_servers ~= "" and dns_servers or "N/A"),
+    "",
+    "--- Configured Zapret2 Strategies (UCI) ---",
+    zapret_uci ~= "" and zapret_uci or "  (none configured)",
     "",
     "--- Scanner State ---",
     "Status:     " .. tostring(status_tbl.status or "unknown"),

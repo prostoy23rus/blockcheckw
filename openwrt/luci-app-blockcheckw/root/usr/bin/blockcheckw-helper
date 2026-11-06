@@ -434,13 +434,18 @@ curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-des
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=8,12
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=8,12
 
-# --- Family 2: Whitelisted Russian SNIs (Hostfake) ---
+# --- Family 2: Whitelisted Russian SNIs (Hostfake - Top White-SNI Pool) ---
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=t2.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=alfabank.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=rzd.ru:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=avito.ru:tcp_ts=-600000
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=yandex.ru:tcp_ts=-600000
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=hostfakesplit:host=t2.ru:tcp_ts=-600000
 
 # --- Family 3: Sequence Overlap (Seqovl) ---
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1
@@ -450,7 +455,7 @@ curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-des
 # --- Family 4: Packet Disordering ---
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
 curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220
-curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,slectv+1,mlds:0-2,acold,eopold+2,ewdhost=1
+curl_test_https_tls13 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,sniext+1,host+1,midsld-2,midsld,midsld+2,endhost-1
 
 # --- Family 5: Synthetic Fake Payload & Badsum Drop ---
 curl_test_https_tls12 ipv4 $domain : nfqws2 --payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld
@@ -606,16 +611,23 @@ generate_adaptive_corpus() {
             add_cand("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=8,12")
             add_cand("--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:pos=8,12")
             add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
+            add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
             add_cand("--payload=tls_client_hello --lua-desync=hostfakesplit:host=t2.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=8,12")
         end
 
-        -- 2. Hostfake mutations
+        -- 2. Hostfake mutations (Curated Top White-SNI pool from dpi-detector)
         if fams.hostfake then
-            for _, h in ipairs({ "gosuslugi.ru", "t2.ru", "vk.com", "google.com", "ozon.ru", "yandex.ru" }) do
+            local white_snis = {
+                "gosuslugi.ru", "esia.gosuslugi.ru", "sber.ru", "alfabank.ru",
+                "rzd.ru", "vk.com", "avito.ru", "ozon.ru", "yandex.ru", "t2.ru"
+            }
+            for _, h in ipairs(white_snis) do
                 add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000", h))
                 add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=0", h))
                 add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000 --lua-desync=multisplit:pos=1,midsld", h))
                 add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld,1220", h))
+                add_cand(string.format("--payload=tls_client_hello --lua-desync=hostfakesplit:host=%s:tcp_seq=0:tcp_ack=-66000:badsum", h))
             end
         end
 

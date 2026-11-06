@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "updated": "2026-10-31",
+  "version": "1.2",
+  "updated": "2026-11-06",
   "presets": {
     "builtin": {
       "name": "Встроенные хосты (33)",
@@ -28,7 +28,14 @@
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220"
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=alfabank.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=rzd.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=avito.ru:tcp_ts=-600000"
       ]
     },
     "preset_youtube": {
@@ -37,9 +44,21 @@
       "domain": "www.youtube.com",
       "test_url": "https://www.youtube.com",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (youtube.com)", "url": "https://www.youtube.com", "range": "0-32767" },
-        { "name": "Превью и медиа (i.ytimg.com)", "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", "range": "0-16383" },
-        { "name": "Видеопотоки CDN (manifest.googlevideo.com)", "url": "https://manifest.googlevideo.com", "range": "0-4096" }
+        {
+          "name": "Веб-интерфейс (youtube.com)",
+          "url": "https://www.youtube.com",
+          "range": "0-32767"
+        },
+        {
+          "name": "Превью и медиа (i.ytimg.com)",
+          "url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+          "range": "0-16383"
+        },
+        {
+          "name": "Видеопотоки CDN (manifest.googlevideo.com)",
+          "url": "https://manifest.googlevideo.com",
+          "range": "0-4096"
+        }
       ],
       "hostlist": "list_hosts_youtube",
       "port": "443",
@@ -68,7 +87,14 @@
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x0F0F0F0F:tcp_seq=-10000:tcp_ack=-66000:badsum --lua-desync=multisplit:pos=2,sld:seqovl=620",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1"
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=1,sniext+1:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=rzd.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000 --lua-desync=multisplit:pos=sniext+1,endhost-1"
       ]
     },
     "preset_discord": {
@@ -77,11 +103,33 @@
       "domain": "discord.com",
       "test_url": "https://discord.com",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (discord.com)", "url": "https://discord.com", "range": "0-32767" },
-        { "name": "API авторизации (discord.com/api)", "url": "https://discord.com/api/v9/experiments", "range": "0-16383" },
-        { "name": "Медиа CDN (cdn.discordapp.com)", "url": "https://cdn.discordapp.com/embed/avatars/0.png", "range": "0-8191" },
-        { "name": "CDN обновлений и вложений (stable.dl2.discordapp.net)", "url": "https://stable.dl2.discordapp.net", "range": "0-4096" },
-        { "name": "Голосовой RTC канал (STUN UDP)", "url": "stun://stun.l.google.com:19302", "type": "stun", "host": "stun.l.google.com", "port": 19302 }
+        {
+          "name": "Веб-интерфейс (discord.com)",
+          "url": "https://discord.com",
+          "range": "0-32767"
+        },
+        {
+          "name": "API авторизации (discord.com/api)",
+          "url": "https://discord.com/api/v9/experiments",
+          "range": "0-16383"
+        },
+        {
+          "name": "Медиа CDN (cdn.discordapp.com)",
+          "url": "https://cdn.discordapp.com/embed/avatars/0.png",
+          "range": "0-8191"
+        },
+        {
+          "name": "CDN обновлений и вложений (stable.dl2.discordapp.net)",
+          "url": "https://stable.dl2.discordapp.net",
+          "range": "0-4096"
+        },
+        {
+          "name": "Голосовой RTC канал (STUN UDP)",
+          "url": "stun://stun.l.google.com:19302",
+          "type": "stun",
+          "host": "stun.l.google.com",
+          "port": 19302
+        }
       ],
       "dual_circuit": true,
       "voice_profile": {
@@ -107,7 +155,12 @@
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=discord.com:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld"
+        "--payload=tls_client_hello --lua-desync=fake:blob=blob_stun:repeats=4:tcp_ts=-600000 --lua-desync=multidisorder:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "preset_twitch": {
@@ -116,8 +169,16 @@
       "domain": "twitch.tv",
       "test_url": "https://twitch.tv",
       "validation_endpoints": [
-        { "name": "Веб-интерфейс (twitch.tv)", "url": "https://twitch.tv", "range": "0-32767" },
-        { "name": "Видео-шлюз и CDN (usher.ttvnw.net)", "url": "https://usher.ttvnw.net", "range": "0-4096" }
+        {
+          "name": "Веб-интерфейс (twitch.tv)",
+          "url": "https://twitch.tv",
+          "range": "0-32767"
+        },
+        {
+          "name": "Видео-шлюз и CDN (usher.ttvnw.net)",
+          "url": "https://usher.ttvnw.net",
+          "range": "0-4096"
+        }
       ],
       "hostlist": "list_hosts_twitch",
       "port": "443",
@@ -137,7 +198,11 @@
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=twitch.tv:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1"
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "preset_x": {
@@ -146,8 +211,16 @@
       "domain": "x.com",
       "test_url": "https://x.com",
       "validation_endpoints": [
-        { "name": "Портал X (x.com)", "url": "https://x.com", "range": "0-32767" },
-        { "name": "Медиа CDN (pbs.twimg.com)", "url": "https://pbs.twimg.com", "range": "0-4096" }
+        {
+          "name": "Портал X (x.com)",
+          "url": "https://x.com",
+          "range": "0-32767"
+        },
+        {
+          "name": "Медиа CDN (pbs.twimg.com)",
+          "url": "https://pbs.twimg.com",
+          "range": "0-4096"
+        }
       ],
       "hostlist": "list_hosts_x",
       "port": "443",
@@ -165,7 +238,12 @@
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
         "--lua-init=fake_default_tls=tls_mod(fake_default_tls,'rnd') --lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multisplit:pos=10,midsld:seqovl=1:seqovl_pattern=fake_default_tls",
         "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multidisorder:pos=1,host+1,midsld",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "preset_instagram": {
@@ -174,8 +252,16 @@
       "domain": "gateway.instagram.com",
       "test_url": "https://gateway.instagram.com",
       "validation_endpoints": [
-        { "name": "Шлюз Instagram (gateway.instagram.com)", "url": "https://gateway.instagram.com", "range": "0-32767" },
-        { "name": "Медиа CDN (static.cdninstagram.com)", "url": "https://static.cdninstagram.com", "range": "0-4096" }
+        {
+          "name": "Шлюз Instagram (gateway.instagram.com)",
+          "url": "https://gateway.instagram.com",
+          "range": "0-32767"
+        },
+        {
+          "name": "Медиа CDN (static.cdninstagram.com)",
+          "url": "https://static.cdninstagram.com",
+          "range": "0-4096"
+        }
       ],
       "hostlist": "list_hosts_instagram",
       "port": "443",
@@ -192,7 +278,12 @@
         "--payload=tls_client_hello --lua-desync=fake:blob=fake_default_tls:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=hostfakesplit:host=google.com:tcp_ts=-600000",
-        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1"
+        "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "tcp16": {
@@ -212,7 +303,15 @@
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
-        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1"
+        "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=esia.gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=alfabank.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=rzd.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=avito.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "domains": {
@@ -232,7 +331,11 @@
       "turbo_strategies": [
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=sniext+1",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",
-        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld"
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=gosuslugi.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=sber.ru:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=vk.com:tcp_ts=-600000",
+        "--payload=tls_client_hello --lua-desync=hostfakesplit:host=ozon.ru:tcp_seq=0:tcp_ack=-66000:badsum"
       ]
     },
     "test_strategy": {

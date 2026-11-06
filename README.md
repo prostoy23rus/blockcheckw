@@ -1,6 +1,6 @@
 # Zapret2Wizard (Zapret2 Edition)
 
-[![GitHub Release](https://img.shields.io/badge/Release-v0.16.1-00d1b2?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
+[![GitHub Release](https://img.shields.io/badge/Release-v0.16.2-00d1b2?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![OpenWrt](https://img.shields.io/badge/OpenWrt-21.02%20|%2022.03%20|%2023.05%20|%2024.10%20|%2025.x%20|%20snapshot-blue?style=flat-square)](https://openwrt.org)
 [![Architectures](https://img.shields.io/badge/Arch-arm64%20|%20x86__64%20|%20arm%20|%20mips%20|%20mipsel%20|%20riscv64-success?style=flat-square)](https://github.com/prostoy23rus/zapret2wizard)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
@@ -38,7 +38,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 
 ---
 
-## 🚀 Ключевые возможности и архитектура (v0.16.1)
+## 🚀 Ключевые возможности и архитектура (v0.16.2)
 
 Данный репозиторий представляет собой глубокую модернизацию и автономную эволюцию оригинального проекта `rcd27/blockcheckw`:
 
@@ -59,7 +59,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 ### 2. Генетическое профилирование DPI (Genetic Fingerprinting) и 4-слотовый Circular-синтез
 * **Зондирование 7 векторов уязвимостей ТСПУ**: движок сканирует линию на восприимчивость к фундаментальным техникам десинка:
   1. *Geneva 8+4 TCB split* (дробление заголовка TLS ClientHello с обходом буфера сборки).
-  2. *Hostfake* (подмена SNI на легитимные белые российские ресурсы Госуслуги / T2 / VK).
+  2. *Hostfake* (подмена SNI на легитимные белые российские ресурсы Госуслуги, ЕСИА, Сбербанк, Альфа-Банк, РЖД, VK, Авито, Озон).
   3. *Seqovl Overlap* (перекрытие номеров последовательности TCP, сбивающее парсер ТСПУ).
   4. *Packet Disordering* (инверсия порядка сегментов TCP).
   5. *Fake / Badsum* (проверка фильтрации пакетов с невалидной контрольной суммой TCP).
@@ -127,7 +127,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 <details open>
 <summary><b>Сравнительная таблица возможностей: Zapret2Wizard против альтернатив (нажмите, чтобы скрыть / развернуть)</b></summary>
 
-| Возможность / Параметр | blockcheck2.sh (bol-van) | zapret2-finder (Bash) | blockcheckw (rcd27 CLI) | ⚡ **Zapret2Wizard (v0.16.1)** |
+| Возможность / Параметр | blockcheck2.sh (bol-van) | zapret2-finder (Bash) | blockcheckw (rcd27 CLI) | ⚡ **Zapret2Wizard (v0.16.2)** |
 | :--- | :---: | :---: | :---: | :---: |
 | **Архитектура и движок** | Bash + curl (последовательный) | Bash + curl (скриптовый) | Rust (только CLI бинарник) | **Rust + LuCI Web + Lua + Shell (полный стек)** |
 | **Время поиска («Турбо-режим»)** | ❌ Нет (~60–90 мин) | ❌ Нет (~15–30 мин) | ❌ Нет (~2–5 мин) | ⚡ **10–15 секунд (Топ-векторы ТСПУ 2026)** |
@@ -190,7 +190,7 @@ sh -c "$(curl -sSL https://raw.githubusercontent.com/prostoy23rus/zapret2wizard/
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ ⚡ Zapret2Wizard — Поиск стратегий Zapret2   [✓ Zapret2]  [v0.16.1]  [🗑 Удалить]   │
+│ ⚡ Zapret2Wizard — Поиск стратегий Zapret2   [✓ Zapret2]  [v0.16.2]  [🗑 Удалить]   │
 │ Быстрый подбор рабочих параметров DPI, сборка Circular и внедрение в 1 клик.     │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```

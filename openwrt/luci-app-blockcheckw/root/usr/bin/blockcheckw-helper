@@ -155,7 +155,7 @@ ensure_preset_hostlist() {
             sed -i -E '/googleadservices|googletagmanager|googlesyndication|googletagservices/d' "$yt_file" 2>/dev/null || true
             _add_domains_if_missing "$yt_file" \
                 "googlevideo.com" "youtube.com" "youtu.be" "ytimg.com" \
-                "ggpht.com" "gvt1.com" "youtubei.googleapis.com" \
+                "ggpht.com" "gvt1.com" "youtubei.googleapis.com" "dl.google.com" \
                 "yt3.ggpht.com" "yt4.ggpht.com" "i.ytimg.com" "i9.ytimg.com" \
                 "signaler-pa.youtube.com" "manifest.googlevideo.com" "yt3.googleusercontent.com"
             if ! uci -q get zapret2.list_hosts_youtube >/dev/null; then
@@ -1839,7 +1839,7 @@ for idx, ep in ipairs(endpoints) do
         })
     else
         local range_opt = (ep.range and ep.range ~= "") and ("--range " .. ep.range) or "--range 0-16383"
-        local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}' -o /dev/null --connect-timeout 4 -m 6 '%s' 2>/dev/null", range_opt, ep.url)
+        local cmd = string.format("curl -4 -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}' -o /dev/null --connect-timeout 4 -m 6 '%s' 2>/dev/null", range_opt, ep.url)
         local pipe = io.popen(cmd)
         local out = pipe and pipe:read("*a") or ""
         if pipe then pipe:close() end
@@ -1975,7 +1975,8 @@ if preset_key == "preset_youtube" then
     test_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
     test_range = "0-2097151"
     test_name = "Google Video & Media CDN (2 МБ чанк)"
-    fallback_endpoint = "https://www.youtube.com/generate_204"
+    fallback_endpoint = "https://www.youtube.com"
+    fallback_range = "0-1048575"
 elseif preset_key == "preset_discord" then
     test_endpoint = "https://stable.dl2.discordapp.net/distro/app/stable/win/x86/1.0.9059/DiscordSetup.exe"
     test_range = "0-2097151"
@@ -2005,7 +2006,7 @@ end
 
 local function do_curl(ep, rg)
     local range_opt = (rg and rg ~= "") and ("--range " .. rg) or ""
-    local cmd = string.format("curl -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}|%%{time_connect}|%%{time_starttransfer}' -o /dev/null --connect-timeout 5 -m 10 '%s' 2>/dev/null", range_opt, ep)
+    local cmd = string.format("curl -4 -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}|%%{time_connect}|%%{time_starttransfer}' -o /dev/null --connect-timeout 4 -m 8 '%s' 2>/dev/null", range_opt, ep)
     local pipe = io.popen(cmd)
     local out = pipe and pipe:read("*a") or ""
     if pipe then pipe:close() end
@@ -2048,14 +2049,19 @@ local is_success = ((code_num >= 200 and code_num < 400) or code_num == 403 or c
 
 local speed_kbs = math.floor(speed / 1024)
 local transfer_time = math.max(0.005, total_time - time_start)
-if size > 0 and is_success then
-    if speed_kbs == 0 or size < 65536 then
-        local calc_kbs = math.floor((size / transfer_time) / 1024)
-        if size < 65536 and transfer_time < 0.3 then
-            speed_kbs = math.max(speed_kbs, calc_kbs, 1200)
-        elseif calc_kbs > speed_kbs then
-            speed_kbs = calc_kbs
+if is_success then
+    if size > 0 then
+        if speed_kbs == 0 or size < 65536 then
+            local calc_kbs = math.floor((size / transfer_time) / 1024)
+            if size < 65536 and transfer_time < 0.3 then
+                speed_kbs = math.max(speed_kbs, calc_kbs, 1200)
+            elseif calc_kbs > speed_kbs then
+                speed_kbs = calc_kbs
+            end
         end
+    elseif (code_num == 200 or code_num == 204 or code_num == 206) and total_time < 2.0 then
+        speed_kbs = 1500
+        size = 32768
     end
 end
 

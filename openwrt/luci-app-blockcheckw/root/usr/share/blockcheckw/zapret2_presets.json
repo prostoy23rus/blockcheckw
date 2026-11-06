@@ -50,8 +50,10 @@
       "filter_l7": "tls",
       "description": "Видеопотоки googlevideo, превью ytimg, youtube.com",
       "turbo_strategies": [
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multisplit:pos=sniext+1,endhost-1",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multisplit:pos=midsld",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_md5:repeats=6 --lua-desync=multidisorder:pos=midsld",
+        "--payload=tls_client_hello --lua-desync=fakeddisorder:pos=sniext+1,endhost-1:tcp_md5",
         "--payload=tls_client_hello --lua-desync=fakeddisorder:pos=midsld:tcp_md5",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:ip_autottl=-2,3-20:repeats=6",
         "--payload=tls_client_hello --lua-desync=rst:ip_autottl=-2,3-20",
@@ -60,6 +62,7 @@
         "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=2,midsld:seqovl=1",
         "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
         "--lua-desync=wssize:wsize=1:scale=6 --payload=tls_client_hello --lua-desync=multidisorder:pos=midsld",
+        "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=sniext+1,endhost-1",
         "--payload=tls_client_hello --lua-desync=fake:blob=0x00000000:tcp_seq=-10000:tcp_ack=-66000:repeats=2 --lua-desync=multisplit:pos=1,midsld",
         "--payload=tls_client_hello --lua-desync=multidisorder:pos=1,midsld,1220",
         "--payload=tls_client_hello --lua-desync=multisplit:pos=10:seqovl=1",

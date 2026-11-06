@@ -156,6 +156,7 @@ ensure_preset_hostlist() {
             _add_domains_if_missing "$yt_file" \
                 "googlevideo.com" "youtube.com" "youtu.be" "ytimg.com" \
                 "ggpht.com" "gvt1.com" "youtubei.googleapis.com" "dl.google.com" \
+                "test.googlevideo.com" \
                 "yt3.ggpht.com" "yt4.ggpht.com" "i.ytimg.com" "i9.ytimg.com" \
                 "signaler-pa.youtube.com" "manifest.googlevideo.com" "yt3.googleusercontent.com"
             if ! uci -q get zapret2.list_hosts_youtube >/dev/null; then
@@ -1968,15 +1969,19 @@ local preset_obj = presets_data.presets and (presets_data.presets[preset_key] or
 local test_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
 local test_range = "0-2097151" -- 2 MB chunk from Google Edge CDN
 local test_name = "Google Video & Media CDN (2 МБ чанк)"
+local test_extra = ""
 local fallback_endpoint = ""
 local fallback_range = ""
+local fallback_extra = ""
 
 if preset_key == "preset_youtube" then
-    test_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
+    test_endpoint = "https://test.googlevideo.com/v2/cimg/android/blobs/sha256:6fd8bdac3da660bde7bd0b6f2b6a46e1b686afb74b9a4614def32532b73f5eaa"
     test_range = "0-2097151"
-    test_name = "Google Video & Media CDN (2 МБ чанк)"
-    fallback_endpoint = "https://www.youtube.com"
-    fallback_range = "0-1048575"
+    test_extra = "--connect-to ::google.com -H 'Host: mirror.gcr.io'"
+    test_name = "YouTube Video Stream (SNI: test.googlevideo.com 2 МБ)"
+    fallback_endpoint = "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe"
+    fallback_range = "0-2097151"
+    fallback_extra = ""
 elseif preset_key == "preset_discord" then
     test_endpoint = "https://stable.dl2.discordapp.net/distro/app/stable/win/x86/1.0.9059/DiscordSetup.exe"
     test_range = "0-2097151"
@@ -2004,9 +2009,10 @@ else
     test_name = "Пользовательский узел (" .. custom:gsub("^https?://", ""):gsub("/.*$", "") .. ")"
 end
 
-local function do_curl(ep, rg)
+local function do_curl(ep, rg, extra_args)
     local range_opt = (rg and rg ~= "") and ("--range " .. rg) or ""
-    local cmd = string.format("curl -4 -k -s -L %s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}|%%{time_connect}|%%{time_starttransfer}' -o /dev/null --connect-timeout 4 -m 8 '%s' 2>/dev/null", range_opt, ep)
+    local extra = (extra_args and extra_args ~= "") and (" " .. extra_args) or ""
+    local cmd = string.format("curl -4 -k -s -L %s%s -w '%%{http_code}|%%{size_download}|%%{speed_download}|%%{time_total}|%%{time_connect}|%%{time_starttransfer}' -o /dev/null --connect-timeout 4 -m 8 '%s' 2>/dev/null", range_opt, extra, ep)
     local pipe = io.popen(cmd)
     local out = pipe and pipe:read("*a") or ""
     if pipe then pipe:close() end
@@ -2021,18 +2027,30 @@ local function do_curl(ep, rg)
     }
 end
 
-local res = do_curl(test_endpoint, test_range)
+local res = do_curl(test_endpoint, test_range, test_extra)
 local code_num = tonumber(res.code) or 0
 local is_success = ((code_num >= 200 and code_num < 400) or code_num == 403 or code_num == 404) and (res.size > 0 or res.total_time < 5.0)
 
 if not is_success and fallback_endpoint ~= "" then
-    local res_fb = do_curl(fallback_endpoint, fallback_range)
+    local res_fb = do_curl(fallback_endpoint, fallback_range, fallback_extra)
     local fb_code = tonumber(res_fb.code) or 0
     if ((fb_code >= 200 and fb_code < 400) or fb_code == 403 or fb_code == 404) then
         res = res_fb
         test_endpoint = fallback_endpoint
-        test_name = test_name .. " (резерв)"
+        test_name = test_name .. " (резерв: dl.google.com)"
         code_num = fb_code
+        is_success = true
+    end
+end
+
+if not is_success and preset_key == "preset_youtube" then
+    local res_yt = do_curl("https://www.youtube.com", "0-1048575", "")
+    local yt_code = tonumber(res_yt.code) or 0
+    if yt_code >= 200 and yt_code < 400 then
+        res = res_yt
+        test_endpoint = "https://www.youtube.com"
+        test_name = test_name .. " (резерв: youtube.com)"
+        code_num = yt_code
         is_success = true
     end
 end
@@ -2726,6 +2744,14 @@ local zapret_uci = run_cmd("uci show zapret2 2>/dev/null | grep -E '\\.name=|\\.
 local dns_servers = run_cmd("cat /etc/resolv.conf 2>/dev/null | grep -E '^nameserver' | tr '\\n' ', '")
 local ggc_diag = run_cmd("curl -4 -s -k --connect-timeout 2 -m 3 'https://redirector.googlevideo.com/report_mapping?di=no'")
 local quic_target = run_cmd("uci -q get firewall.reject_quic.target")
+local flow_offload_sw = run_cmd("uci -q get firewall.@defaults[0].flow_offloading")
+local flow_offload_hw = run_cmd("uci -q get firewall.@defaults[0].flow_offloading_hw")
+local flow_status = "Disabled"
+if flow_offload_hw == "1" then
+    flow_status = "Hardware (Fastpath HW NAT active, threshold >= 30 pkts)"
+elseif flow_offload_sw == "1" then
+    flow_status = "Software (Flow Offload active)"
+end
 
 local status_json = read_file(status_file)
 local status_tbl = json.parse(status_json) or {}
@@ -2756,6 +2782,7 @@ local report_lines = {
     os_release ~= "" and os_release or "N/A",
     "",
     "--- Hardware Resources ---",
+    "Flow Offloading: " .. flow_status,
     "Load Average: " .. loadavg_str,
     memory_str,
     disk_str,

@@ -54,7 +54,8 @@ var PRESET_DEFS = {
 			details: [
 				{ title: '🎯 Что тестируется', text: 'googlevideo.com (CDN видеопотоков 1080p-4K), i.ytimg.com (обложки и аватары), youtube.com (веб-интерфейс и API).' },
 				{ title: '🛡️ Секция Zapret2', text: 'Создает или дополняет секцию zapret2.BlockcheckW_YouTube (список list_hosts_youtube). При нахождении новой стратегии создается отдельная версия (BlockcheckW_YouTube_2...) без затирания старой.' },
-				{ title: '📱 Смартфоны и Smart TV', text: 'Приложения YouTube на смартфонах и ТВ по умолчанию используют протокол QUIC (UDP 443). Роутер автоматически блокирует QUIC (правило Reject-QUIC), принуждая плеер переключиться на TCP TLS, где стратегия Zapret2 успешно расщепляет пакеты.' },
+				{ title: '📱 Смартфоны и Smart TV', text: 'Приложения YouTube на смартфонах и ТВ по умолчанию используют протокол QUIC (UDP 443). Роутер автоматически отклоняет QUIC мгновенным ICMP Unreachable (правило Reject-QUIC: target=REJECT), предотвращая 6–10 секундную задержку черного экрана и переводя плеер на защищенный TCP TLS.' },
+				{ title: '🌐 Google Global Cache (GGC)', text: 'YouTube направляет видеопоток на локальные кеширующие сервера провайдеров (GGC). Замер скорости автоматически определяет узел, оператора и город. При зависании видео на 19–25 сек (Cache Miss) Zapret2 с Circular-связкой защищает обходные каналы к центральным ЦОД.' },
 				{ title: '⚙️ Рекомендация', text: 'Используйте связку «Турбо» + «Circular авто-ротация». Circular объединит fake-split и disorder для надежной работы без буферизации.' }
 			]
 		}
@@ -1524,7 +1525,7 @@ return view.extend({
 				}
 
 				// Update versions history dropdown
-				if (sData.versions && sData.versions.length > 1) {
+				if (versionsSelectEl && versionsBarEl && sData.versions && sData.versions.length > 1) {
 					versionsBarEl.style.display = 'flex';
 					versionsSelectEl.innerHTML = '';
 					sData.versions.forEach(function(v) {
@@ -1534,11 +1535,11 @@ return view.extend({
 					});
 					btnActivateVersion.style.display = 'none';
 					btnDeleteVersion.style.display = 'none';
-				} else {
+				} else if (versionsBarEl) {
 					versionsBarEl.style.display = 'none';
 				}
 			} else {
-				versionsBarEl.style.display = 'none';
+				if (versionsBarEl) versionsBarEl.style.display = 'none';
 				activeMetaBadgesEl.appendChild(
 					E('span', { class: 'badge cbi-color-neutral', style: 'font-size: 11px;' }, 'Стратегия не настроена')
 				);
@@ -1588,7 +1589,7 @@ return view.extend({
 		}
 
 		function activateSelectedVersion() {
-			var chosenSec = versionsSelectEl.value;
+			var chosenSec = versionsSelectEl ? versionsSelectEl.value : null;
 			if (!chosenSec) return;
 
 			bcwShowModal('Активация стратегии', [
@@ -1628,7 +1629,7 @@ return view.extend({
 		}
 
 		function deleteSelectedVersion() {
-			var chosenSec = versionsSelectEl.value;
+			var chosenSec = versionsSelectEl ? versionsSelectEl.value : null;
 			if (!chosenSec) return;
 
 			if (!confirm('Вы уверены, что хотите удалить сохранённую запись ' + chosenSec + ' из конфигурации Zapret2?')) {
@@ -2496,6 +2497,23 @@ return view.extend({
 							E('div', { style: 'font-size: 15px; font-weight: bold; color: #e5e9f0; margin-top: 4px;' }, (parsed.size_mb || '0') + ' МБ за ' + (parsed.total_time_sec || '0') + 'с')
 						])
 					]),
+
+					parsed.ggc_mapping ? E('div', {
+						style: 'background: rgba(0,0,0,0.25); border: 1px solid var(--bcw-border-sub); border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;'
+					}, [
+						E('div', { style: 'display: flex; align-items: center; gap: 10px;' }, [
+							E('span', { style: 'font-size: 18px;' }, '🌐'),
+							E('div', {}, [
+								E('div', { style: 'font-size: 11px; color: #abb2bf;' }, 'Маршрутизация Google Global Cache (GGC):'),
+								E('div', { style: 'font-size: 13px; font-weight: bold; color: #e5e9f0;' },
+									(parsed.ggc_mapping.cluster || 'Неизвестен') + ' (' + (parsed.ggc_mapping.operator || 'Google CDN') + ' • ' + (parsed.ggc_mapping.city || 'Регион') + ')')
+							])
+						]),
+						E('span', {
+							class: 'badge ' + (parsed.ggc_mapping.is_local ? 'cbi-color-green' : 'cbi-color-amber'),
+							style: 'font-size: 11px; padding: 4px 10px; font-weight: 600;'
+						}, parsed.ggc_mapping.is_local ? '✓ Локальный узел РФ' : '⚠️ Резервный ЦОД (Европа)')
+					]) : null,
 
 					E('div', {
 						style: 'padding: 12px 14px; background: rgba(0,0,0,0.2); border-left: 3px solid ' + badgeColor + '; border-radius: 6px; font-size: 13px; line-height: 1.5; color: #e5e9f0; margin-bottom: 14px;'

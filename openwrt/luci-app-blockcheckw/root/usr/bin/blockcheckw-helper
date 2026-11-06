@@ -219,6 +219,7 @@ ensure_preset_hostlist() {
 }
 
 ensure_firewall_quic_reject() {
+    local reload_needed=0
     if ! uci -q get firewall.reject_quic >/dev/null; then
         uci set firewall.reject_quic=rule
         uci set firewall.reject_quic.name='Reject-QUIC'
@@ -227,6 +228,13 @@ ensure_firewall_quic_reject() {
         uci set firewall.reject_quic.proto='udp'
         uci set firewall.reject_quic.dest_port='443'
         uci set firewall.reject_quic.target='REJECT'
+        reload_needed=1
+    elif [ "$(uci -q get firewall.reject_quic.target)" != "REJECT" ]; then
+        # Strictly enforce REJECT instead of DROP to eliminate 6-10 second video spinner delays
+        uci set firewall.reject_quic.target='REJECT'
+        reload_needed=1
+    fi
+    if [ "$reload_needed" = "1" ]; then
         uci commit firewall 2>/dev/null || true
         /etc/init.d/firewall reload >/dev/null 2>&1 || true
     fi
@@ -2106,6 +2114,91 @@ else
     verdict = "Максимальная скорость CDN (" .. speed_mbps .. " Мбит/с)! Потоки 4K UHD и многопоточный просмотр без малейших задержек."
 end
 
+local ggc_info = nil
+if preset_key == "preset_youtube" or arg1 == "preset_youtube" or arg1:find("youtube") then
+    local p_ggc = io.popen("curl -4 -s -k --connect-timeout 3 -m 4 'https://redirector.googlevideo.com/report_mapping?di=no' 2>/dev/null", "r")
+    if p_ggc then
+        local ggc_out = p_ggc:read("*a") or ""
+        p_ggc:close()
+        ggc_out = ggc_out:gsub("^%s+", ""):gsub("%s+$", "")
+        local ip, cluster, subnet = ggc_out:match("([%d%.]+)%s*=>%s*([%w%-_]+)%s*%(([^%)]+)%)")
+        if not cluster then
+            ip, cluster = ggc_out:match("([%d%.]+)%s*=>%s*([%w%-_]+)")
+        end
+        if cluster then
+            local operator = "Google CDN"
+            local city = "Региональный узел"
+            local is_local = true
+
+            local op_part, loc_part = cluster:match("^([%a]+)%-(%a+)%d*")
+            if not op_part then
+                loc_part = cluster:match("^(%a%a%a)%d+")
+            end
+
+            local op_names = {
+                rostelecom = "Ростелеком",
+                vimpelcom = "билайн (Вымпелком)",
+                megafon = "МегаФон",
+                comstar = "МТС",
+                ertelecom = "Дом.ру (Эр-Телеком)",
+                transtelecom = "ТТК (Транстелеком)",
+                netbynet = "NetByNet"
+            }
+            if op_part and op_names[op_part] then
+                operator = op_names[op_part]
+            end
+
+            local cities_map = {
+                krr = "Краснодар",
+                svo = "Москва (Шереметьево)",
+                dme = "Москва (Домодедово)",
+                vko = "Москва (Внуково)",
+                led = "Санкт-Петербург (Пулково)",
+                goj = "Нижний Новгород (Стригино)",
+                skx = "Саранск",
+                ovb = "Новосибирск (Толмачёво)",
+                aer = "Сочи (Адлер)",
+                kzn = "Казань",
+                sam = "Самара (Курумоч)",
+                rov = "Ростов-на-Дону (Платов)",
+                svx = "Екатеринбург (Кольцово)",
+                ufa = "Уфа",
+                kja = "Красноярск (Емельяново)",
+                vvo = "Владивосток (Кневичи)",
+                khv = "Хабаровск (Новый)",
+                oms = "Омск (Центральный)",
+                cek = "Челябинск (Баландино)",
+                pee = "Пермь (Большое Савино)",
+                vgv = "Вологда",
+                iar = "Ярославль (Туношна)",
+                vst = "Стокгольм (Швеция)",
+                arn = "Стокгольм (Швеция)",
+                fra = "Франкфурт (Германия)",
+                ams = "Амстердам (Нидерланды)",
+                hel = "Хельсинки (Финляндия)",
+                waw = "Варшава (Польша)"
+            }
+
+            if loc_part and cities_map[loc_part:lower()] then
+                city = cities_map[loc_part:lower()]
+            end
+
+            if cluster:find("^fra") or cluster:find("^ams") or cluster:find("^arn") or cluster:find("^hel") or cluster:find("^waw") or cluster:find("^vst") then
+                is_local = false
+            end
+
+            ggc_info = {
+                raw = ggc_out,
+                cluster = cluster,
+                operator = operator,
+                city = city,
+                subnet = subnet or "",
+                is_local = is_local
+            }
+        end
+    end
+end
+
 local result = {
     success = is_success,
     target = arg1,
@@ -2124,7 +2217,8 @@ local result = {
     rating_badge = rating_badge,
     rating_title = rating_title,
     throttled = throttled,
-    verdict = verdict
+    verdict = verdict,
+    ggc_mapping = ggc_info
 }
 
 print(json.stringify(result))
@@ -2624,6 +2718,8 @@ local bcw_procs = run_cmd("ps | grep -E 'blockcheckw' | grep -v grep")
 local nft_tables = run_cmd("nft list tables 2>/dev/null")
 local zapret_uci = run_cmd("uci show zapret2 2>/dev/null | grep -E '\\.name=|\\.strategy=|\\.dual_circuit=|\\.ports=' | head -n 35")
 local dns_servers = run_cmd("cat /etc/resolv.conf 2>/dev/null | grep -E '^nameserver' | tr '\\n' ', '")
+local ggc_diag = run_cmd("curl -4 -s -k --connect-timeout 2 -m 3 'https://redirector.googlevideo.com/report_mapping?di=no'")
+local quic_target = run_cmd("uci -q get firewall.reject_quic.target")
 
 local status_json = read_file(status_file)
 local status_tbl = json.parse(status_json) or {}
@@ -2670,6 +2766,10 @@ local report_lines = {
     "",
     "--- DNS & Resolvers ---",
     "Nameservers: " .. (dns_servers ~= "" and dns_servers or "N/A"),
+    "",
+    "--- Google Global Cache (GGC) & QUIC Telemetry ---",
+    "GGC Cluster Mapping: " .. (ggc_diag ~= "" and ggc_diag or "Unavailable / Not detected"),
+    "Reject-QUIC Status:  " .. (quic_target ~= "" and ("Active (target=" .. quic_target .. ")") or "Not configured in firewall"),
     "",
     "--- Configured Zapret2 Strategies (UCI) ---",
     zapret_uci ~= "" and zapret_uci or "  (none configured)",
